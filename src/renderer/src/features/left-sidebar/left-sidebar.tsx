@@ -1,0 +1,298 @@
+import React, { useState } from 'react'
+import {
+  ChevronRight,
+  Folder,
+  ListFilter,
+  MoreHorizontal,
+  Pin,
+  Plus,
+  Search,
+  SquarePen
+} from 'lucide-react'
+import { ActionMenu } from '@/components/action-menu'
+import { IconButton } from '@/components/layout/icon-button'
+import { cn } from '@/lib/utils'
+import { ProfileMenu } from '@/features/account/profile-menu'
+import { InlineRename } from '@/features/workspace/dialogs'
+import { useChatMenu } from '@/features/workspace/chat-menu'
+import { useWorkspace, type Chat } from '@/features/workspace/workspace-store'
+
+const SMALL = 'h-[14px] w-[14px] stroke-[1.7]'
+const NAV =
+  'flex h-7 w-full cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-[#d4d4d2] transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+
+/** A chat in the list. The "…" shows on hover and holds the chat's actions. */
+function ChatRow({ chat, indent }: { chat: Chat; indent?: boolean }): React.JSX.Element {
+  const ws = useWorkspace()
+  const menu = useChatMenu()
+  const selected = chat.id === ws.activeId
+  const renaming = ws.renamingId === chat.id
+
+  return (
+    <li className="group/row relative">
+      {renaming ? (
+        <div className={cn('flex h-7 items-center px-1', indent && 'pl-5')}>
+          <InlineRename
+            value={chat.title}
+            onSave={(v) => ws.rename(chat.id, v)}
+            onCancel={() => ws.startRename(null)}
+            className="h-6 w-full text-[13px]"
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => ws.select(chat.id)}
+          onDoubleClick={() => ws.startRename(chat.id)}
+          title={chat.title}
+          aria-current={selected ? 'true' : undefined}
+          className={cn(
+            'flex h-7 w-full cursor-pointer items-center gap-2 rounded-md pr-7 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            indent ? 'pl-6' : 'pl-2',
+            selected
+              ? 'bg-white/[0.09] text-foreground'
+              : 'text-[#b9b9b6] hover:bg-white/[0.05] hover:text-foreground'
+          )}
+        >
+          {chat.pinned && <Pin className="h-3 w-3 shrink-0 -rotate-45 text-muted-foreground" />}
+          <span className="truncate">{chat.title}</span>
+        </button>
+      )}
+      {!renaming && (
+        <div className="absolute right-0.5 top-0.5">
+          <ActionMenu
+            align="start"
+            side="bottom"
+            items={menu(chat)}
+            trigger={(open) => (
+              <button
+                type="button"
+                aria-label={`Actions for ${chat.title}`}
+                className={cn(
+                  'grid h-6 w-6 cursor-pointer place-items-center rounded text-muted-foreground transition-opacity hover:bg-white/[0.08] hover:text-foreground focus-visible:opacity-100',
+                  open ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100'
+                )}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            )}
+          />
+        </div>
+      )}
+    </li>
+  )
+}
+
+function SectionLabel({
+  children,
+  action
+}: {
+  children: React.ReactNode
+  action?: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <div className="mt-3 flex h-6 items-center justify-between pl-2 pr-0.5">
+      <span className="text-[11.5px] text-muted-foreground">{children}</span>
+      {action}
+    </div>
+  )
+}
+
+/** Body of the left sidebar (below the title-bar row). */
+export function LeftSidebar(): React.JSX.Element {
+  const ws = useWorkspace()
+  const [view, setView] = useState<'active' | 'archived'>('active')
+  const [shut, setShut] = useState<Set<string>>(new Set())
+
+  const visible = ws.chats.filter((c) => (view === 'archived' ? c.archived : !c.archived))
+  const byRecent = (a: Chat, b: Chat): number => b.updatedAt - a.updatedAt
+  const pinned = visible.filter((c) => c.pinned && !c.projectId).sort(byRecent)
+  const loose = visible.filter((c) => !c.pinned && !c.projectId).sort(byRecent)
+  const inGroup = (id: string): Chat[] =>
+    visible
+      .filter((c) => c.projectId === id)
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || byRecent(a, b))
+
+  const toggle = (id: string): void =>
+    setShut((s) => {
+      const n = new Set(s)
+      if (!n.delete(id)) n.add(id)
+      return n
+    })
+
+  return (
+    <div data-tour="sidebar" className="flex min-h-0 flex-1 flex-col">
+      <nav className="flex flex-col gap-px px-2 pt-2">
+        <button type="button" onClick={() => ws.newChat()} className={NAV}>
+          <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+            <SquarePen className={SMALL} />
+          </span>
+          New chat
+        </button>
+        <button type="button" onClick={() => ws.setSearchOpen(true)} className={NAV}>
+          <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+            <Search className={SMALL} />
+          </span>
+          Search
+        </button>
+      </nav>
+
+      <div className="slim-scroll mt-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        {view === 'active' && (
+          <>
+            <SectionLabel
+              action={
+                <IconButton
+                  title="New project"
+                  className="p-1"
+                  onClick={() => ws.setDialog({ kind: 'new-project' })}
+                >
+                  <Plus className={SMALL} />
+                </IconButton>
+              }
+            >
+              Projects
+            </SectionLabel>
+            {ws.groups.length === 0 && (
+              <button
+                type="button"
+                onClick={() => ws.setDialog({ kind: 'new-project' })}
+                className="mt-0.5 flex h-7 w-full cursor-pointer items-center rounded-md px-2 text-left text-[12.5px] text-[#77776f] hover:text-foreground"
+              >
+                Group chats by project
+              </button>
+            )}
+            {ws.groups.map((g) => {
+              const open = !shut.has(g.id)
+              const items = inGroup(g.id)
+              return (
+                <div key={g.id} className="mt-px">
+                  <div className="group/row relative">
+                    <button
+                      type="button"
+                      onClick={() => toggle(g.id)}
+                      aria-expanded={open}
+                      title={g.folder ?? g.name}
+                      className="flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pl-1.5 pr-14 text-left text-[13px] text-[#d4d4d2] hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <ChevronRight
+                        className={cn(
+                          'h-3 w-3 shrink-0 text-muted-foreground transition-transform',
+                          open && 'rotate-90'
+                        )}
+                      />
+                      <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{g.name}</span>
+                    </button>
+                    <div className="absolute right-0.5 top-0.5 flex opacity-0 group-hover/row:opacity-100 has-[[data-state=open]]:opacity-100">
+                      <IconButton
+                        title="New chat in project"
+                        className="p-1"
+                        onClick={() => ws.newChat(g.id)}
+                      >
+                        <Plus className={SMALL} />
+                      </IconButton>
+                      <ActionMenu
+                        align="start"
+                        items={[
+                          {
+                            id: 'rename',
+                            label: 'Rename',
+                            onClick: () => ws.setDialog({ kind: 'rename-project', id: g.id })
+                          },
+                          {
+                            id: 'remove',
+                            label: 'Remove project',
+                            danger: true,
+                            onClick: () => ws.removeGroup(g.id)
+                          }
+                        ]}
+                        trigger={
+                          <button
+                            type="button"
+                            aria-label={`Actions for ${g.name}`}
+                            className="grid h-6 w-6 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-white/[0.08] hover:text-foreground"
+                          >
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </button>
+                        }
+                      />
+                    </div>
+                  </div>
+                  {open && (
+                    <ul className="flex flex-col gap-px">
+                      {items.length === 0 && (
+                        <li className="pl-8 text-[12px] leading-6 text-[#77776f]">No chats yet</li>
+                      )}
+                      {items.map((c) => (
+                        <ChatRow key={c.id} chat={c} indent />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+
+            {pinned.length > 0 && (
+              <>
+                <SectionLabel>Pinned</SectionLabel>
+                <ul className="flex flex-col gap-px">
+                  {pinned.map((c) => (
+                    <ChatRow key={c.id} chat={c} />
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+
+        <SectionLabel
+          action={
+            <ActionMenu
+              align="start"
+              items={[
+                {
+                  id: 'active',
+                  label: 'Chats',
+                  checked: view === 'active',
+                  onClick: () => setView('active')
+                },
+                {
+                  id: 'archived',
+                  label: 'Archived',
+                  checked: view === 'archived',
+                  onClick: () => setView('archived')
+                }
+              ]}
+              trigger={
+                <IconButton title="Filter" className="p-1">
+                  <ListFilter className={SMALL} />
+                </IconButton>
+              }
+            />
+          }
+        >
+          {view === 'archived' ? 'Archived' : 'Chats'}
+        </SectionLabel>
+        <ul className="flex flex-col gap-px">
+          {(view === 'archived' ? visible.sort(byRecent) : loose).map((c) => (
+            <ChatRow key={c.id} chat={c} />
+          ))}
+        </ul>
+        {view === 'archived' && visible.length === 0 && (
+          <p className="px-2 pt-1 text-[12px] text-[#77776f]">Nothing archived.</p>
+        )}
+        {view === 'active' &&
+          loose.length === 0 &&
+          pinned.length === 0 &&
+          ws.groups.length === 0 && (
+            <p className="px-2 pt-1 text-[12px] text-[#77776f]">No chats yet.</p>
+          )}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1 border-t border-white/[0.08] px-2 py-2">
+        <ProfileMenu />
+      </div>
+    </div>
+  )
+}

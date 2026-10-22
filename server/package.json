@@ -1,0 +1,18 @@
+{
+  "name": "morecode-server",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hosted backend for MoreCode: accounts, plans, Paystack payments, AI access and share links. PostgreSQL in production.",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node --no-warnings src/main.mjs",
+    "test": "node --no-warnings test/server.test.mjs && node --no-warnings test/billing.test.mjs && node --no-warnings test/repo.test.mjs",
+    "backup": "node --no-warnings scripts/backup.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  }
+}

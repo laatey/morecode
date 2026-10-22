@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: morecode
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: morecode
+    volumes:
+      - morecode-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U morecode -d morecode"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  morecode:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: ["8787:8787"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://morecode:${POSTGRES_PASSWORD}@db:5432/morecode
+
+volumes:
+  morecode-pg:

@@ -1,0 +1,532 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import 'tailwindcss' source(none);
+@source ".";
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Cutline design system — Morline aesthetic.
+ * DM Sans for UI/chat, Bricolage Grotesque for display, JetBrains Mono for coordinates & code.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --font-display: var(--font-display-family);
+  --font-sans: var(--font-sans-family);
+  --font-mono: var(--font-mono-family);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-score: var(--score);
+  --color-score-foreground: var(--score-foreground);
+  --color-score-mid: var(--score-mid);
+  --color-score-low: var(--score-low);
+  --color-grid: var(--grid);
+  --color-surface: var(--surface);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.75rem;
+  --font-display-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-sans-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono-family: 'JetBrains Mono', ui-monospace, monospace;
+
+  --background: oklch(0.982 0.008 92);
+  --foreground: oklch(0.19 0.012 264);
+  --surface: oklch(0.955 0.01 92);
+  --card: oklch(0.995 0.004 92);
+  --card-foreground: oklch(0.19 0.012 264);
+  --popover: oklch(0.995 0.004 92);
+  --popover-foreground: oklch(0.19 0.012 264);
+  --primary: oklch(0.52 0.21 262);
+  --primary-foreground: oklch(0.99 0.004 92);
+  --secondary: oklch(0.94 0.012 92);
+  --secondary-foreground: oklch(0.23 0.012 264);
+  --muted: oklch(0.945 0.01 92);
+  --muted-foreground: oklch(0.5 0.016 264);
+  --accent: oklch(0.93 0.03 262);
+  --accent-foreground: oklch(0.32 0.12 262);
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0.004 92);
+  --border: oklch(0.89 0.012 92);
+  --input: oklch(0.89 0.012 92);
+  --ring: oklch(0.52 0.21 262);
+  --score: oklch(0.72 0.19 142);
+  --score-foreground: oklch(0.19 0.012 264);
+  --score-mid: oklch(0.8 0.16 85);
+  --score-low: oklch(0.65 0.18 30);
+  --grid: oklch(0.89 0.012 92);
+  --chart-1: oklch(0.52 0.21 262);
+  --chart-2: oklch(0.72 0.19 142);
+  --chart-3: oklch(0.8 0.16 85);
+  --chart-4: oklch(0.65 0.18 30);
+  --chart-5: oklch(0.45 0.05 264);
+  --sidebar: oklch(0.965 0.01 92);
+  --sidebar-foreground: oklch(0.19 0.012 264);
+  --sidebar-primary: oklch(0.52 0.21 262);
+  --sidebar-primary-foreground: oklch(0.99 0.004 92);
+  --sidebar-accent: oklch(0.93 0.03 262);
+  --sidebar-accent-foreground: oklch(0.32 0.12 262);
+  --sidebar-border: oklch(0.89 0.012 92);
+  --sidebar-ring: oklch(0.52 0.21 262);
+}
+
+.dark {
+  --background: #272726;
+  --foreground: oklch(0.965 0.006 92);
+  --surface: #272726;
+  --card: oklch(0.225 0.001 106);
+  --card-foreground: oklch(0.965 0.006 92);
+  --popover: oklch(0.225 0.001 106);
+  --popover-foreground: oklch(0.965 0.006 92);
+  --primary: oklch(0.65 0.19 262);
+  --primary-foreground: oklch(0.15 0.012 264);
+  --secondary: oklch(0.255 0.001 106);
+  --secondary-foreground: oklch(0.955 0.006 92);
+  --muted: oklch(0.248 0.001 106);
+  --muted-foreground: oklch(0.7 0.003 106);
+  --accent: oklch(0.31 0.002 106);
+  --accent-foreground: oklch(0.94 0.003 106);
+  --destructive: oklch(0.68 0.2 25);
+  --destructive-foreground: oklch(0.15 0.012 264);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.65 0.19 262);
+  --score: oklch(0.78 0.19 145);
+  --score-foreground: oklch(0.16 0.012 264);
+  --score-mid: oklch(0.83 0.16 85);
+  --score-low: oklch(0.7 0.18 30);
+  --grid: oklch(1 0 0 / 8%);
+  --chart-1: oklch(0.65 0.19 262);
+  --chart-2: oklch(0.78 0.19 145);
+  --chart-3: oklch(0.83 0.16 85);
+  --chart-4: oklch(0.7 0.18 30);
+  --chart-5: oklch(0.75 0.003 106);
+  --sidebar: oklch(0.205 0.001 106);
+  --sidebar-foreground: oklch(0.965 0.006 92);
+  --sidebar-primary: oklch(0.65 0.19 262);
+  --sidebar-primary-foreground: oklch(0.15 0.012 264);
+  --sidebar-accent: oklch(0.31 0.002 106);
+  --sidebar-accent-foreground: oklch(0.94 0.003 106);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.65 0.19 262);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans-family);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  optgroup,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    html,
+    body,
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-muted-foreground) transparent;
+    }
+  }
+
+  ::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-corner,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-button,
+  *::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  ::-webkit-scrollbar-thumb,
+  *::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+    background-color: var(--color-muted-foreground);
+  }
+
+  ::-webkit-scrollbar-thumb:hover,
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-foreground);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display-family);
+    letter-spacing: 0;
+  }
+}
+
+/* Fine editorial grid, carried over from the concept artwork. */
+@utility grid-paper {
+  background-image:
+    linear-gradient(to right, var(--color-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-grid) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+@utility grid-paper-sm {
+  background-image:
+    linear-gradient(to right, var(--color-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+@utility auth-grid {
+  background-image: radial-gradient(circle, var(--color-grid) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility label-caps {
+  font-family: var(--font-sans-family);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.edge-flow {
+  animation: edge-flow 1.2s linear infinite;
+}
+@keyframes deploy-bar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+.deploy-bar {
+  animation: deploy-bar 1.4s ease-in-out infinite;
+}
+@keyframes rec-blink {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    opacity: 0.15;
+  }
+}
+.rec-blink {
+  animation: rec-blink 1.4s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .edge-flow,
+  .deploy-bar,
+  .rec-blink {
+    animation: none;
+  }
+}
+
+/* Marketing field-guide frame: corner marks instead of a page grid. */
+.corner-bracket {
+  position: absolute;
+  width: 19px;
+  height: 19px;
+  pointer-events: none;
+  border-color: var(--color-primary);
+  z-index: 2;
+}
+.corner-bracket-tl {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+.corner-bracket-tr {
+  top: -1px;
+  right: -1px;
+  border-top: 2px solid;
+  border-right: 2px solid;
+}
+.corner-bracket-bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom: 2px solid;
+  border-left: 2px solid;
+}
+.corner-bracket-br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+}
+
+/* Printed red sun disc (hinomaru) behind the hero wordmark. */
+.sun-disc {
+  background: radial-gradient(circle at 50% 40%, #d8503a 0%, #c23a28 55%, #a52c1d 100%);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+  opacity: 0.95;
+}
+
+/* Ink captions sitting directly on the ukiyo-e plate. */
+.plate-note {
+  color: #241d12;
+}
+
+/* Prevent iOS Safari from auto-zooming on focus when font-size < 16px */
+@media screen and (max-width: 768px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+      [type='button']
+    ):not([type='submit']):not([type='reset']),
+  textarea,
+  select,
+  [cmdk-input] {
+    font-size: 16px !important;
+  }
+}
+
+/* Diff colours for the change review. */
+:root {
+  --diff-add: oklch(0.55 0.15 150);
+  --diff-del: oklch(0.58 0.2 25);
+}
+.dark {
+  --diff-add: oklch(0.74 0.15 150);
+  --diff-del: oklch(0.7 0.17 25);
+}
+
+/* Syntax colours for code in the change review (light and dark). */
+:root {
+  --syn-keyword: oklch(0.5 0.2 20);
+  --syn-string: oklch(0.45 0.12 250);
+  --syn-number: oklch(0.5 0.14 60);
+  --syn-title: oklch(0.45 0.18 300);
+  --syn-comment: oklch(0.55 0.02 260);
+  --syn-attr: oklch(0.45 0.13 200);
+  --syn-meta: oklch(0.5 0.16 150);
+}
+.dark {
+  --syn-keyword: oklch(0.72 0.17 20);
+  --syn-string: oklch(0.8 0.09 240);
+  --syn-number: oklch(0.8 0.13 70);
+  --syn-title: oklch(0.78 0.14 300);
+  --syn-comment: oklch(0.62 0.02 260);
+  --syn-attr: oklch(0.78 0.11 200);
+  --syn-meta: oklch(0.78 0.14 150);
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-built_in,
+.hljs-type {
+  color: var(--syn-keyword);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-template-variable,
+.hljs-symbol {
+  color: var(--syn-string);
+}
+.hljs-number,
+.hljs-variable,
+.hljs-bullet {
+  color: var(--syn-number);
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-section,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--syn-title);
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-name,
+.hljs-params {
+  color: var(--syn-attr);
+}
+.hljs-meta,
+.hljs-link,
+.hljs-subst {
+  color: var(--syn-meta);
+}
+.hljs-addition {
+  color: var(--diff-add);
+}
+.hljs-deletion {
+  color: var(--diff-del);
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--syn-comment);
+  font-style: italic;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+
+/* Electron window-drag regions */
+.app-drag {
+  -webkit-app-region: drag;
+}
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* "Thinking" glyph: four lines that breathe while the AI works, and sit still when it is done. */
+@keyframes think-line {
+  0%,
+  100% {
+    transform: scaleX(0.45);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+.think-glyph[data-active='true'] .think-line {
+  transform-origin: left center;
+  animation: think-line 1.3s ease-in-out infinite;
+}
+.think-glyph[data-active='true'] .think-line:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.think-glyph[data-active='true'] .think-line:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.think-glyph[data-active='true'] .think-line:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+/* Soft moving highlight for "Thinking…" / "Working…" labels. */
+@keyframes text-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+.text-shimmer {
+  background: linear-gradient(90deg, #8d8d8a 35%, #e8e8e6 50%, #8d8d8a 65%) 120% 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shimmer 2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .think-glyph[data-active='true'] .think-line,
+  .text-shimmer {
+    animation: none;
+  }
+  .text-shimmer {
+    color: #8d8d8a;
+    background: none;
+  }
+}
+
+/* Terminal and diff scrollbars: slim, only as visible as they need to be. */
+.slim-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+/* Indeterminate page-loading bar in the Browser tab. */
+@keyframes load-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+/* Settings → Appearance → Reduce motion */
+[data-motion='reduced'] *,
+[data-motion='reduced'] *::before,
+[data-motion='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
