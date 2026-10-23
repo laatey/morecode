@@ -201,7 +201,7 @@ export function Btn({
       variant={variant === 'primary' ? 'default' : variant === 'danger' ? 'destructive' : 'secondary'}
       {...props}
       disabled={props.disabled || busy}
-      className={cn('rounded-[5px]', className)}
+      className={cn('h-7 rounded-[6px] px-2 text-[12px]', className)}
     >
       {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
       {children}
