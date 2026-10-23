@@ -133,7 +133,7 @@ function toolLine(t: ToolBlock): string | null {
 
 /** The chat so far as plain text turns (what a real agent needs as context). */
 export function toHistory(msgs: Msg[]): { role: 'user' | 'assistant'; text: string }[] {
-  return msgs.flatMap((m) => {
+  return msgs.flatMap<{ role: 'user' | 'assistant'; text: string }>((m) => {
     if (m.role === 'user') return [{ role: 'user' as const, text: m.text }]
     if (m.role !== 'agent') return []
     const lines = m.parts.flatMap((p) => (p.type === 'text' ? [p.text] : p.type === 'tool' ? [toolLine(p.tool)] : []))

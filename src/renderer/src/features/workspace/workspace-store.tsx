@@ -9,7 +9,6 @@ import React, {
 } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/auth-store'
-import { DEMO_MESSAGES } from '@/features/ai-assistant/use-chat'
 import type { Msg } from '@/features/ai-assistant/types'
 import { workspaceKey } from '@/lib/storage-keys'
 import { useChatSync, type RemoteChat } from './chat-sync'
@@ -85,35 +84,11 @@ const Ctx = createContext<WorkspaceApi | null>(null)
 const uid = (): string => crypto.randomUUID().slice(0, 8)
 const now = (): number => Date.now()
 
-const SEED_TITLES = [
-  'Project cleanup and UI improvements',
-  'Clarifying context and alignment',
-  'GitHub deployment and updates',
-  'Production readiness check',
-  'Modern icon pack design'
-]
-
-function seed(): Saved {
+function emptyWorkspace(): Saved {
   const t = now()
-  const chats: Chat[] = [
-    {
-      id: 'c1',
-      title: 'Build the alignment grid demo',
-      projectId: null,
-      pinned: false,
-      archived: false,
-      updatedAt: t
-    },
-    ...SEED_TITLES.map((title, i) => ({
-      id: `c${i + 2}`,
-      title,
-      projectId: null,
-      pinned: false,
-      archived: false,
-      updatedAt: t - (i + 1) * 3_600_000
-    }))
-  ]
-  return { chats, groups: [], activeId: 'c1', messages: { c1: DEMO_MESSAGES } }
+  const id = uid()
+  const chat: Chat = { id, title: NEW_CHAT_TITLE, projectId: null, pinned: false, archived: false, updatedAt: t }
+  return { chats: [chat], groups: [], activeId: id, messages: { [id]: [] } }
 }
 
 const keyFor = workspaceKey
@@ -123,12 +98,20 @@ function load(accountId: string): Saved {
     const raw = localStorage.getItem(keyFor(accountId))
     if (raw) {
       const s = JSON.parse(raw) as Saved
-      if (Array.isArray(s.chats) && s.chats.length) return s
+      if (Array.isArray(s.chats) && s.chats.length) {
+        // Older releases inserted the c1–c6 demo chats on first run. They were never
+        // user content, so remove them while retaining any real chats the person created.
+        const chats = s.chats.filter((chat) => !/^c\d+$/.test(chat.id))
+        if (chats.length) {
+          const messages = Object.fromEntries(Object.entries(s.messages ?? {}).filter(([id]) => !/^c\d+$/.test(id)))
+          return { ...s, chats, activeId: chats.some((chat) => chat.id === s.activeId) ? s.activeId : chats[0].id, messages }
+        }
+      }
     }
   } catch {
-    /* fall through to the starter data */
+    /* fall through to an empty workspace */
   }
-  return seed()
+  return emptyWorkspace()
 }
 
 /** A message list that was saved mid-run must not come back looking busy. */
