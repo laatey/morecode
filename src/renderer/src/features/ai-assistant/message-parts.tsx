@@ -14,7 +14,7 @@ function WithMentions({ text }: { text: string }): React.JSX.Element {
     <>
       {text.split(/((?<=^|\s)@[^\s@]+)/g).map((part, i) =>
         i % 2 ? (
-          <span key={i} className="rounded-[4px] bg-white/[0.08] px-1 text-[#e9e9e7]">
+          <span key={i} className="rounded-[4px] border border-[#4f8cff]/20 bg-[#1d4ed8]/15 px-1 text-[#8ab4ff]">
             {part}
           </span>
         ) : (
@@ -146,8 +146,16 @@ export function Markdown({ text }: { text: string }): React.JSX.Element {
         code: ({ children, className }) => {
           const str = String(children ?? '').replace(/\n$/, '')
           if (!className && !str.includes('\n')) {
+            const isFileReference = /(?:^|\/)[\w.@-]+(?:\/[\w.@-]+)*\.(?:[a-z0-9]{1,8})$/i.test(str)
             return (
-              <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-[12px]">
+              <code
+                className={cn(
+                  'rounded border px-1.5 py-0.5 font-mono text-[12px]',
+                  isFileReference
+                    ? 'border-[#4f8cff]/25 bg-[#1d4ed8]/15 text-[#8ab4ff]'
+                    : 'border-white/[0.08] bg-white/[0.06] text-[#b9cdfd]'
+                )}
+              >
                 {children}
               </code>
             )

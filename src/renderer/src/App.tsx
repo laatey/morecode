@@ -196,12 +196,16 @@ function AppShell(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linked, active.id])
 
-  const { openTab, tabs, paneTabs, layout } = useRightPanel()
+  const { openTab, closeTab, tabs, paneTabs, layout } = useRightPanel()
   const visibleTabIds = paneTabs.slice(0, getLayout(layout).panes)
   const docsOpen =
     !rightCollapsed && tabs.some((t) => t.kind === 'docs' && visibleTabIds.includes(t.id))
-  /** Document button: open (or focus) the Docs tab, expanding the right sidebar if needed. */
-  const openDocs = (): void => openTab('docs')
+  /** Document button: open or focus Docs; click again while visible to close it. */
+  const openDocs = (): void => {
+    const visibleDocs = tabs.find((t) => t.kind === 'docs' && visibleTabIds.includes(t.id))
+    if (visibleDocs && !rightCollapsed) closeTab(visibleDocs.id)
+    else openTab('docs')
+  }
 
   // opening any tab (from a button, a menu or a chat message) expands the sidebar if needed
   const reveal = useRef({ collapsed: rightCollapsed, toggle: toggleRight })
@@ -316,7 +320,7 @@ function AppShell(): React.JSX.Element {
                 {folder && (
                   <>
                     {group || !account ? (
-                      <span className="app-no-drag @max-[560px]:hidden px-1.5 py-0.5 text-[13.5px] text-muted-foreground truncate max-w-[140px] tracking-tight min-w-0">
+                      <span className="app-no-drag @max-[380px]:hidden px-1.5 py-0.5 text-[13.5px] text-muted-foreground truncate max-w-[160px] tracking-tight min-w-0">
                         {folder}
                       </span>
                     ) : (
@@ -348,14 +352,14 @@ function AppShell(): React.JSX.Element {
                           <button
                             type="button"
                             title="Switch project folder"
-                            className="app-no-drag @max-[560px]:hidden px-1.5 py-0.5 rounded text-[13.5px] text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors truncate max-w-[140px] tracking-tight cursor-pointer focus:outline-none min-w-0"
+                            className="app-no-drag @max-[380px]:hidden px-1.5 py-0.5 rounded text-[13.5px] text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors truncate max-w-[160px] tracking-tight cursor-pointer focus:outline-none min-w-0"
                           >
                             {folder}
                           </button>
                         }
                       />
                     )}
-                    <span className="@max-[560px]:hidden text-muted-foreground/40 text-[13px] shrink-0 font-light">
+                    <span className="@max-[380px]:hidden text-muted-foreground/40 text-[13px] shrink-0 font-light">
                       /
                     </span>
                   </>
