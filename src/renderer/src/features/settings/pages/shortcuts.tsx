@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
-import { KeyChip } from '@/features/ai-assistant/panels/ui'
 import { cn } from '@/lib/utils'
 import { Btn, Group, Page, Row, TextInput } from '../kit'
 import { useSettings } from '../settings-store'
@@ -17,9 +16,12 @@ const GROUPS: ShortcutGroup[] = ['General', 'Layout', 'Panels']
 
 function Keys({ combo }: { combo: string }): React.JSX.Element {
   return (
-    <span className="flex items-center gap-1">
+    <span className="flex items-center gap-1.5 text-[12px] text-[#ececea]">
       {comboParts(combo).map((k, i) => (
-        <KeyChip key={`${k}${i}`}>{k}</KeyChip>
+        <React.Fragment key={`${k}${i}`}>
+          {i > 0 && <span className="text-[#aaa9a5]">+</span>}
+          <kbd className="font-sans">{k}</kbd>
+        </React.Fragment>
       ))}
     </span>
   )
@@ -131,10 +133,10 @@ export function ShortcutsPage(): React.JSX.Element {
                       setEditing(isEditing ? null : s.id)
                     }}
                     className={cn(
-                      'flex h-8 min-w-[110px] cursor-pointer items-center justify-center rounded-[8px] border px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]/60',
+                      'flex h-7 min-w-[96px] cursor-pointer items-center justify-center rounded-[5px] bg-white/[0.1] px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]/60',
                       isEditing
-                        ? 'border-[#3b82f6]/70 bg-[#3b82f6]/10 text-[12.5px] text-[#a3c8ff]'
-                        : 'border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08]'
+                        ? 'bg-[#3b82f6]/20 text-[12px] text-[#c6ddff]'
+                        : 'hover:bg-white/[0.16]'
                     )}
                   >
                     {isEditing ? 'Press keys…' : <Keys combo={bindings[s.id]} />}
@@ -150,9 +152,12 @@ export function ShortcutsPage(): React.JSX.Element {
         <Group title="Always the same">
           {fixed.map((f) => (
             <Row key={f.label} title={f.label}>
-              <span className="flex items-center gap-1">
-                {f.keys.map((k) => (
-                  <KeyChip key={k}>{k}</KeyChip>
+              <span className="flex items-center gap-1.5 text-[12px] text-[#ececea]">
+                {f.keys.map((k, i) => (
+                  <React.Fragment key={k}>
+                    {i > 0 && <span className="text-[#aaa9a5]">+</span>}
+                    <kbd className="font-sans">{k}</kbd>
+                  </React.Fragment>
                 ))}
               </span>
             </Row>

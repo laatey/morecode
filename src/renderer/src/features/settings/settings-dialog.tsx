@@ -108,10 +108,10 @@ export function SettingsDialog(): React.JSX.Element {
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="fixed left-1/2 top-1/2 z-50 flex h-[min(600px,calc(100vh-48px))] w-[min(800px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 select-text overflow-hidden border border-white/[0.1] bg-[#1c1c1b] shadow-[0_24px_80px_rgba(0,0,0,0.68)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
+          className="fixed left-1/2 top-1/2 z-50 flex h-[min(540px,calc(100vh-56px))] w-[min(720px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 select-text overflow-hidden rounded-[10px] border border-white/[0.12] bg-[#30302e] shadow-[0_24px_80px_rgba(0,0,0,0.58)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
         >
           <Dialog.Title className="sr-only">Settings</Dialog.Title>
-          <nav aria-label="Settings navigation" className="flex w-[190px] shrink-0 flex-col border-r border-white/[0.08] bg-[#181817] p-2">
+          <nav aria-label="Settings navigation" className="flex w-[174px] shrink-0 flex-col border-r border-white/[0.1] bg-[#2b2b29] p-2">
             <div className="mb-3 flex items-center gap-2 px-1 pt-0.5 text-[13px] font-medium text-[#f1f1ef]">
               <SettingsIcon className="h-3.5 w-3.5 text-[#a8a8a4]" />
               Settings
@@ -123,7 +123,7 @@ export function SettingsDialog(): React.JSX.Element {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search"
-                className="h-7 w-full border border-white/[0.12] bg-transparent pl-8 pr-2 text-[12px] text-[#ededeb] placeholder:text-[#8e8e8a] outline-none transition-colors focus:border-[#3b82f6]"
+                className="h-7 w-full rounded-[5px] border-0 bg-white/[0.1] pl-8 pr-2 text-[12px] text-[#ededeb] placeholder:text-[#aaa9a5] outline-none transition-colors focus:ring-1 focus:ring-[#3b82f6]"
               />
             </div>
 
@@ -148,8 +148,8 @@ export function SettingsDialog(): React.JSX.Element {
                             className={cn(
                               'flex h-7 w-full cursor-pointer items-center gap-2 px-2 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]',
                               active
-                                ? 'bg-white/[0.09] text-white'
-                                : 'text-[#c9c9c5] hover:bg-white/[0.05] hover:text-white'
+                                ? 'rounded-[5px] bg-white/[0.14] text-white'
+                                : 'rounded-[5px] text-[#d0d0cc] hover:bg-white/[0.08] hover:text-white'
                             )}
                           >
                             <n.icon className={cn('h-3.5 w-3.5 shrink-0 stroke-[1.7]', active ? 'text-[#3b82f6]' : 'text-[#a8a8a4]')} />
@@ -164,14 +164,14 @@ export function SettingsDialog(): React.JSX.Element {
             </div>
           </nav>
 
-          <div className="relative flex min-w-0 flex-1 flex-col bg-[#1c1c1b]">
+          <div className="relative flex min-w-0 flex-1 flex-col bg-[#343432]">
             <Dialog.Close
               aria-label="Close settings"
-              className="absolute right-2 top-2 z-20 grid h-7 w-7 cursor-pointer place-items-center text-[#c9c9c5] transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]"
+              className="absolute right-2 top-2 z-20 grid h-7 w-7 cursor-pointer place-items-center rounded-[5px] text-[#d0d0cc] transition-colors hover:bg-white/[0.1] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]"
             >
               <X className="h-4 w-4" />
             </Dialog.Close>
-            <div ref={scroller} className="slim-scroll h-full overflow-y-auto px-6 py-5 pr-10">
+            <div ref={scroller} className="slim-scroll h-full overflow-y-auto px-5 py-4 pr-9">
               <Page />
             </div>
           </div>
