@@ -223,6 +223,17 @@ export function registerWorkspaceIpc(): void {
 
   ipcMain.handle('workspace:files', () => listFiles())
 
+  ipcMain.handle('workspace:read-file', (_event, rel: string): { ok: true; text: string } | { ok: false; error: string } => {
+    const full = typeof rel === 'string' ? safeFilePath(rel) : null
+    if (!full) return { ok: false, error: 'That file is outside your project.' }
+    try {
+      if (statSync(full).size > MAX_BYTES) return { ok: false, error: 'This file is too large to preview.' }
+      return { ok: true, text: readFileSync(full, 'utf8') }
+    } catch {
+      return { ok: false, error: 'Could not open this file. It may have been moved or deleted.' }
+    }
+  })
+
   ipcMain.handle('workspace:reveal', async (_event, path?: string) => {
     const target =
       typeof path === 'string' && existsSync(path) && statSync(path).isDirectory() ? path : getWorkspaceRoot()

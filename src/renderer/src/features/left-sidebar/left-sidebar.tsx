@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import {
   ChevronRight,
-  File,
   Folder,
   ListFilter,
   MoreHorizontal,
@@ -19,6 +18,8 @@ import { useChatMenu } from '@/features/workspace/chat-menu'
 import { useWorkspace, type Chat } from '@/features/workspace/workspace-store'
 import { useWorkspaceFiles } from '@/features/ai-assistant/workspace-files'
 import { buildTree, type TreeNode } from '@/features/right-panel/tabs/file-tree'
+import { requestFilePreview } from '@/features/right-panel/file-preview-request'
+import { useRightPanel } from '@/features/right-panel/store'
 
 const SMALL = 'h-[14px] w-[14px] stroke-[1.7]'
 const NAV =
@@ -101,7 +102,15 @@ function SectionLabel({
   )
 }
 
-function SidebarFileTree({ nodes, depth = 0 }: { nodes: TreeNode<{ path: string }>[]; depth?: number }): React.JSX.Element {
+function SidebarFileTree({
+  nodes,
+  onFile,
+  depth = 0
+}: {
+  nodes: TreeNode<{ path: string }>[]
+  onFile: (path: string) => void
+  depth?: number
+}): React.JSX.Element {
   const [closed, setClosed] = useState<Set<string>>(new Set())
   const toggle = (path: string): void =>
     setClosed((current) => {
@@ -120,11 +129,9 @@ function SidebarFileTree({ nodes, depth = 0 }: { nodes: TreeNode<{ path: string 
               <button
                 type="button"
                 title={node.path}
-                onClick={() => void window.api?.workspace.openFile(node.path)}
-                className="flex h-6 w-full cursor-pointer items-center gap-1.5 px-1.5 text-left text-[12px] text-[#aaa9a5] hover:bg-white/[0.05] hover:text-foreground"
+                onClick={() => onFile(node.path)}
+                className="flex h-6 w-full cursor-pointer items-center px-1.5 pl-4 text-left text-[12px] text-[#aaa9a5] hover:bg-white/[0.05] hover:text-foreground"
               >
-                <span className="w-3 shrink-0" />
-                <File className="h-3 w-3 shrink-0 text-[#8c8c87]" />
                 <span className="truncate">{node.name}</span>
               </button>
             </li>
@@ -141,10 +148,9 @@ function SidebarFileTree({ nodes, depth = 0 }: { nodes: TreeNode<{ path: string 
               className="flex h-6 w-full cursor-pointer items-center gap-1 px-1.5 text-left text-[12px] text-[#cacac6] hover:bg-white/[0.05] hover:text-foreground"
             >
               <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
-              <Folder className="h-3.5 w-3.5 shrink-0 text-[#8c8c87]" />
               <span className="truncate">{node.name}</span>
             </button>
-            {open && <SidebarFileTree nodes={node.children} depth={depth + 1} />}
+            {open && <SidebarFileTree nodes={node.children} onFile={onFile} depth={depth + 1} />}
           </li>
         )
       })}
@@ -154,12 +160,17 @@ function SidebarFileTree({ nodes, depth = 0 }: { nodes: TreeNode<{ path: string 
 
 function FilesSection(): React.JSX.Element {
   const files = useWorkspaceFiles('sidebar')
+  const { openTab } = useRightPanel()
   const tree = buildTree(files.map((path) => ({ path })))
+  const openFile = (path: string): void => {
+    requestFilePreview(path)
+    openTab('file')
+  }
   return (
-    <section className="mx-2 mt-2 shrink-0 border-b border-white/[0.08] pb-2">
-      <SectionLabel>Files</SectionLabel>
-      <div className="slim-scroll max-h-[210px] overflow-y-auto px-0.5">
-        {tree.length ? <SidebarFileTree nodes={tree} /> : <p className="px-2 py-2 text-[12px] text-[#77776f]">No files found.</p>}
+    <section className="mx-2 mt-0.5 shrink-0 pb-1">
+      <div className="flex h-5 items-center px-2 text-[10.5px] text-muted-foreground">Files</div>
+      <div className="slim-scroll max-h-[180px] overflow-y-auto px-0.5">
+        {tree.length ? <SidebarFileTree nodes={tree} onFile={openFile} /> : <p className="px-2 py-1.5 text-[12px] text-[#77776f]">No files found.</p>}
       </div>
     </section>
   )

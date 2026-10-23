@@ -123,6 +123,8 @@ const api = {
     choose: (): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:choose'),
     /** Every file in the project, as relative paths (for @ mentions). */
     files: (): Promise<string[]> => ipcRenderer.invoke('workspace:files'),
+    /** Read a small project file for MoreCode's in-app file preview. */
+    readFile: (path: string): Promise<DocResult> => ipcRenderer.invoke('workspace:read-file', path),
     /** Show the project folder in the system file explorer. */
     reveal: (path?: string): Promise<void> => ipcRenderer.invoke('workspace:reveal', path),
     /** Open one project file in the person's default editor. */

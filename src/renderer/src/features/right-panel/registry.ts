@@ -1,4 +1,4 @@
-import { Globe, FileText, GitCompare, SquareTerminal, ListTodo, ClipboardList } from 'lucide-react'
+import { Globe, FileText, GitCompare, SquareTerminal, ListTodo, ClipboardList, FileCode2 } from 'lucide-react'
 import type { TabDefinition } from './types'
 import { BrowserTab } from './tabs/browser-tab'
 import { DocsTab } from './tabs/docs-tab'
@@ -8,6 +8,7 @@ import { disposeTerminal } from './terminal/terminal-store'
 import { forgetBrowser } from './tabs/browser-state'
 import { TaskTab } from './tabs/task-tab'
 import { PlanTab } from './tabs/plan-tab'
+import { FilePreviewTab } from './tabs/file-preview-tab'
 
 /**
  * THE place to add a new right-panel tab:
@@ -16,6 +17,13 @@ import { PlanTab } from './tabs/plan-tab'
  * It then shows up in the "+" menu and the empty state, and `openTab('my-kind')` works anywhere.
  */
 export const TAB_DEFINITIONS: TabDefinition[] = [
+  {
+    kind: 'file',
+    title: 'File',
+    description: 'Preview a project file',
+    icon: FileCode2,
+    component: FilePreviewTab
+  },
   {
     kind: 'browser',
     title: 'Browser',
