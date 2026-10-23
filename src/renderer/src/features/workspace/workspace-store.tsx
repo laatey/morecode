@@ -160,6 +160,26 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
 
   useEffect(persist, [chats, groups, activeId, persist])
 
+  // The folder chosen during onboarding is a real project, not merely a working directory.
+  // Put the first empty chat inside that project so the sidebar matches what the person chose.
+  const projectPath = account?.project?.path
+  useEffect(() => {
+    const project = account?.project
+    if (!project || groups.some((group) => group.folder === project.path)) return
+    const id = uid()
+    setGroups((current) => [...current, { id, name: project.name, folder: project.path }])
+    setChats((current) =>
+      current.map((chat) =>
+        chat.id === activeId &&
+        chat.projectId === null &&
+        chat.title === NEW_CHAT_TITLE &&
+        !messages.current[chat.id]?.length
+          ? { ...chat, projectId: id }
+          : chat
+      )
+    )
+  }, [account?.project, activeId, groups, projectPath])
+
   // chats from other computers: newer copies replace older ones; the chat on screen is left alone
   const applyRemote = useCallback(
     (items: RemoteChat[]) => {
