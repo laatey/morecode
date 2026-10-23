@@ -125,6 +125,9 @@ const api = {
     files: (): Promise<string[]> => ipcRenderer.invoke('workspace:files'),
     /** Read a small project file for MoreCode's in-app file preview. */
     readFile: (path: string): Promise<DocResult> => ipcRenderer.invoke('workspace:read-file', path),
+    /** Read a project image as a safe data URL for MoreCode's in-app preview. */
+    readImage: (path: string): Promise<{ ok: true; dataUrl: string } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('workspace:read-image', path),
     /** Show the project folder in the system file explorer. */
     reveal: (path?: string): Promise<void> => ipcRenderer.invoke('workspace:reveal', path),
     /** Open one project file in the person's default editor. */

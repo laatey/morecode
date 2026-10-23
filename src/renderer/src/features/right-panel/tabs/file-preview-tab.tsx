@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { ExternalLink, FileText } from 'lucide-react'
 import { IconButton } from '@/components/layout/icon-button'
+import { highlightLines, languageFor } from '@/lib/highlight'
 import { takeFilePreviewRequest } from '../file-preview-request'
 import { TabEmpty, TabToolbar } from './tab-kit'
 
@@ -8,6 +9,7 @@ export function FilePreviewTab(): React.JSX.Element {
   const [path, setPath] = useState<string | null>(() => takeFilePreviewRequest())
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [image, setImage] = useState<string | null>(null)
 
   useEffect(() => {
     const open = (): void => setPath(takeFilePreviewRequest())
@@ -19,10 +21,14 @@ export function FilePreviewTab(): React.JSX.Element {
     if (!path) return
     let stale = false
     setText(null)
+    setImage(null)
     setError(null)
-    void window.api.workspace.readFile(path).then((result) => {
+    const imageFile = /\.(png|jpe?g|gif|webp|svg)$/i.test(path)
+    const read = imageFile ? window.api.workspace.readImage(path) : window.api.workspace.readFile(path)
+    void read.then((result) => {
       if (stale) return
-      if (result.ok) setText(result.text)
+      if (result.ok && 'dataUrl' in result) setImage(result.dataUrl)
+      else if (result.ok) setText(result.text)
       else setError(result.error)
     })
     return () => {
@@ -45,13 +51,28 @@ export function FilePreviewTab(): React.JSX.Element {
       </TabToolbar>
       {error ? (
         <p className="p-4 text-[12px] text-[#e8b365]">{error}</p>
+      ) : image ? (
+        <div className="slim-scroll flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+          <img src={image} alt={path} className="max-h-full max-w-full object-contain" />
+        </div>
       ) : text === null ? (
         <p className="p-4 text-[12px] text-muted-foreground">Opening…</p>
       ) : (
-        <pre className="slim-scroll min-h-0 flex-1 overflow-auto p-4 font-mono text-[12px] leading-[19px] text-[#d6d6d3]">
-          <code>{text}</code>
-        </pre>
+        <CodePreview path={path} text={text} />
       )}
     </div>
+  )
+}
+
+function CodePreview({ path, text }: { path: string; text: string }): React.JSX.Element {
+  const lines = highlightLines(text.split('\n'), languageFor(path))
+  return (
+    <pre className="slim-scroll hljs min-h-0 flex-1 overflow-auto p-4 font-mono text-[12px] leading-[19px] text-[#d6d6d3]">
+      <code>
+        {lines.map((line, index) => (
+          <span key={index} className="block whitespace-pre" dangerouslySetInnerHTML={{ __html: line || ' ' }} />
+        ))}
+      </code>
+    </pre>
   )
 }

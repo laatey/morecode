@@ -167,9 +167,9 @@ function FilesSection(): React.JSX.Element {
     openTab('file')
   }
   return (
-    <section className="mx-2 mt-0.5 shrink-0 pb-1">
-      <div className="flex h-5 items-center px-2 text-[10.5px] text-muted-foreground">Files</div>
-      <div className="slim-scroll max-h-[180px] overflow-y-auto px-0.5">
+    <section className="flex min-h-0 flex-1 flex-col px-2 pt-2">
+      <div className="flex h-6 shrink-0 items-center px-2 text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Explorer</div>
+      <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-0.5 pb-2">
         {tree.length ? <SidebarFileTree nodes={tree} onFile={openFile} /> : <p className="px-2 py-1.5 text-[12px] text-[#77776f]">No files found.</p>}
       </div>
     </section>
@@ -177,7 +177,7 @@ function FilesSection(): React.JSX.Element {
 }
 
 /** Body of the left sidebar (below the title-bar row). */
-export function LeftSidebar({ showFiles = false }: { showFiles?: boolean }): React.JSX.Element {
+export function LeftSidebar({ mode }: { mode: 'chat' | 'code' }): React.JSX.Element {
   const ws = useWorkspace()
   const [view, setView] = useState<'active' | 'archived'>('active')
   const [shut, setShut] = useState<Set<string>>(new Set())
@@ -200,24 +200,26 @@ export function LeftSidebar({ showFiles = false }: { showFiles?: boolean }): Rea
 
   return (
     <div data-tour="sidebar" className="flex min-h-0 flex-1 flex-col">
-      <nav className="flex flex-col gap-px px-2 pt-2">
-        <button type="button" onClick={() => ws.newChat()} className={NAV}>
-          <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
-            <SquarePen className={SMALL} />
-          </span>
-          New chat
-        </button>
-        <button type="button" onClick={() => ws.setSearchOpen(true)} className={NAV}>
-          <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
-            <Search className={SMALL} />
-          </span>
-          Search
-        </button>
-      </nav>
+      {mode === 'code' ? (
+        <FilesSection />
+      ) : (
+        <>
+          <nav className="flex flex-col gap-px px-2 pt-2">
+            <button type="button" onClick={() => ws.newChat()} className={NAV}>
+              <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+                <SquarePen className={SMALL} />
+              </span>
+              New chat
+            </button>
+            <button type="button" onClick={() => ws.setSearchOpen(true)} className={NAV}>
+              <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+                <Search className={SMALL} />
+              </span>
+              Search
+            </button>
+          </nav>
 
-      {showFiles && <FilesSection />}
-
-      <div className="slim-scroll mt-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          <div className="slim-scroll mt-1 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {view === 'active' && (
           <>
             <SectionLabel
@@ -368,7 +370,9 @@ export function LeftSidebar({ showFiles = false }: { showFiles?: boolean }): Rea
           ws.groups.length === 0 && (
             <p className="px-2 pt-1 text-[12px] text-[#77776f]">No chats yet.</p>
           )}
-      </div>
+          </div>
+        </>
+      )}
 
       <div className="flex shrink-0 items-center gap-1 border-t border-white/[0.08] px-2 py-2">
         <ProfileMenu />

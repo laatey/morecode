@@ -275,7 +275,7 @@ function AppShell(): React.JSX.Element {
               arrowsClass="@max-[200px]:hidden"
             />
           </div>
-          <LeftSidebar showFiles={mode === 'code'} />
+          <LeftSidebar mode={mode} />
         </ResizablePanel>
 
         <ResizableHandle onToggle={toggleLeft} disabled={leftCollapsed} />

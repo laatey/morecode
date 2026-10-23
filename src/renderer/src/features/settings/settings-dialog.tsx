@@ -8,7 +8,7 @@ import {
   Monitor,
   Keyboard,
   Search,
-  Settings as SettingsIcon,
+  SlidersHorizontal,
   ShieldCheck,
   Cpu,
   X,
@@ -35,7 +35,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Preferences',
     items: [
-      { id: 'general', label: 'General', icon: SettingsIcon },
+      { id: 'general', label: 'General', icon: SlidersHorizontal },
       { id: 'appearance', label: 'Appearance', icon: Monitor },
       { id: 'models', label: 'Models', icon: Cpu },
       { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
@@ -108,14 +108,10 @@ export function SettingsDialog(): React.JSX.Element {
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="fixed left-1/2 top-1/2 z-50 flex h-[min(540px,calc(100vh-56px))] w-[min(720px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 select-text overflow-hidden rounded-[10px] border border-white/[0.12] bg-[#30302e] shadow-[0_24px_80px_rgba(0,0,0,0.58)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
+          className="fixed left-1/2 top-1/2 z-50 flex h-[min(540px,calc(100vh-56px))] w-[min(720px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 select-text overflow-hidden rounded-[10px] border border-white/[0.12] bg-[#272726] shadow-[0_24px_80px_rgba(0,0,0,0.58)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
         >
           <Dialog.Title className="sr-only">Settings</Dialog.Title>
-          <nav aria-label="Settings navigation" className="flex w-[174px] shrink-0 flex-col border-r border-white/[0.1] bg-[#2b2b29] p-2">
-            <div className="mb-3 flex items-center gap-2 px-1 pt-0.5 text-[13px] font-medium text-[#f1f1ef]">
-              <SettingsIcon className="h-3.5 w-3.5 text-[#a8a8a4]" />
-              Settings
-            </div>
+          <nav aria-label="Settings navigation" className="flex w-[174px] shrink-0 flex-col border-r border-white/[0.1] bg-[#272726] p-2">
             <div className="relative mb-3">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8e8e8a]" />
               <input
@@ -164,7 +160,7 @@ export function SettingsDialog(): React.JSX.Element {
             </div>
           </nav>
 
-          <div className="relative flex min-w-0 flex-1 flex-col bg-[#343432]">
+          <div className="relative flex min-w-0 flex-1 flex-col bg-[#272726]">
             <Dialog.Close
               aria-label="Close settings"
               className="absolute right-2 top-2 z-20 grid h-7 w-7 cursor-pointer place-items-center rounded-[5px] text-[#d0d0cc] transition-colors hover:bg-white/[0.1] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]"

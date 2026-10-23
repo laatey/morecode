@@ -61,6 +61,14 @@ const SKIP_DIRS = new Set([
 const MAX_DEPTH = 4
 const MAX_FILES = 300
 const MAX_BYTES = 2 * 1024 * 1024
+const IMAGE_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml'
+}
 
 export interface DocInfo {
   /** Path relative to the workspace, always with forward slashes. */
@@ -231,6 +239,18 @@ export function registerWorkspaceIpc(): void {
       return { ok: true, text: readFileSync(full, 'utf8') }
     } catch {
       return { ok: false, error: 'Could not open this file. It may have been moved or deleted.' }
+    }
+  })
+
+  ipcMain.handle('workspace:read-image', (_event, rel: string): { ok: true; dataUrl: string } | { ok: false; error: string } => {
+    const full = typeof rel === 'string' ? safeFilePath(rel) : null
+    const mime = full ? IMAGE_TYPES[extname(full).toLowerCase()] : undefined
+    if (!full || !mime) return { ok: false, error: 'That is not a supported image file.' }
+    try {
+      if (statSync(full).size > MAX_BYTES * 4) return { ok: false, error: 'This image is too large to preview.' }
+      return { ok: true, dataUrl: `data:${mime};base64,${readFileSync(full).toString('base64')}` }
+    } catch {
+      return { ok: false, error: 'Could not open this image. It may have been moved or deleted.' }
     }
   })
 
