@@ -15,10 +15,10 @@ export function Page({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="space-y-7">
-      <header className="pr-8">
-        <h2 className="text-[15px] font-semibold tracking-tight text-[#f3f3f1]">{title}</h2>
-        {description && <p className="mt-1 text-[12.5px] leading-relaxed text-[#8e8e8a]">{description}</p>}
+    <div className="mx-auto max-w-[620px] space-y-8">
+      <header className="border-b border-white/[0.07] pb-5 pr-8">
+        <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[#f7f7f4]">{title}</h2>
+        {description && <p className="mt-1.5 max-w-[540px] text-[13px] leading-relaxed text-[#9a9a96]">{description}</p>}
       </header>
       {children}
     </div>
@@ -37,8 +37,8 @@ export function Group({
 }): React.JSX.Element {
   return (
     <section>
-      {title && <h3 className="pb-0.5 text-[14px] font-semibold tracking-tight text-[#f3f3f1]">{title}</h3>}
-      <div className="divide-y divide-white/[0.07]">{children}</div>
+      {title && <h3 className="pb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#a4a4a0]">{title}</h3>}
+      <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#242423] px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] divide-y divide-white/[0.07]">{children}</div>
       {note && <p className="pt-2 text-[12px] leading-relaxed text-[#737370]">{note}</p>}
     </section>
   )
@@ -59,12 +59,12 @@ export function Row({
   className?: string
 }): React.JSX.Element {
   return (
-    <div className={cn('flex min-h-[46px] items-center justify-between gap-6 py-2.5', className)}>
+    <div className={cn('flex min-h-[62px] items-center justify-between gap-6 py-3', className)}>
       <div className="flex min-w-0 flex-1 items-start gap-3">
         {icon && <div className="mt-0.5 shrink-0">{icon}</div>}
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] leading-snug text-[#f1f1ef]">{title}</div>
-          {description && <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">{description}</div>}
+          <div className="text-[13px] font-medium leading-snug text-[#f1f1ef]">{title}</div>
+          {description && <div className="mt-0.5 text-[12px] leading-relaxed text-[#92928e]">{description}</div>}
         </div>
       </div>
       {children && <div className="flex shrink-0 items-center justify-end gap-2">{children}</div>}

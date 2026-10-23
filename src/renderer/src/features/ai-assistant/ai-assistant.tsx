@@ -491,7 +491,7 @@ export function AiAssistant(): React.JSX.Element {
       )}
 
       <div className="shrink-0 px-3 pb-1 pt-1">
-        <div className="relative mx-auto w-full max-w-[var(--content-w,56rem)]">
+        <div className="relative mx-auto w-full max-w-[46rem]">
           {slashOpen && (
             <SlashMenu
               commands={slashList}
@@ -813,7 +813,7 @@ export function AiAssistant(): React.JSX.Element {
       </div>
 
       {empty && (
-        <div className="mx-auto mt-2 flex w-full max-w-[var(--content-w,56rem)] flex-col items-center gap-2 px-3">
+        <div className="mx-auto mt-2 flex w-full max-w-[46rem] flex-col items-center gap-2 px-3">
           <div className="flex flex-wrap justify-center gap-1.5">
             {SUGGESTIONS.map((t) => (
               <button

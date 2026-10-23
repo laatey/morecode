@@ -115,6 +115,7 @@ export function BillingPage(): React.JSX.Element {
   const currency = billing.currency ?? cfg.currency
   const history = getUsageHistory(account)
   const peak = Math.max(1, ...history.map((d) => d.count), plan.dailyMessages > 100 ? 0 : plan.dailyMessages)
+  const hasHistory = history.some((d) => d.count > 0)
   const used = account.sentToday
   const pct = account.apiKey ? 0 : Math.min(100, (used / plan.dailyMessages) * 100)
   const price = priceOf(cfg, account.plan, billing.yearly)
@@ -182,31 +183,42 @@ export function BillingPage(): React.JSX.Element {
       </Group>
 
       <Group title="Messages">
-        <div className="space-y-2 py-3.5">
+        <div className="space-y-3 py-4">
           <div className="flex items-baseline justify-between text-[13px]">
-            <span className="text-[#ececea]">Today</span>
-            <span className="text-[#8d8d8a]">
+            <span className="font-medium text-[#ececea]">Today</span>
+            <span className="text-[#9b9b97]">
               {account.apiKey ? `${used} sent, no limit` : `${used} of ${plan.dailyMessages} used, ${messagesLeft} left`}
             </span>
           </div>
           {!account.apiKey && <Bar percent={pct} tone={limitTone(pct)} label="Messages used today" />}
         </div>
-        <div className="py-3.5">
-          <div className="mb-2 text-[12.5px] text-[#8d8d8a]">Last 14 days</div>
-          <div className="flex h-[72px] items-end gap-1" role="img" aria-label="Messages sent each day for the last 14 days">
-            {history.map((d) => (
-              <div key={d.key} className="flex h-full flex-1 items-end" title={`${d.label}: ${d.count} messages`}>
-                <div
-                  className={d.today ? 'w-full rounded-[3px] bg-[#3b82f6]' : 'w-full rounded-[3px] bg-white/[0.18]'}
-                  style={{ height: `${Math.max(4, (d.count / peak) * 100)}%` }}
-                />
+        <div className="border-t border-white/[0.07] py-4">
+          <div className="mb-3 flex items-center justify-between text-[12px]">
+            <span className="font-medium text-[#d7d7d3]">Usage history</span>
+            <span className="text-[#777773]">Last 14 days</span>
+          </div>
+          {hasHistory ? (
+            <>
+              <div className="flex h-[88px] items-end gap-1.5" role="img" aria-label="Messages sent each day for the last 14 days">
+                {history.map((d) => (
+                  <div key={d.key} className="group flex h-full flex-1 items-end" title={`${d.label}: ${d.count} messages`}>
+                    <div
+                      className={d.today ? 'w-full rounded-t-[4px] bg-[#8b9dff]' : 'w-full rounded-t-[4px] bg-[#5f6685] transition-colors group-hover:bg-[#7985ba]'}
+                      style={{ height: `${Math.max(4, (d.count / peak) * 100)}%` }}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="mt-1.5 flex justify-between text-[11.5px] text-[#77776f]">
-            <span>{history[0].label}</span>
-            <span>Today</span>
-          </div>
+              <div className="mt-2 flex justify-between text-[11px] text-[#777773]">
+                <span>{history[0].label}</span>
+                <span>Today</span>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-lg border border-dashed border-white/[0.1] bg-[#1e1e1d] px-4 py-5 text-center text-[12px] text-[#858581]">
+              Your actual message history will appear here after you start a chat.
+            </div>
+          )}
         </div>
       </Group>
 
