@@ -15,10 +15,10 @@ export function Page({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="mx-auto max-w-[620px] space-y-8">
-      <header className="border-b border-white/[0.07] pb-5 pr-8">
-        <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[#f7f7f4]">{title}</h2>
-        {description && <p className="mt-1.5 max-w-[540px] text-[13px] leading-relaxed text-[#9a9a96]">{description}</p>}
+    <div className="mx-auto max-w-[560px] space-y-6">
+      <header className="border-b border-white/[0.08] pb-4 pr-8">
+        <h2 className="text-[17px] font-medium text-[#f7f7f4]">{title}</h2>
+        {description && <p className="mt-1 max-w-[500px] text-[12px] leading-relaxed text-[#9a9a96]">{description}</p>}
       </header>
       {children}
     </div>
@@ -37,8 +37,8 @@ export function Group({
 }): React.JSX.Element {
   return (
     <section>
-      {title && <h3 className="pb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#a4a4a0]">{title}</h3>}
-      <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#242423] px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] divide-y divide-white/[0.07]">{children}</div>
+      {title && <h3 className="pb-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#8e8e8a]">{title}</h3>}
+      <div className="divide-y divide-white/[0.08] border-y border-white/[0.08]">{children}</div>
       {note && <p className="pt-2 text-[12px] leading-relaxed text-[#737370]">{note}</p>}
     </section>
   )
@@ -59,12 +59,12 @@ export function Row({
   className?: string
 }): React.JSX.Element {
   return (
-    <div className={cn('flex min-h-[62px] items-center justify-between gap-6 py-3', className)}>
+    <div className={cn('flex min-h-[50px] items-center justify-between gap-5 py-2.5', className)}>
       <div className="flex min-w-0 flex-1 items-start gap-3">
         {icon && <div className="mt-0.5 shrink-0">{icon}</div>}
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-medium leading-snug text-[#f1f1ef]">{title}</div>
-          {description && <div className="mt-0.5 text-[12px] leading-relaxed text-[#92928e]">{description}</div>}
+          <div className="text-[12.5px] font-medium leading-snug text-[#f1f1ef]">{title}</div>
+          {description && <div className="mt-0.5 text-[11.5px] leading-relaxed text-[#92928e]">{description}</div>}
         </div>
       </div>
       {children && <div className="flex shrink-0 items-center justify-end gap-2">{children}</div>}
@@ -92,13 +92,13 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]/50 disabled:cursor-not-allowed disabled:opacity-40',
+        'relative h-5 w-9 shrink-0 cursor-pointer rounded-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6] disabled:cursor-not-allowed disabled:opacity-40',
         checked ? 'bg-[#3b82f6]' : 'bg-[#3a3a38] hover:bg-[#444442]'
       )}
     >
       <span
         className={cn(
-          'absolute left-[2px] top-[2px] h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+          'absolute left-[2px] top-[2px] h-4 w-4 rounded-none bg-white transition-transform',
           checked && 'translate-x-4'
         )}
       />
@@ -121,7 +121,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex h-8 shrink-0 select-none items-center rounded-[9px] bg-[#2a2a29] p-[2px]"
+      className="inline-flex h-7 shrink-0 select-none items-center border border-white/[0.1] bg-[#222221] p-px"
     >
       {options.map((o) => {
         const active = o.value === value
@@ -133,9 +133,9 @@ export function Segmented<T extends string>({
             aria-checked={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              'flex h-[26px] cursor-pointer items-center justify-center rounded-[7px] px-3 text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]/50',
+              'flex h-6 cursor-pointer items-center justify-center px-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]',
               active
-                ? 'bg-[#3f3f3d] text-white ring-1 ring-white/[0.12]'
+                ? 'bg-[#3b82f6] text-white'
                 : 'text-[#b4b4b0] hover:text-white'
             )}
           >
@@ -174,7 +174,7 @@ export function Pick<T extends string>({
         <button
           type="button"
           style={width ? { minWidth: width } : undefined}
-          className="inline-flex h-8 cursor-pointer items-center justify-end gap-1.5 rounded-lg px-2 text-[13px] text-[#f1f1ef] transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]/50"
+          className="inline-flex h-7 cursor-pointer items-center justify-end gap-1.5 px-2 text-[12px] text-[#f1f1ef] transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]"
         >
           <span className="truncate">{current}</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#8e8e8a]" />
@@ -201,7 +201,7 @@ export function Btn({
       variant={variant === 'primary' ? 'default' : variant === 'danger' ? 'destructive' : 'secondary'}
       {...props}
       disabled={props.disabled || busy}
-      className={className}
+      className={cn('rounded-none', className)}
     >
       {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
       {children}
@@ -217,7 +217,7 @@ export const TextInput = React.forwardRef<
     ref={ref}
     {...props}
     className={cn(
-      'h-8 w-full rounded-lg border border-white/[0.12] bg-[#232322] px-2.5 text-[12.5px] text-[#f1f1ef] outline-none transition-colors placeholder:text-[#737370] focus:border-white/[0.3]',
+      'h-7 w-full rounded-none border border-white/[0.12] bg-[#232322] px-2 text-[12px] text-[#f1f1ef] outline-none transition-colors placeholder:text-[#737370] focus:border-[#3b82f6]',
       className
     )}
   />
@@ -273,7 +273,7 @@ export function DangerRow({
         )}
       </div>
       {open && (
-        <div className="mt-3 space-y-3 rounded-[10px] border border-[#e5584f]/25 bg-[#e5584f]/[0.06] p-3.5">
+        <div className="mt-3 space-y-3 border border-[#e5584f]/25 bg-[#e5584f]/[0.06] p-3">
           {typeToConfirm && (
             <label className="block text-[13px] text-[#c9c9c6]">
               Type <span className="font-medium text-[#ececea]">{typeToConfirm}</span> to confirm

@@ -5,12 +5,12 @@ import {
   CircleHelp,
   CreditCard,
   Database,
+  Monitor,
   Keyboard,
-  Palette,
   Search,
   Settings as SettingsIcon,
   ShieldCheck,
-  Sparkles,
+  Cpu,
   X,
   type LucideIcon
 } from 'lucide-react'
@@ -36,8 +36,8 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Preferences',
     items: [
       { id: 'general', label: 'General', icon: SettingsIcon },
-      { id: 'appearance', label: 'Appearance', icon: Palette },
-      { id: 'models', label: 'Models', icon: Sparkles },
+      { id: 'appearance', label: 'Appearance', icon: Monitor },
+      { id: 'models', label: 'Models', icon: Cpu },
       { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
       { id: 'notifications', label: 'Notifications', icon: Bell }
     ]
@@ -108,12 +108,12 @@ export function SettingsDialog(): React.JSX.Element {
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="fixed left-1/2 top-1/2 z-50 flex h-[min(680px,calc(100vh-40px))] w-[min(940px,calc(100vw-40px))] -translate-x-1/2 -translate-y-1/2 select-text overflow-hidden rounded-2xl border border-white/[0.1] bg-[#1c1c1b] shadow-[0_32px_100px_rgba(0,0,0,0.72)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+          className="fixed left-1/2 top-1/2 z-50 flex h-[min(600px,calc(100vh-48px))] w-[min(800px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 select-text overflow-hidden border border-white/[0.1] bg-[#1c1c1b] shadow-[0_24px_80px_rgba(0,0,0,0.68)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"
         >
           <Dialog.Title className="sr-only">Settings</Dialog.Title>
-          <nav aria-label="Settings navigation" className="flex w-[226px] shrink-0 flex-col border-r border-white/[0.08] bg-[#181817] p-3">
-            <div className="mb-4 flex items-center gap-2 px-1 pt-0.5 text-[13px] font-semibold text-[#f1f1ef]">
-              <SettingsIcon className="h-4 w-4 text-[#9da9ff]" />
+          <nav aria-label="Settings navigation" className="flex w-[190px] shrink-0 flex-col border-r border-white/[0.08] bg-[#181817] p-2">
+            <div className="mb-3 flex items-center gap-2 px-1 pt-0.5 text-[13px] font-medium text-[#f1f1ef]">
+              <SettingsIcon className="h-3.5 w-3.5 text-[#a8a8a4]" />
               Settings
             </div>
             <div className="relative mb-3">
@@ -123,7 +123,7 @@ export function SettingsDialog(): React.JSX.Element {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search"
-                className="h-8 w-full rounded-[8px] border border-white/[0.14] bg-transparent pl-8 pr-2.5 text-[12.5px] text-[#ededeb] placeholder:text-[#8e8e8a] outline-none transition-colors focus:border-white/[0.3]"
+                className="h-7 w-full border border-white/[0.12] bg-transparent pl-8 pr-2 text-[12px] text-[#ededeb] placeholder:text-[#8e8e8a] outline-none transition-colors focus:border-[#3b82f6]"
               />
             </div>
 
@@ -133,7 +133,7 @@ export function SettingsDialog(): React.JSX.Element {
               ) : (
                 filteredSections.map((section) => (
                   <div key={section.title} className="mb-2">
-                    <p className="px-2 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#737370]">
+                    <p className="px-2 pb-1 pt-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#737370]">
                       {section.title}
                     </p>
                     <div className="space-y-0.5">
@@ -146,13 +146,13 @@ export function SettingsDialog(): React.JSX.Element {
                             aria-current={active ? 'page' : undefined}
                             onClick={() => setTab(n.id)}
                             className={cn(
-                              'flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-[8px] px-2.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8b9dff]/50',
+                              'flex h-7 w-full cursor-pointer items-center gap-2 px-2 text-left text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]',
                               active
-                                ? 'bg-[#343746] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                                ? 'bg-white/[0.09] text-white'
                                 : 'text-[#c9c9c5] hover:bg-white/[0.05] hover:text-white'
                             )}
                           >
-                            <n.icon className={cn('h-4 w-4 shrink-0 stroke-[1.7]', active ? 'text-[#b9c4ff]' : 'text-[#a8a8a4]')} />
+                            <n.icon className={cn('h-3.5 w-3.5 shrink-0 stroke-[1.7]', active ? 'text-[#3b82f6]' : 'text-[#a8a8a4]')} />
                             <span className="truncate">{n.label}</span>
                           </button>
                         )
@@ -164,14 +164,14 @@ export function SettingsDialog(): React.JSX.Element {
             </div>
           </nav>
 
-          <div className="relative flex min-w-0 flex-1 flex-col bg-[#1f1f1e]">
+          <div className="relative flex min-w-0 flex-1 flex-col bg-[#1c1c1b]">
             <Dialog.Close
               aria-label="Close settings"
-              className="absolute right-3 top-3 z-20 grid h-7 w-7 cursor-pointer place-items-center rounded-lg text-[#c9c9c5] transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]/50"
+              className="absolute right-2 top-2 z-20 grid h-7 w-7 cursor-pointer place-items-center text-[#c9c9c5] transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]"
             >
               <X className="h-4 w-4" />
             </Dialog.Close>
-            <div ref={scroller} className="slim-scroll h-full overflow-y-auto px-9 py-8 pr-12">
+            <div ref={scroller} className="slim-scroll h-full overflow-y-auto px-6 py-5 pr-10">
               <Page />
             </div>
           </div>

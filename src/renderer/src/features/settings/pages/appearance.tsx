@@ -25,7 +25,7 @@ export function AppearancePage(): React.JSX.Element {
             ]}
           />
         </Row>
-        <Row title="Conversation width" description="How wide the chat and the message box can grow.">
+        <Row title="Conversation width" description="How wide responses can grow. The composer stays compact.">
           <Segmented<ContentWidth>
             label="Conversation width"
             value={settings.contentWidth}

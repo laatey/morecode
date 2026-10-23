@@ -158,22 +158,14 @@ function AppShell(): React.JSX.Element {
     toggleRight
   } = useResponsiveSidebars()
 
-  // Chat = just the conversation. Code = the conversation with the tools panel open beside it.
+  // Chat keeps the sidebar focused on chats; Code adds the project file tree there.
   const [mode, setMode] = useState<Mode>(() => (localStorage.getItem('morecode:mode') === 'code' ? 'code' : 'chat'))
-  const modeStarted = useRef(false)
   useEffect(() => {
     try {
       localStorage.setItem('morecode:mode', mode)
     } catch {
       // not being able to remember the choice is harmless
     }
-    if (!modeStarted.current) {
-      modeStarted.current = true // the first run only restores; it must not move panels
-      return
-    }
-    if (mode === 'code') openTab('diff') // also expands the panel if it was collapsed
-    else if (!reveal.current.collapsed) reveal.current.toggle()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
   const { account, openProject } = useAuth()
   const ws = useWorkspace()
@@ -283,7 +275,7 @@ function AppShell(): React.JSX.Element {
               arrowsClass="@max-[200px]:hidden"
             />
           </div>
-          <LeftSidebar />
+          <LeftSidebar showFiles={mode === 'code'} />
         </ResizablePanel>
 
         <ResizableHandle onToggle={toggleLeft} disabled={leftCollapsed} />
