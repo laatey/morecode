@@ -30,7 +30,18 @@ export function getWorkspaceRoot(): string {
   return root
 }
 
-function setWorkspaceRoot(next: string): void {
+/** A predictable home for projects created by the AI, separate from any open project. */
+export function getNewProjectRoot(): string {
+  const folder = join(app.getPath('documents'), 'MoreCode Projects')
+  try {
+    mkdirSync(folder, { recursive: true })
+  } catch {
+    // The create-project tool will report a useful error if Documents is unavailable.
+  }
+  return folder
+}
+
+export function setWorkspaceRoot(next: string): void {
   root = next
   try {
     writeFileSync(stateFile(), JSON.stringify({ root: next }))
@@ -226,6 +237,13 @@ export function registerWorkspaceIpc(): void {
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     if (result.canceled || !result.filePaths[0]) return null
     setWorkspaceRoot(result.filePaths[0])
+    return info()
+  })
+
+  /** Make an already-existing folder the active project without opening a picker. */
+  ipcMain.handle('workspace:open', (_event, folder: unknown) => {
+    if (typeof folder !== 'string' || !existsSync(folder) || !statSync(folder).isDirectory()) return null
+    setWorkspaceRoot(folder)
     return info()
   })
 

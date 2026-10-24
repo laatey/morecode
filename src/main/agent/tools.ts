@@ -1,6 +1,7 @@
 import { spawn, execFile, type ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'fs'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
+import { setWorkspaceRoot } from '../workspace'
 import type { ToolDef } from './anthropic'
 import { diffFiles } from './diff'
 
@@ -14,6 +15,8 @@ export type PermissionAction = 'command' | 'install' | 'remove' | 'network'
 
 export interface ToolContext {
   cwd: string
+  /** Documents-based parent for new standalone projects. */
+  newProjectRoot?: string
   signal: AbortSignal
   emit: (tool: Record<string, unknown>) => void
   ask: (req: { id: string; action: PermissionAction; title: string; command: string; reason?: string }) => Promise<Decision>
@@ -125,6 +128,65 @@ type Input = Record<string, unknown>
 const str = (v: unknown, name: string): string => {
   if (typeof v !== 'string') throw new Error(`“${name}” must be text.`)
   return v
+}
+
+const PROJECT_TEMPLATES = new Set(['vanilla', 'vanilla-ts', 'vue', 'vue-ts', 'react', 'react-ts', 'svelte', 'svelte-ts'])
+const projectSlug = (raw: string): string =>
+  raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+/** Create a standalone Vite project under Documents, then move the agent into it. */
+async function createProject(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
+  const name = projectSlug(str(i.name, 'name'))
+  const template = typeof i.template === 'string' ? i.template : 'react-ts'
+  if (!name) throw new Error('Use a short project name made from letters or numbers.')
+  if (!PROJECT_TEMPLATES.has(template)) throw new Error(`“${template}” is not a supported Vite template.`)
+  if (!ctx.newProjectRoot) throw new Error('The Documents project folder is not available in this version of MoreCode.')
+  const parent = resolve(ctx.newProjectRoot)
+  const target = join(parent, name)
+  if (existsSync(target)) throw new Error(`${target} already exists. Choose another name or open that folder.`)
+
+  const command = `npm create vite@latest ${JSON.stringify(target)} -- --template ${template}`
+  const decision = await ctx.ask({
+    id: `perm-${id}`,
+    action: 'install',
+    title: 'Create a new project',
+    command,
+    reason: `Create ${name} in Documents\\MoreCode Projects with the ${template} template.`
+  })
+  if (decision === 'deny') return { content: 'The person did not allow the project to be created.', isError: true }
+
+  ctx.emit({ kind: 'command', id, label: `Create ${name}`, command, status: 'running' })
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  const output = await new Promise<{ code: number | null; text: string }>((done) => {
+    let text = ''
+    const child = spawn(npm, ['create', 'vite@latest', target, '--', '--template', template], {
+      cwd: parent,
+      windowsHide: true,
+      env: { ...process.env, CI: '1', NO_COLOR: '1', TERM: 'dumb' }
+    })
+    const add = (chunk: Buffer): void => {
+      text += chunk.toString('utf8')
+      if (text.length > 200_000) text = text.slice(-100_000)
+    }
+    child.stdout?.on('data', add)
+    child.stderr?.on('data', add)
+    child.on('error', (error) => done({ code: 1, text: error.message }))
+    child.on('close', (code) => done({ code, text }))
+  })
+  const shown = clip(output.text.trim() || '(no output)')
+  if (output.code !== 0 || !existsSync(target)) {
+    ctx.emit({ kind: 'command', id, label: `Create ${name}`, command, status: 'error', output: shown })
+    return { content: `${shown}\n[exit code ${output.code}]`, isError: true }
+  }
+  ctx.cwd = target
+  setWorkspaceRoot(target)
+  ctx.emit({ kind: 'project', name: basename(target), path: target })
+  ctx.emit({ kind: 'command', id, label: `Create ${name}`, command, status: 'done', output: shown })
+  return { content: `Created ${basename(target)} in ${target}. This is now the active project folder. Install dependencies before starting the dev server.` }
 }
 
 async function readFile(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
@@ -335,6 +397,18 @@ function presentPlan(ctx: ToolContext, id: string, i: Input): ToolResult {
 
 export const TOOL_DEFS: ToolDef[] = [
   {
+    name: 'create_project',
+    description: 'Create a new standalone Vite project in the person’s Documents\\MoreCode Projects folder and make it the active project. Use this instead of scaffolding inside the current project when the person asks for a new project without a location.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Short project name.' },
+        template: { type: 'string', enum: [...PROJECT_TEMPLATES], description: 'Vite template.' }
+      },
+      required: ['name', 'template']
+    }
+  },
+  {
     name: 'list_dir',
     description: 'List the files and folders in a directory of the project. Use "." for the project root.',
     input_schema: { type: 'object', properties: { path: { type: 'string', description: 'Folder path relative to the project root.' } } }
@@ -428,6 +502,8 @@ export const TOOL_DEFS: ToolDef[] = [
 export async function executeTool(name: string, id: string, input: Input, ctx: ToolContext): Promise<ToolResult> {
   try {
     switch (name) {
+      case 'create_project':
+        return await createProject(ctx, id, input)
       case 'list_dir':
         return listDir(ctx, id, input)
       case 'read_file':

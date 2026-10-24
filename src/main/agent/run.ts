@@ -19,6 +19,7 @@ export interface UsageDetail {
 export type OutEvent =
   | { type: 'tool'; tool: Record<string, unknown> }
   | { type: 'text'; delta: string }
+  | { type: 'project'; name: string; path: string }
   | { type: 'usage'; tokens: number; detail: UsageDetail }
 
 export interface RunInput {
@@ -32,6 +33,8 @@ export interface RunInput {
   history: { role: 'user' | 'assistant'; text: string }[]
   style: Style
   runId: string
+  /** Documents-based parent used only when a person asks to start a separate project. */
+  newProjectRoot?: string
   /** Extra headers for the MoreCode server (never sent to anyone else). */
   headers?: Record<string, string>
 }
@@ -52,7 +55,7 @@ const VOICE: Record<Style, string> = {
   pro: 'The person is an experienced developer. Be brief and technical; skip basics.'
 }
 
-export function buildSystem(cwd: string, style: Style): string {
+export function buildSystem(cwd: string, style: Style, newProjectRoot?: string): string {
   let notes = ''
   for (const name of ['AGENTS.md', 'CLAUDE.md']) {
     const file = join(cwd, name)
@@ -71,6 +74,7 @@ How to work:
 - For anything with more than a couple of steps, call todo_write first and keep it updated.
 - After changing code, check your work when a check exists (tests, type check, lint) with run_command.
 - If the person asks for a plan, or the change is large or risky, call present_plan and stop. Do not change files until they approve.
+- If the person asks to create a new, separate project and has not named a folder, call create_project. It creates the project in ${newProjectRoot ?? 'their Documents folder'}, switches this run into it, and keeps it out of the project currently open in MoreCode. Never scaffold a separate project inside the current project unless the person explicitly gives that location.
 - You can only touch files inside the project folder. If a command is refused, do not look for a way around it; explain and ask.
 - Never invent file contents or command output. If something fails, say so plainly and say what you will try next.
 - Finish with a short summary of what changed and anything the person should check. Write for a person, not a log.${notes}`
@@ -106,10 +110,11 @@ function userContent(input: RunInput): ContentBlock[] {
 
 /** One whole request: keep asking the model and running its tools until it has finished. */
 export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
-  const system = buildSystem(input.cwd, input.style)
+  const system = buildSystem(input.cwd, input.style, input.newProjectRoot)
   const messages: ApiMessage[] = [...buildHistory(input.history), { role: 'user', content: userContent(input) }]
   const ctx = {
     cwd: input.cwd,
+    newProjectRoot: input.newProjectRoot,
     signal: io.signal,
     runId: input.runId,
     emit: (tool: Record<string, unknown>) => io.emit({ type: 'tool', tool }),

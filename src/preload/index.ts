@@ -76,6 +76,7 @@ export type AgentMessage = { runId: string } & (
       evt:
         | { type: 'tool'; tool: Record<string, unknown> }
         | { type: 'text'; delta: string }
+        | { type: 'project'; name: string; path: string }
         | { type: 'usage'; tokens: number; detail: AgentUsage }
     }
   | {
@@ -146,6 +147,8 @@ const api = {
   workspace: {
     get: (): Promise<WorkspaceInfo> => ipcRenderer.invoke('workspace:get'),
     choose: (): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:choose'),
+    /** Change the active project to an existing folder without showing the folder picker. */
+    open: (folder: string): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:open', folder),
     /** Every file in the project, as relative paths (for @ mentions). */
     files: (): Promise<string[]> => ipcRenderer.invoke('workspace:files'),
     /** Read a small project file for MoreCode's in-app file preview. */

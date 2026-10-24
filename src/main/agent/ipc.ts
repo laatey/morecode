@@ -1,5 +1,5 @@
 import { ipcMain, type WebContents } from 'electron'
-import { getWorkspaceRoot } from '../workspace'
+import { getNewProjectRoot, getWorkspaceRoot } from '../workspace'
 import { ApiFailure } from './anthropic'
 import { runAgent, type RunInput, type Style } from './run'
 import { keepEdit, revertEdit, type Decision } from './tools'
@@ -50,7 +50,7 @@ export function registerAgentIpc(): void {
     }
 
     void runAgent(
-      { ...payload, cwd: getWorkspaceRoot() },
+      { ...payload, cwd: getWorkspaceRoot(), newProjectRoot: getNewProjectRoot() },
       {
         signal: live.abort.signal,
         emit: (evt) => send({ kind: 'evt', evt }),

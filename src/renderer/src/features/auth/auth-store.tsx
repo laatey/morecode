@@ -141,6 +141,10 @@ export function AuthProvider({
   const openProject = useCallback(
     async (p: Project) => {
       if (!account) return
+      // The project shown in the sidebar and the desktop command/file workspace must be one thing.
+      // Previously this only changed account metadata, leaving agents in whichever old folder was
+      // last selected in the native dialog.
+      if (p.path && window.api?.workspace?.open) await window.api.workspace.open(p.path)
       const recents = [
         p,
         ...account.recents.filter((r) => r.path !== p.path || r.name !== p.name)

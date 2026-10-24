@@ -188,6 +188,20 @@ function AppShell(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linked, active.id])
 
+  // A standalone project made by the AI becomes a real sidebar project immediately.
+  useEffect(() => {
+    const onCreated = (event: Event): void => {
+      const detail = (event as CustomEvent<{ name?: string; path?: string }>).detail
+      if (!detail?.name || !detail.path) return
+      const existing = ws.groups.find((item) => item.folder === detail.path)
+      const projectId = existing?.id ?? ws.addGroup(detail.name, detail.path)
+      ws.moveTo(ws.active.id, projectId)
+      void openProject({ name: detail.name, path: detail.path })
+    }
+    window.addEventListener('workspace:project-created', onCreated)
+    return () => window.removeEventListener('workspace:project-created', onCreated)
+  }, [openProject, ws])
+
   const { openTab, closeTab, tabs, paneTabs, layout } = useRightPanel()
   const visibleTabIds = paneTabs.slice(0, getLayout(layout).panes)
   const docsOpen =

@@ -77,6 +77,11 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         const e = m.evt
         if (e.type === 'tool') yield { type: 'tool', tool: e.tool as unknown as ToolBlock }
         else if (e.type === 'text') yield { type: 'text', delta: e.delta }
+        else if (e.type === 'project') {
+          window.dispatchEvent(
+            new CustomEvent('workspace:project-created', { detail: { name: e.name, path: e.path } })
+          )
+        }
         else {
           cfg.onUsage(e.detail)
           yield { type: 'usage', tokens: e.tokens }
