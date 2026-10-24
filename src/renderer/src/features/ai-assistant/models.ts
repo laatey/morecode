@@ -6,11 +6,17 @@ export interface ModelInfo {
 }
 
 export const KAGGLE_QWEN_MODEL = 'qwen2.5-coder-14b-kaggle'
+export const MORLINE_GATEWAY_MODEL = 'anthropic/claude-sonnet-5'
 
 export const MODELS: ModelInfo[] = [
   { id: 'claude-opus-5-5', name: 'Opus 5.5', description: 'Most capable, for complex work' },
   { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', description: 'Balanced speed and quality' },
   { id: 'claude-haiku-5-5', name: 'Haiku 5.5', description: 'Fastest, for quick edits' },
+  {
+    id: MORLINE_GATEWAY_MODEL,
+    name: 'Claude Sonnet (Morline)',
+    description: 'Your protected Morline gateway'
+  },
   {
     id: KAGGLE_QWEN_MODEL,
     name: 'Qwen Coder 14B (Kaggle)',
@@ -27,3 +33,4 @@ export const resolveModel = (id: string): string =>
 export const modelName = (id: string): string => MODELS.find((m) => m.id === id)?.name ?? id
 
 export const isKaggleQwen = (id: string): boolean => id === KAGGLE_QWEN_MODEL
+export const isMorlineGateway = (id: string): boolean => id === MORLINE_GATEWAY_MODEL

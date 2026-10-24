@@ -13,7 +13,7 @@ const runs = new Map<string, Live>()
 
 type Payload = Omit<RunInput, 'cwd'>
 
-const MODELS = /^(claude-[a-z0-9.-]+|qwen2\.5-coder-14b-kaggle)$/i
+const MODELS = /^(claude-[a-z0-9.-]+|qwen2\.5-coder-14b-kaggle|anthropic\/claude-sonnet-5)$/i
 
 function valid(p: unknown): p is Payload {
   const x = p as Payload
@@ -124,7 +124,7 @@ export function registerAgentIpc(): void {
     }
   )
 
-  /** Check a live personal Kaggle endpoint without sending any project data. */
+  /** Check a configured personal endpoint without sending any project data. */
   ipcMain.handle(
     'agent:test-endpoint',
     async (_e, endpoint: unknown, token: unknown): Promise<{ ok: boolean; message?: string }> => {
@@ -134,7 +134,7 @@ export function registerAgentIpc(): void {
         typeof token !== 'string' ||
         token.length < 20
       ) {
-        return { ok: false, message: 'Enter the HTTPS endpoint and its notebook token.' }
+        return { ok: false, message: 'Enter the HTTPS endpoint and its access key.' }
       }
       try {
         const res = await fetch(`${endpoint.replace(/\/$/, '')}/health`, {
@@ -143,13 +143,13 @@ export function registerAgentIpc(): void {
         })
         if (res.ok) return { ok: true }
         if (res.status === 401 || res.status === 403)
-          return { ok: false, message: 'That notebook token was not accepted.' }
+          return { ok: false, message: 'That endpoint key was not accepted.' }
         return { ok: false, message: `The endpoint did not become ready (${res.status}).` }
       } catch {
         return {
           ok: false,
           message:
-            'Could not reach the endpoint. Start the Kaggle notebook and copy its current tunnel URL.'
+            'Could not reach the endpoint. Check its URL and that it is running.'
         }
       }
     }

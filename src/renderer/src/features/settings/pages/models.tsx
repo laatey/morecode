@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/auth-store'
 import { errorText } from '@/features/auth/ui'
-import { isKaggleQwen, MODELS } from '@/features/ai-assistant/models'
+import { isKaggleQwen, isMorlineGateway, MODELS } from '@/features/ai-assistant/models'
 import { Btn, Group, Page, Pick, Row, TextInput } from '../kit'
 import { useSettings } from '../settings-store'
 
@@ -177,6 +177,66 @@ function KaggleEndpointRow(): React.JSX.Element {
   )
 }
 
+function MorlineGatewayRow(): React.JSX.Element {
+  const { settings, set } = useSettings()
+  const [adding, setAdding] = useState(false)
+  const [endpoint, setEndpoint] = useState(settings.morlineGatewayUrl)
+  const [key, setKey] = useState(settings.morlineGatewayKey)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const configured = Boolean(settings.morlineGatewayUrl && settings.morlineGatewayKey)
+
+  return (
+    <div className="py-3">
+      <div className="flex items-center gap-6">
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] text-[#ededeb]">Morline AI gateway</div>
+          <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">
+            Uses your protected Morline endpoint. Provider keys stay on Morline.
+          </div>
+        </div>
+        {configured && !adding ? (
+          <div className="flex items-center gap-2">
+            <span className="max-w-40 truncate font-mono text-[11px] text-[#c9c9c6]">{settings.morlineGatewayUrl}</span>
+            <Btn variant="danger" onClick={() => set({ morlineGatewayKey: '' })}>Remove</Btn>
+          </div>
+        ) : !adding ? <Btn onClick={() => setAdding(true)}>Connect gateway</Btn> : null}
+      </div>
+      {adding && (
+        <form
+          className="mt-3 space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            setBusy(true)
+            setError(null)
+            const clean = endpoint.trim().replace(/\/$/, '')
+            window.api.agent
+              .testEndpoint(clean, key.trim())
+              .then((r) => {
+                if (!r.ok) throw new Error(r.message)
+                set({ morlineGatewayUrl: clean, morlineGatewayKey: key.trim() })
+                setAdding(false)
+                toast('Morline gateway connected')
+              })
+              .catch((err: Error) => setError(err.message))
+              .finally(() => setBusy(false))
+          }}
+        >
+          <TextInput autoFocus autoComplete="off" spellCheck={false} aria-label="Morline gateway URL" placeholder="https://api.morline.space/ai" className="font-mono" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} />
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <TextInput type="password" autoComplete="off" spellCheck={false} aria-label="Morline gateway key" placeholder="Morline gateway key" className="font-mono" value={key} onChange={(e) => setKey(e.target.value)} />
+              {error && <p className="mt-1.5 text-[12.5px] text-[#f4a39e]">{error}</p>}
+            </div>
+            <Btn variant="primary" type="submit" busy={busy} disabled={!endpoint.trim() || !key.trim()}>Test and save</Btn>
+            <Btn onClick={() => setAdding(false)}>Cancel</Btn>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
 export function ModelsPage(): React.JSX.Element {
   const { settings, set } = useSettings()
   const current = MODELS.find((m) => m.id === settings.model)
@@ -197,6 +257,7 @@ export function ModelsPage(): React.JSX.Element {
       </Group>
       <Group title="Access">
         <ApiKeyRow />
+        {isMorlineGateway(settings.model) && <MorlineGatewayRow />}
         {isKaggleQwen(settings.model) && <KaggleEndpointRow />}
       </Group>
     </Page>
