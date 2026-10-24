@@ -149,6 +149,8 @@ const api = {
     choose: (): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:choose'),
     /** Change the active project to an existing folder without showing the folder picker. */
     open: (folder: string): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:open', folder),
+    /** Create or reopen an empty Documents-based folder for a sidebar project. */
+    createProject: (name: string): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:create-project', name),
     /** Every file in the project, as relative paths (for @ mentions). */
     files: (): Promise<string[]> => ipcRenderer.invoke('workspace:files'),
     /** Read a small project file for MoreCode's in-app file preview. */

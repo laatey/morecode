@@ -188,6 +188,17 @@ function AppShell(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linked, active.id])
 
+  // Groups created by older versions could be labels with no folder. Upgrade one when opened so
+  // commands cannot fall back to the last unrelated project directory.
+  useEffect(() => {
+    if (!group || linked || !window.api?.workspace?.createProject) return
+    void window.api.workspace.createProject(group.name).then((created) => {
+      if (!created) return
+      ws.linkGroup(group.id, created.root)
+      void openProject({ name: group.name, path: created.root })
+    })
+  }, [group, linked, openProject, ws])
+
   // A standalone project made by the AI becomes a real sidebar project immediately.
   useEffect(() => {
     const onCreated = (event: Event): void => {

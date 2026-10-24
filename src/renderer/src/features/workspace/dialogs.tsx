@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { FolderOpen } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from './workspace-store'
 import { CommandPalette } from '@/features/palette/command-palette'
@@ -253,10 +254,18 @@ export function WorkspaceDialogs(): React.JSX.Element {
         chooseFolder={desktop}
         onClose={close}
         onSubmit={(name, folder) => {
-          const id = ws.addGroup(name, folder)
-          if (dialog?.kind === 'new-project' && dialog.moveChatId) ws.moveTo(dialog.moveChatId, id)
-          else ws.newChat(id)
-          close()
+          void (async () => {
+            const created = folder ? null : await window.api?.workspace?.createProject(name)
+            const projectFolder = folder ?? created?.root
+            if (!projectFolder) {
+              toast('Could not create a project folder in Documents')
+              return
+            }
+            const id = ws.addGroup(name, projectFolder)
+            if (dialog?.kind === 'new-project' && dialog.moveChatId) ws.moveTo(dialog.moveChatId, id)
+            else ws.newChat(id)
+            close()
+          })()
         }}
       />
       <NameDialog

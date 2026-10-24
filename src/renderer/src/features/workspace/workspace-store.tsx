@@ -67,6 +67,7 @@ interface WorkspaceApi {
   remove: (id: string) => void
   moveTo: (id: string, projectId: string | null) => void
   addGroup: (name: string, folder?: string) => string
+  linkGroup: (id: string, folder: string) => void
   renameGroup: (id: string, name: string) => void
   removeGroup: (id: string) => void
   setSearchOpen: (open: boolean) => void
@@ -362,6 +363,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     return id
   }, [])
 
+  const linkGroup = useCallback((id: string, folder: string) => {
+    setGroups((items) => items.map((group) => (group.id === id ? { ...group, folder } : group)))
+  }, [])
+
   const renameGroup = useCallback((id: string, name: string) => {
     const clean = name.trim()
     if (clean)
@@ -442,6 +447,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       remove,
       moveTo,
       addGroup,
+      linkGroup,
       renameGroup,
       removeGroup,
       setSearchOpen,
@@ -467,6 +473,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       remove,
       moveTo,
       addGroup,
+      linkGroup,
       renameGroup,
       removeGroup,
       deleteAllChats,

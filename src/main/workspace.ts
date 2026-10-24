@@ -50,6 +50,12 @@ export function setWorkspaceRoot(next: string): void {
   }
 }
 
+const folderName = (raw: string): string =>
+  raw
+    .trim()
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+
 const info = (): { root: string; name: string } => ({
   root: getWorkspaceRoot(),
   name: basename(getWorkspaceRoot()) || getWorkspaceRoot()
@@ -245,6 +251,20 @@ export function registerWorkspaceIpc(): void {
     if (typeof folder !== 'string' || !existsSync(folder) || !statSync(folder).isDirectory()) return null
     setWorkspaceRoot(folder)
     return info()
+  })
+
+  /** Create or reopen an empty project folder under Documents for sidebar projects. */
+  ipcMain.handle('workspace:create-project', (_event, name: unknown) => {
+    const slug = typeof name === 'string' ? folderName(name) : ''
+    if (!slug) return null
+    try {
+      const folder = join(getNewProjectRoot(), slug)
+      mkdirSync(folder, { recursive: true })
+      setWorkspaceRoot(folder)
+      return info()
+    } catch {
+      return null
+    }
   })
 
   ipcMain.handle('workspace:files', () => listFiles())
