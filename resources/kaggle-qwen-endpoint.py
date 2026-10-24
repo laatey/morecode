@@ -29,11 +29,10 @@ IDLE_MINUTES = 20
 
 
 def install() -> None:
-    # Kaggle already includes CUDA PyTorch. These packages have wheels for its Python 3.13 image;
-    # unlike llama-cpp-python, no native C++ build is required.
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-q", "-U", "fastapi", "uvicorn", "transformers", "accelerate", "bitsandbytes"]
-    )
+    # Kaggle already includes PyTorch, FastAPI, Transformers and Accelerate. Do not upgrade the
+    # shared notebook environment: doing so can break Kaggle's Gradio and telemetry packages.
+    # bitsandbytes is the only extra runtime this notebook needs.
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "bitsandbytes"])
 
 
 install()
