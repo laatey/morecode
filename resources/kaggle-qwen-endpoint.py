@@ -41,7 +41,7 @@ install()
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TextIteratorStreamer
 
 
 if not torch.cuda.is_available():
@@ -90,7 +90,7 @@ def qwen_prompt(body: dict[str, Any]) -> str:
         tool_notes = (
             "\n\n# Tools\nYou may call one or more functions. The definitions are:\n<tools>\n"
             + "\n".join(json.dumps({"name": t.get("name"), "description": t.get("description"), "parameters": t.get("input_schema")}) for t in tools)
-            + "\n</tools>\nTo call a tool, return exactly:\n<tool_call>\n{\"name\": \"tool name\", \"arguments\": {}}\n</tool_call>"
+            + "\n</tools>\nWhen you need a tool, do not explain what you are about to do. Return exactly one or more <tool_call> blocks and nothing else. Never use Markdown fences or a JSON code block.\n<tool_call>\n{\"name\": \"tool name\", \"arguments\": {}}\n</tool_call>"
         )
     pieces = [f"<|im_start|>system\n{system}{tool_notes}<|im_end|>"]
     for message in body.get("messages", []):
@@ -111,31 +111,45 @@ def qwen_prompt(body: dict[str, Any]) -> str:
     return "\n".join(pieces)
 
 
-def generate(body: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+def model_chunks(body: dict[str, Any]):
     inputs = TOKENIZER(qwen_prompt(body), return_tensors="pt").to(MODEL.device)
-    with torch.inference_mode():
-        generated = MODEL.generate(
-            **inputs,
-            max_new_tokens=min(int(body.get("max_tokens", 2048)), 3072),
-            do_sample=True,
-            temperature=0.15,
-            top_p=0.9,
-            pad_token_id=TOKENIZER.eos_token_id,
-            eos_token_id=TOKENIZER.eos_token_id,
-            use_cache=True,
-        )
-    raw = TOKENIZER.decode(generated[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=False)
-    raw = raw.split("<|im_end|>", 1)[0].split("<|im_start|>", 1)[0].strip()
+    streamer = TextIteratorStreamer(TOKENIZER, skip_prompt=True, skip_special_tokens=True)
+    kwargs = {
+        **inputs,
+        "max_new_tokens": min(int(body.get("max_tokens", 2048)), 3072),
+        "do_sample": True,
+        "temperature": 0.15,
+        "top_p": 0.9,
+        "pad_token_id": TOKENIZER.eos_token_id,
+        "eos_token_id": TOKENIZER.eos_token_id,
+        "use_cache": True,
+        "streamer": streamer,
+    }
+    def run_generation() -> None:
+        with torch.inference_mode():
+            MODEL.generate(**kwargs)
+
+    worker = threading.Thread(target=run_generation, daemon=True)
+    worker.start()
+    yield from streamer
+    worker.join()
+
+
+def parse_calls(raw: str, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    allowed = {str(tool.get("name")) for tool in tools}
     calls: list[dict[str, Any]] = []
-    for i, match in enumerate(re.finditer(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", raw, re.S)):
+    candidates = re.findall(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", raw, re.S)
+    # Qwen sometimes wraps a valid call in a Markdown JSON fence despite being instructed not to.
+    # Accept that one harmless variant rather than rendering a shell command as chat text.
+    candidates += re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.S)
+    for i, candidate in enumerate(candidates):
         try:
-            call = json.loads(match.group(1))
-            if isinstance(call.get("name"), str) and isinstance(call.get("arguments"), dict):
+            call = json.loads(candidate)
+            if isinstance(call.get("name"), str) and call["name"] in allowed and isinstance(call.get("arguments"), dict):
                 calls.append({"id": f"toolu_kaggle_{i}_{secrets.token_hex(4)}", "name": call["name"], "input": call["arguments"]})
         except json.JSONDecodeError:
             pass
-    visible = re.sub(r"<tool_call>\s*\{.*?\}\s*</tool_call>", "", raw, flags=re.S).strip()
-    return visible, calls
+    return calls
 
 
 def sse(event: str, payload: dict[str, Any]) -> str:
@@ -143,12 +157,24 @@ def sse(event: str, payload: dict[str, Any]) -> str:
 
 
 def anthopic_events(body: dict[str, Any]):
-    text, calls = generate(body)
     yield sse("message_start", {"type": "message_start", "message": {"usage": {"input_tokens": 0, "output_tokens": 0}}})
+    raw = ""
     index = 0
-    if text:
-        yield sse("content_block_start", {"type": "content_block_start", "index": index, "content_block": {"type": "text", "text": ""}})
-        yield sse("content_block_delta", {"type": "content_block_delta", "index": index, "delta": {"type": "text_delta", "text": text}})
+    text_started = False
+    for chunk in model_chunks(body):
+        raw += chunk
+        probe = raw.lstrip()
+        # Hold known tool prefixes so the command never flashes as ordinary chat prose.
+        if not text_started and (probe.startswith("<tool_call") or probe.startswith("```") or probe.startswith("jsonCopy")):
+            continue
+        if not text_started and probe:
+            text_started = True
+            yield sse("content_block_start", {"type": "content_block_start", "index": index, "content_block": {"type": "text", "text": ""}})
+        if text_started:
+            yield sse("content_block_delta", {"type": "content_block_delta", "index": index, "delta": {"type": "text_delta", "text": chunk}})
+
+    calls = parse_calls(raw, body.get("tools", []))
+    if text_started:
         yield sse("content_block_stop", {"type": "content_block_stop", "index": index})
         index += 1
     for call in calls:
