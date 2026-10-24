@@ -111,7 +111,11 @@ function SidebarFileTree({
   onFile: (path: string) => void
   depth?: number
 }): React.JSX.Element {
-  const [closed, setClosed] = useState<Set<string>>(new Set())
+  // A project tree can be thousands of rows deep. Start folded and let people reveal only the
+  // branch they need, rather than opening every directory on entry to Code mode.
+  const [closed, setClosed] = useState<Set<string>>(() =>
+    new Set(nodes.filter((node) => node.kind === 'dir').map((node) => node.path))
+  )
   const toggle = (path: string): void =>
     setClosed((current) => {
       const next = new Set(current)
