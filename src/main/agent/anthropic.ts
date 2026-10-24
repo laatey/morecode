@@ -80,6 +80,9 @@ async function explain(res: Response): Promise<ApiFailure> {
     const wait = Number(res.headers.get('retry-after'))
     return new ApiFailure('rate_limit', detail || 'You are sending requests faster than your plan allows.', 429, Number.isFinite(wait) && wait > 0 ? wait : undefined)
   }
+  if (res.status === 402) {
+    return new ApiFailure('failed', 'The configured AI gateway is out of credits. Add credits or connect another provider.', 402)
+  }
   if (res.status === 529 || res.status >= 500) {
     return new ApiFailure('failed', 'The AI service is busy right now. Try again in a moment.', res.status)
   }
