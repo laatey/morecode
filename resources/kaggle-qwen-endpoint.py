@@ -14,6 +14,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import subprocess
 import sys
 import threading
@@ -190,13 +191,29 @@ def stop_when_idle() -> None:
             os._exit(0)
 
 
-threading.Thread(target=stop_when_idle, daemon=True).start()
-threading.Thread(target=lambda: __import__("uvicorn").run(APP, host="127.0.0.1", port=PORT, log_level="warning"), daemon=True).start()
+def port_is_open(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+if port_is_open(PORT):
+    print(f"Reusing the existing MoreCode server on port {PORT}.")
+else:
+    threading.Thread(target=stop_when_idle, daemon=True).start()
+    threading.Thread(
+        target=lambda: __import__("uvicorn").run(APP, host="127.0.0.1", port=PORT, log_level="warning"),
+        daemon=True,
+    ).start()
 
 # Cloudflare Quick Tunnel makes a random HTTPS URL for this one notebook session. It is still
 # protected by TOKEN; never post either value publicly. A new notebook run creates both anew.
-subprocess.check_call(["bash", "-lc", "wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O /tmp/cloudflared && chmod +x /tmp/cloudflared"])
-tunnel = subprocess.Popen(["/tmp/cloudflared", "tunnel", "--url", f"http://127.0.0.1:{PORT}"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+# A per-run filename avoids overwriting an active Cloudflare process when the cell is rerun.
+tunnel_bin = f"/tmp/cloudflared-morecode-{secrets.token_hex(5)}"
+subprocess.check_call(
+    ["wget", "-q", "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64", "-O", tunnel_bin]
+)
+os.chmod(tunnel_bin, 0o755)
+tunnel = subprocess.Popen([tunnel_bin, "tunnel", "--url", f"http://127.0.0.1:{PORT}"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 endpoint = None
 for line in iter(tunnel.stdout.readline, ""):
     found = re.search(r"https://[-a-z0-9]+\.trycloudflare\.com", line)
