@@ -26,7 +26,10 @@ function compact<T>(nodes: TreeNode<T>[]): TreeNode<T>[] {
   )
 }
 
-export function buildTree<T extends { path: string }>(items: T[]): TreeNode<T>[] {
+export function buildTree<T extends { path: string }>(
+  items: T[],
+  compactFolders = true
+): TreeNode<T>[] {
   const root: DirNode<T> = { kind: 'dir', name: '', path: '', children: [] }
   for (const item of items) {
     const parts = item.path.split('/')
@@ -41,7 +44,7 @@ export function buildTree<T extends { path: string }>(items: T[]): TreeNode<T>[]
     })
     dir.children.push({ kind: 'file', name: parts[parts.length - 1], path: item.path, item })
   }
-  return compact(root.children)
+  return compactFolders ? compact(root.children) : sortNodes(root.children)
 }
 
 const countFiles = <T,>(n: TreeNode<T>): number =>

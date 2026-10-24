@@ -161,7 +161,8 @@ function SidebarFileTree({
 function FilesSection(): React.JSX.Element {
   const files = useWorkspaceFiles('sidebar')
   const { openTab } = useRightPanel()
-  const tree = buildTree(files.map((path) => ({ path })))
+  // The explorer deliberately keeps each directory visible and starts every one open.
+  const tree = buildTree(files.map((path) => ({ path })), false)
   const openFile = (path: string): void => {
     requestFilePreview(path)
     openTab('file')
