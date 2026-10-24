@@ -18,23 +18,21 @@ import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
 
-MODEL_REPO = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
-MODEL_FILE = "qwen2.5-coder-14b-instruct-q4_k_m.gguf"
+# This is the same Qwen model in an already-quantized 4-bit Transformers format. Downloading
+# pre-quantized weights avoids compiling llama.cpp, which Kaggle's Python 3.13 image rejects.
+MODEL_REPO = "unsloth/Qwen2.5-Coder-14B-Instruct-bnb-4bit"
 PORT = 8000
 IDLE_MINUTES = 20
-CONTEXT_TOKENS = 8192
 
 
 def install() -> None:
-    # Kaggle sessions are disposable, so install the small server dependencies in the notebook.
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "fastapi", "uvicorn", "huggingface_hub"])
-    env = os.environ | {"CMAKE_ARGS": "-DGGML_CUDA=on", "FORCE_CMAKE": "1"}
+    # Kaggle already includes CUDA PyTorch. These packages have wheels for its Python 3.13 image;
+    # unlike llama-cpp-python, no native C++ build is required.
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-q", "--no-binary", "llama-cpp-python", "llama-cpp-python"], env=env
+        [sys.executable, "-m", "pip", "install", "-q", "-U", "fastapi", "uvicorn", "transformers", "accelerate", "bitsandbytes"]
     )
 
 
@@ -42,24 +40,24 @@ install()
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from huggingface_hub import snapshot_download
-from llama_cpp import Llama
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 
-# The official Q4 model is shipped as one or more GGUF parts. llama.cpp accepts the first
-# part and loads its siblings automatically, so download every matching part rather than
-# assuming a single 9 GB file exists.
-MODEL_DIR = snapshot_download(repo_id=MODEL_REPO, allow_patterns=f"*{MODEL_FILE.replace('.gguf', '')}*.gguf")
-MODEL_PARTS = sorted(Path(MODEL_DIR).glob(f"*{MODEL_FILE.replace('.gguf', '')}*.gguf"))
-if not MODEL_PARTS:
-    raise RuntimeError("Could not download the Q4_K_M model files from Hugging Face.")
-MODEL_PATH = str(MODEL_PARTS[0])
-MODEL = Llama(
-    model_path=MODEL_PATH,
-    n_ctx=CONTEXT_TOKENS,
-    n_gpu_layers=-1,
-    n_threads=4,
-    verbose=False,
+if not torch.cuda.is_available():
+    raise RuntimeError("Enable a GPU accelerator in Kaggle before running this notebook.")
+TOKENIZER = AutoTokenizer.from_pretrained(MODEL_REPO)
+MODEL = AutoModelForCausalLM.from_pretrained(
+    MODEL_REPO,
+    device_map="auto",
+    torch_dtype=torch.float16,
+    # Kaggle may provide a P100, which supports FP16 but not BF16.
+    quantization_config=BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+    ),
 )
 TOKEN = secrets.token_urlsafe(32)
 LAST_REQUEST = time.monotonic()
@@ -114,13 +112,20 @@ def qwen_prompt(body: dict[str, Any]) -> str:
 
 
 def generate(body: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
-    raw = MODEL(
-        qwen_prompt(body),
-        max_tokens=min(int(body.get("max_tokens", 2048)), 3072),
-        temperature=0.15,
-        top_p=0.9,
-        stop=["<|im_end|>", "<|im_start|>"],
-    )["choices"][0]["text"].strip()
+    inputs = TOKENIZER(qwen_prompt(body), return_tensors="pt").to(MODEL.device)
+    with torch.inference_mode():
+        generated = MODEL.generate(
+            **inputs,
+            max_new_tokens=min(int(body.get("max_tokens", 2048)), 3072),
+            do_sample=True,
+            temperature=0.15,
+            top_p=0.9,
+            pad_token_id=TOKENIZER.eos_token_id,
+            eos_token_id=TOKENIZER.eos_token_id,
+            use_cache=True,
+        )
+    raw = TOKENIZER.decode(generated[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=False)
+    raw = raw.split("<|im_end|>", 1)[0].split("<|im_start|>", 1)[0].strip()
     calls: list[dict[str, Any]] = []
     for i, match in enumerate(re.finditer(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", raw, re.S)):
         try:
