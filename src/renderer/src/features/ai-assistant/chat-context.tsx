@@ -16,7 +16,7 @@ import { recordPlans } from '@/features/right-panel/plan-history'
 import { recordUsage } from '@/features/billing/usage-log'
 import { mockAgent } from './agent/mock-agent'
 import { makeRealRunner, type RealConfig } from './agent/real-agent'
-import { resolveModel } from './models'
+import { isKaggleQwen, resolveModel } from './models'
 import { useChat, type Policy } from './use-chat'
 import type { AgentRunner } from './types'
 import type { Msg, TodoItem, ToolBlock } from './types'
@@ -74,12 +74,23 @@ export function ChatProvider({
   const { account, service } = useAuth()
   const config = useRef<RealConfig>({ apiKey: null, style: 'some', onUsage: () => undefined })
   useEffect(() => {
+    const useKaggle = isKaggleQwen(settings.model)
     config.current = {
       // your own key goes straight to the AI; otherwise the MoreCode server does it under your plan
-      apiKey: account?.apiKey ?? service.hosted?.token() ?? null,
-      baseUrl: !account?.apiKey && service.hosted ? `${service.hosted.url}/v1/ai` : undefined,
-      hosted: !account?.apiKey && Boolean(service.hosted),
-      forceModel: !account?.apiKey && service.hosted && account?.plan === 'free' ? 'claude-haiku-5-5' : undefined,
+      apiKey: useKaggle
+        ? settings.kaggleToken || null
+        : (account?.apiKey ?? service.hosted?.token() ?? null),
+      baseUrl: useKaggle
+        ? settings.kaggleEndpoint || undefined
+        : !account?.apiKey && service.hosted
+          ? `${service.hosted.url}/v1/ai`
+          : undefined,
+      hosted: !useKaggle && !account?.apiKey && Boolean(service.hosted),
+      forceModel: useKaggle
+        ? undefined
+        : !account?.apiKey && service.hosted && account?.plan === 'free'
+          ? 'claude-haiku-5-5'
+          : undefined,
       style: account?.profile?.experience ?? 'some',
       onUsage: (u) => {
         if (account) {
@@ -97,7 +108,10 @@ export function ChatProvider({
     }
   })
   const runner = useMemo<AgentRunner>(
-    () => (typeof window !== 'undefined' && window.api?.agent ? makeRealRunner(() => config.current) : mockAgent),
+    () =>
+      typeof window !== 'undefined' && window.api?.agent
+        ? makeRealRunner(() => config.current)
+        : mockAgent,
     []
   )
 
@@ -138,19 +152,19 @@ export function ChatProvider({
   const { spendMessage } = useAuth()
   const ask = useCallback(
     (prompt: string) => {
-      if (spendMessage()) send(prompt, [], model, autoAccept)
+      if (isKaggleQwen(model) || spendMessage()) send(prompt, [], model, autoAccept)
     },
     [send, model, autoAccept, spendMessage]
   )
   const retry = useCallback(
     (agentId: string) => {
-      if (spendMessage()) retryRun(agentId, model, autoAccept)
+      if (isKaggleQwen(model) || spendMessage()) retryRun(agentId, model, autoAccept)
     },
     [retryRun, model, autoAccept, spendMessage]
   )
   const edit = useCallback(
     (userId: string, text: string) => {
-      if (spendMessage()) editRun(userId, text, model, autoAccept)
+      if (isKaggleQwen(model) || spendMessage()) editRun(userId, text, model, autoAccept)
     },
     [editRun, model, autoAccept, spendMessage]
   )

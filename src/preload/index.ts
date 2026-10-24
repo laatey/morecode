@@ -71,10 +71,28 @@ export interface AgentUsage {
   ms: number
 }
 export type AgentMessage = { runId: string } & (
-  | { kind: 'evt'; evt: { type: 'tool'; tool: Record<string, unknown> } | { type: 'text'; delta: string } | { type: 'usage'; tokens: number; detail: AgentUsage } }
-  | { kind: 'ask'; req: { id: string; action: 'command' | 'install' | 'remove' | 'network'; title: string; command: string; reason?: string } }
+  | {
+      kind: 'evt'
+      evt:
+        | { type: 'tool'; tool: Record<string, unknown> }
+        | { type: 'text'; delta: string }
+        | { type: 'usage'; tokens: number; detail: AgentUsage }
+    }
+  | {
+      kind: 'ask'
+      req: {
+        id: string
+        action: 'command' | 'install' | 'remove' | 'network'
+        title: string
+        command: string
+        reason?: string
+      }
+    }
   | { kind: 'done' }
-  | { kind: 'error'; error: { kind: 'rate_limit' | 'offline' | 'failed'; message: string; retryAfter?: number } }
+  | {
+      kind: 'error'
+      error: { kind: 'rate_limit' | 'offline' | 'failed'; message: string; retryAfter?: number }
+    }
 )
 export interface TermData {
   id: string
@@ -103,13 +121,20 @@ const api = {
       ipcRenderer.send('agent:permission', runId, id, decision),
     revert: (id: string): Promise<boolean> => ipcRenderer.invoke('agent:revert', id),
     keep: (id: string): void => ipcRenderer.send('agent:keep', id),
-    testKey: (key: string): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('agent:test-key', key),
+    testKey: (key: string): Promise<{ ok: boolean; message?: string }> =>
+      ipcRenderer.invoke('agent:test-key', key),
+    testEndpoint: (endpoint: string, token: string): Promise<{ ok: boolean; message?: string }> =>
+      ipcRenderer.invoke('agent:test-endpoint', endpoint, token),
     onEvent: (cb: (m: AgentMessage) => void): (() => void) => listen('agent:event', cb)
   },
   /** Calls to the MoreCode server, made by the desktop shell so the browser's CORS rules do not apply. Null = no answer. */
   http: {
-    request: (req: { method: string; url: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; body: string } | null> =>
-      ipcRenderer.invoke('api:request', req)
+    request: (req: {
+      method: string
+      url: string
+      headers?: Record<string, string>
+      body?: string
+    }): Promise<{ status: number; body: string } | null> => ipcRenderer.invoke('api:request', req)
   },
   /** Where a picked or dropped file lives on disk. */
   pathFor: (file: File): string => webUtils.getPathForFile(file),
@@ -126,7 +151,9 @@ const api = {
     /** Read a small project file for MoreCode's in-app file preview. */
     readFile: (path: string): Promise<DocResult> => ipcRenderer.invoke('workspace:read-file', path),
     /** Read a project image as a safe data URL for MoreCode's in-app preview. */
-    readImage: (path: string): Promise<{ ok: true; dataUrl: string } | { ok: false; error: string }> =>
+    readImage: (
+      path: string
+    ): Promise<{ ok: true; dataUrl: string } | { ok: false; error: string }> =>
       ipcRenderer.invoke('workspace:read-image', path),
     /** Show the project folder in the system file explorer. */
     reveal: (path?: string): Promise<void> => ipcRenderer.invoke('workspace:reveal', path),
@@ -134,28 +161,34 @@ const api = {
     openFile: (path: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke('workspace:open-file', path),
     /** Show one project file in the system file explorer. */
-    revealFile: (path: string): Promise<boolean> => ipcRenderer.invoke('workspace:reveal-file', path)
+    revealFile: (path: string): Promise<boolean> =>
+      ipcRenderer.invoke('workspace:reveal-file', path)
   },
   docs: {
     list: (): Promise<DocInfo[]> => ipcRenderer.invoke('docs:list'),
     read: (path: string): Promise<DocResult> => ipcRenderer.invoke('docs:read', path),
     open: (path: string): Promise<void> => ipcRenderer.invoke('docs:open', path),
-    write: (path: string, text: string): Promise<SaveResult> => ipcRenderer.invoke('docs:write', path, text),
+    write: (path: string, text: string): Promise<SaveResult> =>
+      ipcRenderer.invoke('docs:write', path, text),
     create: (name: string): Promise<CreateDocResult> => ipcRenderer.invoke('docs:create', name),
     search: (query: string): Promise<DocMatch[]> => ipcRenderer.invoke('docs:search', query)
   },
   git: {
     state: (): Promise<GitState> => ipcRenderer.invoke('git:state'),
     init: (): Promise<SaveResult> => ipcRenderer.invoke('git:init'),
-    commit: (req: { message: string; paths: string[]; newBranch?: string }): Promise<GitCommitResult> =>
-      ipcRenderer.invoke('git:commit', req),
+    commit: (req: {
+      message: string
+      paths: string[]
+      newBranch?: string
+    }): Promise<GitCommitResult> => ipcRenderer.invoke('git:commit', req),
     createPr: (req: { title: string; body: string; base: string }): Promise<GitPrResult> =>
       ipcRenderer.invoke('git:create-pr', req),
     openUrl: (url: string): Promise<void> => ipcRenderer.invoke('git:open-url', url)
   },
   terminal: {
     startDir: (): Promise<string> => ipcRenderer.invoke('term:start-dir'),
-    cd: (cwd: string, target: string): Promise<CdResult> => ipcRenderer.invoke('term:cd', cwd, target),
+    cd: (cwd: string, target: string): Promise<CdResult> =>
+      ipcRenderer.invoke('term:cd', cwd, target),
     run: (id: string, command: string, cwd: string): void =>
       ipcRenderer.send('term:run', { id, command, cwd }),
     kill: (id: string): void => ipcRenderer.send('term:kill', id),

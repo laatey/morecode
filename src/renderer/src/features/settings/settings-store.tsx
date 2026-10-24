@@ -20,6 +20,9 @@ export type ContentWidth = 'narrow' | 'default' | 'wide'
 export interface Settings {
   sendWith: 'enter' | 'mod-enter'
   model: string
+  /** Temporary personal endpoint used by the Kaggle Qwen experiment. Stored only in this app's local settings. */
+  kaggleEndpoint: string
+  kaggleToken: string
   autoAccept: boolean
   interfaceSize: InterfaceSize
   /** How wide the conversation and message box get. */
@@ -38,6 +41,8 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   sendWith: 'enter',
   model: DEFAULT_MODEL,
+  kaggleEndpoint: '',
+  kaggleToken: '',
   autoAccept: false,
   interfaceSize: 'default',
   contentWidth: 'default',
@@ -50,7 +55,11 @@ export const DEFAULT_SETTINGS: Settings = {
 }
 
 export const ZOOM: Record<InterfaceSize, number> = { small: 0.92, default: 1, large: 1.12 }
-export const CONTENT_WIDTH: Record<ContentWidth, string> = { narrow: '44rem', default: '56rem', wide: '72rem' }
+export const CONTENT_WIDTH: Record<ContentWidth, string> = {
+  narrow: '44rem',
+  default: '56rem',
+  wide: '72rem'
+}
 
 function load(): Settings {
   try {
@@ -107,7 +116,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     document.documentElement.dataset.motion = settings.reduceMotion ? 'reduced' : 'full'
   }, [settings.reduceMotion])
 
-  const set = useCallback((patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch })), [])
+  const set = useCallback(
+    (patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch })),
+    []
+  )
   const reset = useCallback(() => setSettings(DEFAULT_SETTINGS), [])
   const openSettings = useCallback((t?: SettingsTab) => {
     if (t) setTab(t)
