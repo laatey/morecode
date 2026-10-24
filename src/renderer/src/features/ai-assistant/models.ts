@@ -14,8 +14,8 @@ export const MODELS: ModelInfo[] = [
   { id: 'claude-haiku-5-5', name: 'Haiku 5.5', description: 'Fastest, for quick edits' },
   {
     id: MORLINE_GATEWAY_MODEL,
-    name: 'Claude Sonnet (Morline)',
-    description: 'Your protected Morline gateway'
+    name: 'Claude Sonnet (Gateway)',
+    description: 'Your separately deployed AI gateway service'
   },
   {
     id: KAGGLE_QWEN_MODEL,

@@ -190,9 +190,9 @@ function MorlineGatewayRow(): React.JSX.Element {
     <div className="py-3">
       <div className="flex items-center gap-6">
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] text-[#ededeb]">Morline AI gateway</div>
+          <div className="text-[13px] text-[#ededeb]">Dedicated AI gateway</div>
           <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">
-            Uses your protected Morline endpoint. Provider keys stay on Morline.
+            Uses your separately deployed endpoint. Provider keys stay in that service.
           </div>
         </div>
         {configured && !adding ? (
@@ -222,7 +222,7 @@ function MorlineGatewayRow(): React.JSX.Element {
               .finally(() => setBusy(false))
           }}
         >
-          <TextInput autoFocus autoComplete="off" spellCheck={false} aria-label="Morline gateway URL" placeholder="https://api.morline.space/ai" className="font-mono" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} />
+          <TextInput autoFocus autoComplete="off" spellCheck={false} aria-label="Gateway URL" placeholder="https://ai-gateway.morline.space" className="font-mono" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} />
           <div className="flex items-start gap-2">
             <div className="flex-1">
               <TextInput type="password" autoComplete="off" spellCheck={false} aria-label="Morline gateway key" placeholder="Morline gateway key" className="font-mono" value={key} onChange={(e) => setKey(e.target.value)} />

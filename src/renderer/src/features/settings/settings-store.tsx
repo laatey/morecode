@@ -23,7 +23,7 @@ export interface Settings {
   /** Temporary personal endpoint used by the Kaggle Qwen experiment. Stored only in this app's local settings. */
   kaggleEndpoint: string
   kaggleToken: string
-  /** Personal Morline AI Gateway address and its dedicated client key. */
+  /** Dedicated AI gateway address and its client key. */
   morlineGatewayUrl: string
   morlineGatewayKey: string
   autoAccept: boolean
@@ -46,7 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   model: DEFAULT_MODEL,
   kaggleEndpoint: '',
   kaggleToken: '',
-  morlineGatewayUrl: 'https://api.morline.space/ai',
+  morlineGatewayUrl: '',
   morlineGatewayKey: '',
   autoAccept: false,
   interfaceSize: 'default',
