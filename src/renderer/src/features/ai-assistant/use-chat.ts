@@ -122,34 +122,74 @@ type AgentMsg = Extract<Msg, { role: 'agent' }>
 const agentApi = (): Window['api']['agent'] | undefined =>
   typeof window === 'undefined' ? undefined : window.api?.agent
 
-/** One line per thing the AI did, so a later turn knows what already happened. */
-function toolLine(t: ToolBlock): string | null {
-  if (t.kind === 'edit') return `[Edited ${t.path} (+${t.added} −${t.removed})${t.review === 'discarded' ? '; the person undid this change' : ''}]`
-  if (t.kind === 'command') return `[Ran \`${t.command}\`${t.status === 'error' ? ' and it failed' : ''}]`
-  if (t.kind === 'plan') return `[Showed a plan: ${t.title} (${t.state === 'approved' ? 'approved' : 'not yet approved'})]`
-  if (t.kind === 'permission' && (t.state === 'denied' || t.state === 'blocked')) return `[The person did not allow: ${t.command}]`
-  return null
+/** Older chats may hold "[Edited x]" lines a model typed as text. They are not history, so they are dropped. */
+const FAKE_ACTIVITY = /\[(?:Edited|Ran|Showed a plan|The person did not allow)[^\]]*\]/g
+
+/** The chat so far as plain text turns. A compaction summary replaces everything before it. */
+export function toHistory(msgs: Msg[]): { role: 'user' | 'assistant'; text: string }[] {
+  const out: { role: 'user' | 'assistant'; text: string }[] = []
+  for (const m of msgs) {
+    if (m.role === 'system') {
+      if (m.summary) {
+        out.length = 0
+        out.push({ role: 'user', text: `Summary of the earlier conversation, so you keep the context:\n${m.summary}` })
+      }
+    } else if (m.role === 'user') out.push({ role: 'user', text: m.text })
+    else {
+      const text = m.parts
+        .flatMap((p) => (p.type === 'text' ? [p.text.replace(FAKE_ACTIVITY, '').trim()] : []))
+        .filter(Boolean)
+        .join('\n')
+      if (text) out.push({ role: 'assistant', text })
+    }
+  }
+  return out
 }
 
-/** The chat so far as plain text turns (what a real agent needs as context). */
-export function toHistory(msgs: Msg[]): { role: 'user' | 'assistant'; text: string }[] {
-  return msgs.flatMap<{ role: 'user' | 'assistant'; text: string }>((m) => {
-    if (m.role === 'user') return [{ role: 'user' as const, text: m.text }]
-    if (m.role !== 'agent') return []
-    const lines = m.parts.flatMap((p) => (p.type === 'text' ? [p.text] : p.type === 'tool' ? [toolLine(p.tool)] : []))
-    const text = lines.filter(Boolean).join('\n')
-    return text ? [{ role: 'assistant' as const, text }] : []
-  })
+/**
+ * What the AI really did so far, as facts: files, commands, the task list, the plan and how the last run ended.
+ * Sent with every request so "continue" resumes the work instead of starting over.
+ */
+export function progressOf(msgs: Msg[]): string {
+  const files = new Map<string, string>()
+  const commands: string[] = []
+  let todos: Extract<ToolBlock, { kind: 'todos' }> | null = null
+  let plan: Extract<ToolBlock, { kind: 'plan' }> | null = null
+  let lastEnd = ''
+  for (const m of msgs) {
+    if (m.role !== 'agent') continue
+    lastEnd = ''
+    for (const p of m.parts) {
+      if (p.type === 'error') lastEnd = `The last run was cut short: ${p.message}`
+      if (p.type !== 'tool') continue
+      const t = p.tool
+      if (t.kind === 'edit' && t.status === 'done') files.set(t.path, t.review === 'discarded' ? 'undone by the person' : 'written')
+      else if (t.kind === 'command') commands.push(`${t.command} → ${t.status === 'error' ? `FAILED${t.output ? `: ${t.output.trim().slice(-160)}` : ''}` : t.status === 'done' ? 'ok' : 'did not finish'}`)
+      else if (t.kind === 'todos') todos = t
+      else if (t.kind === 'plan') plan = t
+    }
+    if (m.stopped && !lastEnd) lastEnd = 'The person stopped the last run before it finished.'
+  }
+  const out: string[] = []
+  if (plan) out.push(`Plan: ${plan.title} (${plan.state === 'approved' ? 'approved by the person' : 'not approved yet'}).`)
+  if (todos) out.push(`Task list:\n${todos.items.map((i) => `- ${i.status === 'done' ? 'done' : i.status === 'active' ? 'in progress' : 'to do'}: ${i.text}`).join('\n')}`)
+  if (files.size) out.push(`Files the AI has written in this chat:\n${[...files].slice(-40).map(([f, how]) => `- ${f} (${how})`).join('\n')}`)
+  if (commands.length) out.push(`Recent commands:\n${commands.slice(-8).map((c) => `- ${c}`).join('\n')}`)
+  if (lastEnd) out.push(lastEnd)
+  return out.join('\n\n').slice(0, 4000)
 }
 
 /** Put files back the way they were before these messages (newest edit first, so repeated edits unwind). */
-function undoEditsIn(msgs: Msg[]): void {
+function undoEditsIn(msgs: Msg[], onEditReverted?: (id: string) => void): void {
   const ids = msgs.flatMap((m) =>
     m.role === 'agent'
       ? m.parts.flatMap((p) => (p.type === 'tool' && p.tool.kind === 'edit' && p.tool.review !== 'discarded' ? [p.tool.id] : []))
       : []
   )
-  for (const id of ids.reverse()) void agentApi()?.revert(id)
+  for (const id of ids.reverse()) {
+    void agentApi()?.revert(id)
+    onEditReverted?.(id)
+  }
 }
 
 /** Change one tool block, wherever it sits in the conversation. */
@@ -185,7 +225,9 @@ export function useChat(
   runner: AgentRunner = mockAgent,
   initial: Msg[] = [],
   initialOwner = '',
-  getPolicy?: () => Policy
+  getPolicy?: () => Policy,
+  onEdit?: (tool: Extract<ToolBlock, { kind: 'edit' }>) => void,
+  onEditReverted?: (id: string) => void
 ): {
   messages: Msg[]
   /** Which chat `messages` belong to; changes in the same render as the messages. */
@@ -202,7 +244,8 @@ export function useChat(
     images: string[],
     model: string,
     autoAccept: boolean,
-    attachments?: Attachment[]
+    attachments?: Attachment[],
+    shown?: string
   ) => void
   /** Run the message before this reply again. */
   retry: (agentId: string, model: string, autoAccept: boolean) => void
@@ -215,7 +258,8 @@ export function useChat(
   discardAll: () => void
   stop: () => void
   clear: () => void
-  compact: () => void
+  /** Write a summary of the chat so far and use it as the AI's memory of it. The chat itself stays on screen. */
+  compact: (model: string) => void
 } {
   const [messages, setMessages] = useState<Msg[]>(initial)
   const [owner, setOwner] = useState(initialOwner)
@@ -235,7 +279,8 @@ export function useChat(
       images: string[],
       attachments: Attachment[],
       model: string,
-      autoAccept: boolean
+      autoAccept: boolean,
+      shown?: string
     ) => {
       if (controller.current) return
       const agentId = uid()
@@ -244,6 +289,7 @@ export function useChat(
         id: uid(),
         role: 'user',
         text: prompt,
+        ...(shown ? { shown } : {}),
         ...(images.length ? { images } : {}),
         ...(attachments.length ? { attachments } : {})
       }
@@ -304,9 +350,11 @@ export function useChat(
             attachments,
             model,
             history: toHistory(base),
+            progress: progressOf(base),
             signal: ctl.signal,
             askPermission
           })) {
+            if (e.type === 'tool' && e.tool.kind === 'edit' && e.tool.status === 'done') onEdit?.(e.tool)
             patch((m) => applyEvent(m, e, autoAccept))
           }
         } catch (err) {
@@ -346,12 +394,12 @@ export function useChat(
         }
       })()
     },
-    [runner, getPolicy]
+    [runner, getPolicy, onEdit]
   )
 
   const send = useCallback(
-    (prompt: string, images: string[], model: string, autoAccept: boolean, attachments: Attachment[] = []) =>
-      run(latest.current, prompt, images, attachments, model, autoAccept),
+    (prompt: string, images: string[], model: string, autoAccept: boolean, attachments: Attachment[] = [], shown?: string) =>
+      run(latest.current, prompt, images, attachments, model, autoAccept, shown),
     [run]
   )
 
@@ -362,20 +410,26 @@ export function useChat(
       const i = all.findIndex((m) => m.id === userId)
       const u = all[i]
       if (i < 0 || !u || u.role !== 'user') return
-      undoEditsIn(all.slice(i)) // running it again starts from the files as they were
-      run(all.slice(0, i), text ?? u.text, u.images ?? [], u.attachments ?? [], model, autoAccept)
+      undoEditsIn(all.slice(i), onEditReverted) // running it again starts from the files as they were
+      run(all.slice(0, i), text ?? u.text, u.images ?? [], u.attachments ?? [], model, autoAccept, text === undefined ? u.shown : undefined)
     },
-    [run]
+    [run, onEditReverted]
   )
   const retry = useCallback(
     (agentId: string, model: string, autoAccept: boolean) => {
       const all = latest.current
       const i = all.findIndex((m) => m.id === agentId)
+      const msg = all[i]
+      // a run that already did work is continued, never wiped: its edits and tool rows stay put
+      if (msg?.role === 'agent' && i === all.length - 1 && msg.parts.some((p) => p.type === 'error') && msg.parts.some((p) => p.type === 'tool' && ['edit', 'command', 'todos'].includes(p.tool.kind))) {
+        const kept = all.map((m) => (m.id === agentId && m.role === 'agent' ? { ...m, parts: m.parts.filter((p) => p.type !== 'error') } : m))
+        return run(kept, 'Continue from where you stopped. Do not redo work that is already done.', [], [], model, autoAccept, 'Continue')
+      }
       for (let j = i - 1; j >= 0; j--) {
         if (all[j].role === 'user') return redo(all[j].id, undefined, model, autoAccept)
       }
     },
-    [redo]
+    [redo, run]
   )
   const edit = useCallback(
     (userId: string, text: string, model: string, autoAccept: boolean) => redo(userId, text, model, autoAccept),
@@ -387,10 +441,10 @@ export function useChat(
     const u = all[i]
     if (i < 0 || !u || u.role !== 'user') return null
     controller.current?.abort()
-    undoEditsIn(all.slice(i))
+    undoEditsIn(all.slice(i), onEditReverted)
     setMessages(all.slice(0, i))
     return u
-  }, [])
+  }, [onEditReverted])
 
   const stop = useCallback(() => controller.current?.abort(), [])
   const load = useCallback((id: string, list: Msg[]) => {
@@ -404,45 +458,92 @@ export function useChat(
     setMessages([])
   }, [])
   const compact = useCallback(
-    () =>
-      setMessages((m) => [
-        {
-          id: uid(),
-          role: 'system',
-          text: `Conversation compacted (${m.length} messages summarised).`
+    (model: string) => {
+      if (controller.current) return
+      const all = latest.current
+      const noteId = uid()
+      const note = (text: string, summary?: string): void =>
+        setMessages((cur) => cur.map((m) => (m.id === noteId ? { id: noteId, role: 'system' as const, text, ...(summary ? { summary } : {}) } : m)))
+      if (!all.some((m) => m.role === 'user')) {
+        setMessages([...all, { id: noteId, role: 'system', text: 'Nothing to compact yet.' }])
+        return
+      }
+      const ctl = new AbortController()
+      controller.current = ctl
+      setRunning(true)
+      setMessages([...all, { id: noteId, role: 'system', text: 'Compacting the conversation…' }])
+      void (async () => {
+        let summary = ''
+        try {
+          for await (const e of runner({
+            prompt:
+              'Write a summary of this conversation so far, to replace the earlier messages. Cover: what the person wants, decisions made, files created or changed (with paths), commands run and how they went, anything still open, and the next steps. Plain sentences and short lists, under 350 words. Do not use any tools.',
+            images: [],
+            attachments: [],
+            model,
+            history: toHistory(all),
+            progress: progressOf(all),
+            noTools: true,
+            signal: ctl.signal,
+            askPermission: () => Promise.resolve('deny')
+          })) {
+            if (e.type === 'text') summary += e.delta
+          }
+          summary = summary.trim()
+          if (ctl.signal.aborted) note('Compacting was stopped. Nothing changed.')
+          else if (!summary) note('Could not compact the conversation (no summary came back). Nothing changed.')
+          else note(`Conversation compacted. ${all.length} earlier messages are summarised for the AI; nothing was removed from this chat.`, summary)
+        } catch (err) {
+          if ((err as Error).name === 'AbortError') note('Compacting was stopped. Nothing changed.')
+          else note(`Could not compact the conversation${err instanceof AgentError ? `: ${err.message}` : ''}. Nothing changed.`)
+        } finally {
+          controller.current = null
+          setRunning(false)
         }
-      ]),
-    []
+      })()
+    },
+    [runner]
   )
 
-  const review = useCallback((to: 'accepted' | 'discarded') => {
-    const pending = latest.current.flatMap((m) =>
-      m.role === 'agent'
-        ? m.parts.flatMap((p) => (p.type === 'tool' && p.tool.kind === 'edit' && p.tool.review === 'pending' ? [p.tool.id] : []))
-        : []
-    )
-    if (to === 'discarded') [...pending].reverse().forEach((id) => void agentApi()?.revert(id))
-    else pending.forEach((id) => agentApi()?.keep(id))
-    setMessages((all) =>
-      all.map((m) =>
-        m.role !== 'agent'
-          ? m
-          : {
-              ...m,
-              parts: m.parts.map((p) =>
-                p.type === 'tool' && p.tool.kind === 'edit' && p.tool.review === 'pending'
-                  ? { type: 'tool' as const, tool: { ...p.tool, review: to } }
-                  : p
-              )
-            }
+  const review = useCallback(
+    (to: 'accepted' | 'discarded') => {
+      const pending = latest.current.flatMap((m) =>
+        m.role === 'agent'
+          ? m.parts.flatMap((p) =>
+              p.type === 'tool' && p.tool.kind === 'edit' && p.tool.review === 'pending' ? [p.tool.id] : []
+            )
+          : []
       )
-    )
-  }, [])
+      if (to === 'discarded')
+        [...pending].reverse().forEach((id) => {
+          void agentApi()?.revert(id)
+          onEditReverted?.(id)
+        })
+      else pending.forEach((id) => agentApi()?.keep(id))
+      setMessages((all) =>
+        all.map((m) =>
+          m.role !== 'agent'
+            ? m
+            : {
+                ...m,
+                parts: m.parts.map((p) =>
+                  p.type === 'tool' && p.tool.kind === 'edit' && p.tool.review === 'pending'
+                    ? { type: 'tool' as const, tool: { ...p.tool, review: to } }
+                    : p
+                )
+              }
+        )
+      )
+    },
+    [onEditReverted]
+  )
   const reviewOne = useCallback((toolId: string, to: 'accepted' | 'discarded') => {
-    if (to === 'discarded') void agentApi()?.revert(toolId)
-    else agentApi()?.keep(toolId)
+    if (to === 'discarded') {
+      void agentApi()?.revert(toolId)
+      onEditReverted?.(toolId)
+    } else agentApi()?.keep(toolId)
     setMessages((all) => mapTool(all, toolId, (t) => (t.kind === 'edit' ? { ...t, review: to } : t)))
-  }, [])
+  }, [onEditReverted])
   const acceptAll = useCallback(() => review('accepted'), [review])
   const discardAll = useCallback(() => review('discarded'), [review])
 
@@ -484,22 +585,27 @@ export function useChat(
   }, [])
 
   const totals = useMemo<ChatTotals>(() => {
-    let added = 0
-    let removed = 0
     let tokens = 0
-    const files = new Set<string>()
+    // per file: the real net change, so rewriting the same file five times counts once
+    const byPath = new Map<string, { a: number; r: number; net: boolean }>()
     for (const m of messages) {
       if (m.role !== 'agent') continue
       tokens += m.tokens ?? 0
       for (const p of m.parts) {
-        if (p.type === 'tool' && p.tool.kind === 'edit' && p.tool.review === 'pending') {
-          added += p.tool.added
-          removed += p.tool.removed
-          files.add(p.tool.path)
-        }
+        if (p.type !== 'tool' || p.tool.kind !== 'edit' || p.tool.review !== 'pending') continue
+        const t = p.tool
+        const prev = byPath.get(t.path)
+        if (t.netAdded !== undefined && t.netRemoved !== undefined) byPath.set(t.path, { a: t.netAdded, r: t.netRemoved, net: true })
+        else byPath.set(t.path, { a: (prev && !prev.net ? prev.a : 0) + t.added, r: (prev && !prev.net ? prev.r : 0) + t.removed, net: false })
       }
     }
-    return { added, removed, files: files.size, tokens }
+    let added = 0
+    let removed = 0
+    for (const v of byPath.values()) {
+      added += v.a
+      removed += v.r
+    }
+    return { added, removed, files: byPath.size, tokens }
   }, [messages])
 
   return {

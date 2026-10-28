@@ -15,8 +15,8 @@ export function Page({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="mx-auto max-w-[500px] space-y-5">
-      <header className="border-b border-white/[0.1] pb-3 pr-8">
+    <div className="mx-auto max-w-[560px] space-y-7">
+      <header className="pb-1 pr-8">
         <h2 className="text-[17px] font-medium text-[#f7f7f4]">{title}</h2>
         {description && <p className="mt-1 max-w-[500px] text-[12px] leading-relaxed text-[#9a9a96]">{description}</p>}
       </header>
@@ -25,7 +25,7 @@ export function Page({
   )
 }
 
-/** A titled section: bold heading, then rows separated by hairlines (no boxes, like Claude). */
+/** A titled section: a heading, then a bordered card whose rows are separated by hairlines. */
 export function Group({
   title,
   note,
@@ -37,9 +37,17 @@ export function Group({
 }): React.JSX.Element {
   return (
     <section>
-      {title && <h3 className="pb-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#8e8e8a]">{title}</h3>}
-      <div className="divide-y divide-white/[0.1] border-y border-white/[0.1]">{children}</div>
-      {note && <p className="pt-2 text-[12px] leading-relaxed text-[#737370]">{note}</p>}
+      {title && <h3 className="pb-2 text-[13px] font-medium text-[#ececea]">{title}</h3>}
+      <div className="divide-y divide-white/[0.07] overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.025]">
+        {React.Children.toArray(children).map((child, i) =>
+          React.isValidElement(child) && child.type === Row ? child : (
+            <div key={i} className="px-4 py-3">
+              {child}
+            </div>
+          )
+        )}
+      </div>
+      {note && <p className="px-1 pt-2 text-[12px] leading-relaxed text-[#737370]">{note}</p>}
     </section>
   )
 }
@@ -59,7 +67,7 @@ export function Row({
   className?: string
 }): React.JSX.Element {
   return (
-    <div className={cn('flex min-h-[50px] items-center justify-between gap-5 py-2.5', className)}>
+    <div className={cn('flex min-h-[54px] items-center justify-between gap-5 px-4 py-3', className)}>
       <div className="flex min-w-0 flex-1 items-start gap-3">
         {icon && <div className="mt-0.5 shrink-0">{icon}</div>}
         <div className="min-w-0 flex-1">

@@ -36,7 +36,7 @@ export function ProjectPicker({ onPick }: { onPick: (p: Project) => void }): Rea
     if (!project) return
     setCreating(true)
     setTimeout(() => {
-      toast(`Created ${project}`)
+      toast.success(`Created ${project}`)
       onPick({ name: project, path: '' })
     }, 1200)
   }

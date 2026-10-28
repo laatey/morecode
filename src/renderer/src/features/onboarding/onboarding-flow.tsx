@@ -150,15 +150,15 @@ function PlanStep({ onBack }: { onBack: () => void }): React.JSX.Element {
       <PlanPicker
         compact
         onChosen={(id, extra) => {
-          toast(`You’re on ${getPlan(id).name}`)
+          toast.success(`You’re on ${getPlan(id).name}`)
           void choosePlan(id, { ...extra, patch: { onboarded: true } })
         }}
         onPaid={(id) => {
-          toast(`You’re on ${getPlan(id).name}`)
+          toast.success(`You’re on ${getPlan(id).name}`)
           void update({ onboarded: true })
         }}
         onKey={(key) => {
-          toast('API key saved')
+          toast.success('API key saved')
           finish({ apiKey: key })
         }}
       />

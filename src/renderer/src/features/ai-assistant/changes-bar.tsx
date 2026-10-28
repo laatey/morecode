@@ -2,7 +2,10 @@ import React from 'react'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-/** Minimal floating bar above the composer while edits are waiting for review. */
+/**
+ * Edits waiting for review. It is a tab attached to the top of the message box (slightly lighter,
+ * rounded, and narrower than the box so it never touches the edges), not a separate floating bar.
+ */
 export function ChangesBar({
   files,
   added,
@@ -17,7 +20,7 @@ export function ChangesBar({
   onDiscard: () => void
 }): React.JSX.Element {
   return (
-    <div className="mb-1.5 flex h-7 items-center justify-between rounded-lg border border-white/[0.08] bg-[#272726] px-2.5 text-[11.5px] shadow-sm">
+    <div className="relative mx-5 -mb-3 flex h-10 items-center justify-between rounded-t-2xl border border-b-0 border-white/[0.1] bg-[#323231] px-3.5 pb-3 text-[11.5px]">
       <div className="flex items-center gap-2">
         <span className="font-medium text-[#d6d6d3]">
           {files} {files === 1 ? 'file' : 'files'} changed

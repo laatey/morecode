@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import { Btn, TextInput, Toggle } from '@/features/settings/kit'
 import { useSkills } from '@/features/skills/skills-store'
 import {
-  CATEGORIES,
   ICONS,
   nameProblem,
   skillIcon,
@@ -15,7 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import { MiniTabs, PanelFrame } from './ui'
 
-type Tab = 'discover' | 'mine' | 'commands'
+type Tab = 'mine' | 'commands'
 type View =
   | { name: 'list' }
   | { name: 'detail'; id: string }
@@ -45,10 +44,10 @@ export function SkillsPanel({
   initialTab,
   onClose
 }: {
-  initialTab: Tab
+  initialTab: string
   onClose: () => void
 }): React.JSX.Element {
-  const [tab, setTab] = useState<Tab>(initialTab)
+  const [tab, setTab] = useState<Tab>(initialTab === 'commands' ? 'commands' : 'mine')
   const [view, setView] = useState<View>({ name: 'list' })
   const back = (): void => setView({ name: 'list' })
 
@@ -68,7 +67,7 @@ export function SkillsPanel({
             : 'Skills'
 
   return (
-    <PanelFrame title={title} onClose={onClose} width={400}>
+    <PanelFrame title={title} onClose={onClose} width={400} maxHeight="50%">
       {view.name === 'list' && (
         <ListView tab={tab} setTab={setTab} setView={setView} onClose={onClose} />
       )}
@@ -98,7 +97,6 @@ function ListView({
   const match = (s: Skill): boolean =>
     !q || `${s.name} ${s.id} ${s.description} ${s.category}`.toLowerCase().includes(q)
 
-  const discover = sk.all.filter((s) => s.source === 'catalog' && match(s))
   const mine = sk.all.filter((s) => sk.isInstalled(s.id) && match(s))
 
   return (
@@ -111,7 +109,6 @@ function ListView({
             setQuery('')
           }}
           options={[
-            { value: 'discover', label: 'Discover' },
             { value: 'mine', label: `Yours${mine.length && !q ? ` · ${mine.length}` : ''}` },
             { value: 'commands', label: 'Commands' }
           ]}
@@ -138,59 +135,11 @@ function ListView({
         </div>
       )}
 
-      {tab === 'discover' && (
-        <div className="space-y-4">
-          <p className="text-[12.5px] leading-5 text-[#8d8d8a]">
-            A skill teaches the AI how to do one job your way. Add the ones you want, then use them
-            with <span className="text-[#d6d6d3]">/</span> in the message box.
-          </p>
-          {discover.length === 0 && <Empty text={`No skills match “${query}”.`} />}
-          {(q ? [null] : CATEGORIES).map((cat) => {
-            const rows = cat ? discover.filter((s) => s.category === cat) : discover
-            if (!rows.length) return null
-            return (
-              <section key={cat ?? 'all'}>
-                {cat && (
-                  <h3 className="mb-1 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#77776f]">
-                    {cat}
-                  </h3>
-                )}
-                <ul className="-mx-1">
-                  {rows.map((s) => (
-                    <SkillRow
-                      key={s.id}
-                      skill={s}
-                      onOpen={() => setView({ name: 'detail', id: s.id })}
-                      right={
-                        sk.isInstalled(s.id) ? (
-                          <span className="flex items-center gap-1 text-[12px] text-[#8d8d8a]">
-                            <Check className="h-3.5 w-3.5" /> Added
-                          </span>
-                        ) : (
-                          <Btn
-                            onClick={() => {
-                              sk.install(s.id)
-                              toast(`${s.name} added. Use it with /${s.id}`)
-                            }}
-                          >
-                            Add
-                          </Btn>
-                        )
-                      }
-                    />
-                  ))}
-                </ul>
-              </section>
-            )
-          })}
-        </div>
-      )}
-
       {tab === 'mine' &&
         (mine.length === 0 ? (
           <Empty
             text={q ? `No skills match “${query}”.` : 'You have not added any skills yet.'}
-            action={!q && <Btn onClick={() => setTab('discover')}>Browse skills</Btn>}
+            action={!q && <Btn onClick={() => setView({ name: 'edit', id: null })}>New skill</Btn>}
           />
         ) : (
           <ul className="-mx-1">
@@ -390,7 +339,7 @@ function DetailView({
                 variant="danger"
                 onClick={() => {
                   sk.deleteSkill(id)
-                  toast('Skill deleted')
+                  toast.success('Skill deleted')
                   onBack()
                 }}
               >
@@ -407,7 +356,7 @@ function DetailView({
           <Btn
             onClick={() => {
               sk.uninstall(id)
-              toast(`${skill.name} removed`)
+              toast.success(`${skill.name} removed`)
             }}
           >
             Remove
@@ -417,7 +366,7 @@ function DetailView({
             variant="primary"
             onClick={() => {
               sk.install(id)
-              toast(`${skill.name} added. Use it with /${id}`)
+              toast.success(`${skill.name} added. Use it with /${id}`)
             }}
           >
             Add skill
@@ -539,7 +488,7 @@ function SkillEditor({
     setTouched(true)
     if (!canSave) return
     sk.saveSkill(draft(), id ?? undefined)
-    toast(id ? 'Skill saved' : `Skill created. Use it with /${slug}`)
+    toast.success(id ? 'Skill saved' : `Skill created. Use it with /${slug}`)
     onSaved(slug)
   }
 
@@ -708,7 +657,7 @@ function CommandEditor({ id, onBack }: { id: string | null; onBack: () => void }
     if (problem || missing) return
     const cmd: CustomCommand = { id: slug, description: description.trim(), prompt: prompt.trim() }
     sk.saveCommand(cmd, id ?? undefined)
-    toast(id ? 'Command saved' : `Command created. Type /${slug} to use it`)
+    toast.success(id ? 'Command saved' : `Command created. Type /${slug} to use it`)
     onBack()
   }
 
@@ -751,7 +700,7 @@ function CommandEditor({ id, onBack }: { id: string | null; onBack: () => void }
                 variant="danger"
                 onClick={() => {
                   sk.deleteCommand(existing.id)
-                  toast('Command deleted')
+                  toast.success('Command deleted')
                   onBack()
                 }}
               >

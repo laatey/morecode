@@ -25,7 +25,7 @@ export function useCopyChat(): (chat: Chat) => void {
     const md = chatToMarkdown(chat.title, ws.getMessages(chat.id))
     navigator.clipboard
       .writeText(md)
-      .then(() => toast('Chat copied'))
+      .then(() => toast.success('Chat copied'))
       .catch(() => toast.error('Could not copy'))
   }
 }
@@ -58,11 +58,11 @@ export function useShareChat(): { share: (chat: Chat) => void; unshare: (chat: C
   return {
     share: (chat) => {
       const history = toHistory(ws.getMessages(chat.id))
-      if (!history.length) return void toast('There is nothing in this chat to share yet.')
+      if (!history.length) return void toast.error('There is nothing in this chat to share yet.')
       hostedRequest<{ token: string; url: string }>('POST', '/v1/shares', { chatId: chat.id, title: chat.title, access: 'view', messages: history })
         .then((r) => {
           setShared(chat.id, r.token)
-          return navigator.clipboard.writeText(r.url).then(() => toast('Share link copied', { description: 'Anyone with the link can read this chat.' }))
+          return navigator.clipboard.writeText(r.url).then(() => toast.success('Share link copied', { description: 'Anyone with the link can read this chat.' }))
         })
         .catch((e: Error) => toast.error(e.message || 'Could not create the link.'))
     },
@@ -72,7 +72,7 @@ export function useShareChat(): { share: (chat: Chat) => void; unshare: (chat: C
       hostedRequest('DELETE', `/v1/shares/${token}`)
         .then(() => {
           setShared(chat.id, null)
-          toast('This chat is no longer shared')
+          toast.success('This chat is no longer shared')
         })
         .catch(() => toast.error('Could not stop sharing. Try again.'))
     }

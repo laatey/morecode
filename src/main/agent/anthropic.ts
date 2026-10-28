@@ -51,9 +51,12 @@ export interface StreamResult {
   usage: Usage
 }
 
+/** True when a provider message means the connection was cut, not that the request was wrong. */
+export const looksDropped = (m: string): boolean => /stream|closed|terminated|socket|ECONN|reset|timed? ?out|overloaded|fetch failed/i.test(m)
+
 /** Something the UI can explain to the person: a kind, a plain message, and when to retry. */
 export class ApiFailure extends Error {
-  kind: 'rate_limit' | 'offline' | 'failed'
+  kind: 'rate_limit' | 'offline' | 'failed' | 'interrupted'
   retryAfter?: number
   status?: number
   constructor(kind: ApiFailure['kind'], message: string, status?: number, retryAfter?: number) {
@@ -118,6 +121,7 @@ export async function streamMessage(
   on: { text?: (delta: string) => void }
 ): Promise<StreamResult> {
   const doFetch = req.fetchImpl ?? fetch
+  const isOpenRouter = req.baseUrl?.replace(/\/$/, '') === 'https://openrouter.ai/api'
   let res: Response
   try {
     res = await doFetch(`${req.baseUrl ?? 'https://api.anthropic.com'}/v1/messages`, {
@@ -126,6 +130,7 @@ export async function streamMessage(
       headers: {
         'content-type': 'application/json',
         'x-api-key': req.apiKey,
+        ...(isOpenRouter ? { authorization: `Bearer ${req.apiKey}` } : {}),
         'anthropic-version': '2023-06-01',
         ...(req.headers ?? {})
       },
@@ -133,11 +138,20 @@ export async function streamMessage(
         model: req.model,
         max_tokens: req.maxTokens ?? 8192,
         stream: true,
-        // the long, unchanging parts are cached so each step of a task costs less
-        system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-        tools: req.tools.map((t, i) =>
-          i === req.tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t
-        ),
+        // Anthropic supports prompt caching. The OpenRouter free router can select providers
+        // that do not, so keep that request portable by omitting Anthropic-only cache fields.
+        system: isOpenRouter
+          ? req.system
+          : [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
+        ...(req.tools.length
+          ? {
+              tools: isOpenRouter
+              ? req.tools
+              : req.tools.map((t, i) =>
+                  i === req.tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t
+                )
+            }
+          : {}),
         messages: req.messages
       })
     })
@@ -151,7 +165,10 @@ export async function streamMessage(
   const usage: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
   let stopReason: string | null = null
 
+  try {
   for await (const f of frames(res.body)) {
+    // what the provider sent back: its shape is checked field by field below
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data: Record<string, any>
     try {
       data = JSON.parse(f.data)
@@ -192,7 +209,8 @@ export async function streamMessage(
           try {
             b.input = b.raw ? JSON.parse(b.raw) : {}
           } catch {
-            b.input = {}
+            // cut off or malformed: mark it so the tool reports it instead of running with nothing
+            b.input = { __invalid: true }
           }
           delete b.raw
         }
@@ -203,11 +221,24 @@ export async function streamMessage(
         if (data.usage?.output_tokens != null) usage.output = data.usage.output_tokens
         break
       case 'error':
-        throw new ApiFailure(
-          data.error?.type === 'rate_limit_error' ? 'rate_limit' : 'failed',
-          data.error?.message ?? 'The AI service reported an error.'
-        )
+        {
+          const msg: string = data.error?.message ?? 'The AI service reported an error.'
+          throw new ApiFailure(
+            data.error?.type === 'rate_limit_error' ? 'rate_limit' : looksDropped(msg) ? 'interrupted' : 'failed',
+            looksDropped(msg) ? 'The connection to the AI dropped before it finished.' : msg
+          )
+        }
     }
+  }
+  } catch (err) {
+    if ((err as Error).name === 'AbortError' || err instanceof ApiFailure) throw err
+    throw new ApiFailure('interrupted', 'The connection to the AI dropped before it finished.')
+  }
+
+  // the stream ended without a stop reason while a tool call was still being written: it was cut off
+  const last = blocks.filter(Boolean).at(-1)
+  if (!stopReason && (!last || last.type === 'tool_use')) {
+    throw new ApiFailure('interrupted', 'The connection to the AI dropped before it finished.')
   }
 
   // empty text blocks are dropped: the API refuses to receive them back in the next turn

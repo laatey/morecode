@@ -3,7 +3,6 @@ import { spawn, execFile, type ChildProcess } from 'child_process'
 import { existsSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { isAbsolute, resolve } from 'path'
-import { getWorkspaceRoot } from './workspace'
 
 /**
  * Runs one command at a time per terminal tab and streams its output back.
@@ -34,12 +33,17 @@ function killTree(child: ChildProcess): void {
 }
 
 export function registerTerminalIpc(): void {
-  ipcMain.handle('term:start-dir', () => getWorkspaceRoot())
+  // A terminal starts in the folder of the project it belongs to (or the home folder for a loose chat).
+  ipcMain.handle('term:start-dir', (_event, folder: unknown) =>
+    typeof folder === 'string' && isDir(folder) ? folder : homedir()
+  )
 
   ipcMain.handle(
     'term:cd',
     (_event, cwd: string, target: string): { ok: true; cwd: string } | { ok: false; error: string } => {
-      const raw = (target ?? '').trim().replace(/^["']|["']$/g, '')
+      // cmd.exe style: "cd /d D:\\x" and a bare drive letter "D:" both just change folder
+      let raw = (target ?? '').trim().replace(/^\/d\s+/i, '').replace(/^["']|["']$/g, '')
+      if (/^[a-z]:$/i.test(raw)) raw = `${raw}\\`
       const dest =
         raw === '' || raw === '~'
           ? homedir()

@@ -1,37 +1,21 @@
 import { skillIcon, type CustomCommand, type Skill } from '@/features/skills/skills-data'
-import {
-  BarChart3,
-  Brush,
-  CircleHelp,
-  Command,
-  NotebookText,
-  Puzzle,
-  ClipboardList,
-  Cpu,
-  Gauge,
-  Layers,
-  Minimize2,
-  ScanSearch,
-  Shield,
-  Sparkles,
-  type LucideIcon
-} from 'lucide-react'
+import { BarChart3, CircleHelp, ClipboardList, Command, Eraser, FileText, Gauge, Minimize2, NotebookText, Puzzle, ScanSearch, ShieldCheck, type LucideIcon } from 'lucide-react'
 
 export type PanelId =
   | 'model'
   | 'context'
   | 'help'
   | 'usage'
-  | 'status'
   | 'skills'
   | 'commands'
-export type ActionId = 'clear' | 'compact' | 'permissions' | 'notes'
+export type ActionId = 'compact' | 'clear' | 'permissions'
 export type CommandGroup =
   | 'Conversation'
-  | 'Workspace'
   | 'Skills'
   | 'Your commands'
+  | 'Workspace'
   | 'Insights'
+  | 'Utilities'
   | 'Shortcuts'
 
 export type SlashCommand = {
@@ -46,118 +30,104 @@ export type SlashCommand = {
 } & (
   | { kind: 'panel'; panel: PanelId }
   | { kind: 'action'; action: ActionId }
-  | { kind: 'prompt'; prompt: string }
+  | { kind: 'prompt'; prompt: string; /** Runs straight away with no extra text needed. */ bare?: boolean }
+  | { kind: 'prefill'; text: string }
   | { kind: 'skill'; skill: Skill }
   | { kind: 'custom'; command: CustomCommand }
 )
-
-export const PLAN_PROMPT =
-  'Make a step-by-step plan for the current task. Do not change any files yet.'
 
 /** Add a command here and it appears in the "/" menu. Panels render in panels/. */
 export const BUILT_IN_COMMANDS: SlashCommand[] = [
   {
     id: 'plan',
-    description: 'Plan first, change nothing yet',
+    description: 'Plan the work first, without changing any files',
     icon: ClipboardList,
     group: 'Conversation',
+    hint: '[add your task]',
     kind: 'prompt',
-    prompt: PLAN_PROMPT
-  },
-  {
-    id: 'review',
-    description: 'Check changes for bugs',
-    icon: ScanSearch,
-    group: 'Conversation',
-    kind: 'prompt',
-    prompt: 'Review the changes on this branch and point out bugs, risks and missing tests.'
+    prompt: 'Make a plan for the task below. Do not change any files until I approve the plan.'
   },
   {
     id: 'compact',
-    description: 'Summarise to free up space',
+    description: 'Summarize this chat for the AI to free up context',
     icon: Minimize2,
-    group: 'Conversation',
+    group: 'Utilities',
     kind: 'action',
     action: 'compact'
   },
   {
-    id: 'clear',
-    description: 'Start a fresh conversation',
-    icon: Brush,
+    id: 'review',
+    description: 'Review your changes for bugs and risks',
+    icon: ScanSearch,
     group: 'Conversation',
+    kind: 'prompt',
+    bare: true,
+    hint: '[what to focus on]',
+    prompt: 'Review the uncommitted changes in this project for bugs, risks and mistakes. Use git diff through run_command, read the changed files, and report what you find, most serious first. Do not change any files.'
+  },
+  {
+    id: 'init',
+    description: 'Write an AGENTS.md that explains this project',
+    icon: FileText,
+    group: 'Conversation',
+    kind: 'prompt',
+    bare: true,
+    prompt: 'Look through this project and write an AGENTS.md in the project root (update it if it exists). Cover what the project is, how to install, run, test and build it, the folder layout, and the conventions to follow. Keep it short and accurate: only say what you verified.'
+  },
+  {
+    id: 'clear',
+    description: 'Start over with an empty chat',
+    icon: Eraser,
+    group: 'Utilities',
     kind: 'action',
     action: 'clear'
   },
   {
-    id: 'init',
-    description: 'Write or edit project notes',
-    icon: Sparkles,
+    id: 'permissions',
+    description: 'Choose what the AI may do without asking',
+    icon: ShieldCheck,
     group: 'Workspace',
     kind: 'action',
-    action: 'notes'
+    action: 'permissions'
   },
   {
     id: 'skills',
     description: 'Browse and manage skills',
     icon: Puzzle,
-    group: 'Workspace',
+    group: 'Skills',
     kind: 'panel',
     panel: 'skills',
     badge: 'new'
   },
   {
     id: 'commands',
-    description: 'Your own / commands',
+    description: 'Browse and manage your own commands',
     icon: Command,
-    group: 'Workspace',
+    group: 'Skills',
     kind: 'panel',
     panel: 'commands'
   },
   {
-    id: 'permissions',
-    description: 'Toggle auto-accept edits',
-    icon: Shield,
-    group: 'Workspace',
-    kind: 'action',
-    action: 'permissions'
-  },
-  {
-    id: 'model',
-    description: 'Choose a model',
-    icon: Cpu,
-    group: 'Workspace',
-    kind: 'panel',
-    panel: 'model'
-  },
-  {
     id: 'context',
-    description: 'What fills the context',
-    icon: Layers,
+    description: 'See what is filling the context window',
+    icon: Gauge,
     group: 'Insights',
     kind: 'panel',
     panel: 'context'
   },
   {
     id: 'usage',
-    description: 'Plan limits and usage',
+    description: 'See token usage and cost',
     icon: BarChart3,
     group: 'Insights',
     kind: 'panel',
     panel: 'usage'
   },
   {
-    id: 'status',
-    description: 'Current status',
-    icon: Gauge,
-    group: 'Insights',
-    kind: 'panel',
-    panel: 'status'
-  },
-  {
     id: 'help',
-    description: 'Commands and shortcuts',
+    description: 'Shortcuts and how commands work',
     icon: CircleHelp,
-    group: 'Shortcuts',
+    group: 'Utilities',
     kind: 'panel',
     panel: 'help'
   }
@@ -167,10 +137,11 @@ export const SLASH_COMMANDS = BUILT_IN_COMMANDS
 
 export const GROUP_ORDER: CommandGroup[] = [
   'Conversation',
-  'Workspace',
   'Skills',
   'Your commands',
   'Insights',
+  'Utilities',
+  'Workspace',
   'Shortcuts'
 ]
 

@@ -25,8 +25,32 @@ export function PermissionsPage(): React.JSX.Element {
     setDraft('')
   }
 
+  const r = settings.rules
+  const trusted = settings.autoAccept && r.commands === 'allow' && r.install === 'allow' && r.network === 'allow'
+  const setTrusted = (on: boolean): void =>
+    set({
+      autoAccept: on,
+      rules: { ...r, commands: on ? 'allow' : 'ask', install: on ? 'allow' : 'ask', network: on ? 'allow' : 'ask' }
+    })
+
   return (
     <Page title="Permissions" description="Decide what the AI can do on its own and when it should check with you first.">
+      <Group title="Trust">
+        <Row
+          title="Trust the AI"
+          description="Edits, commands, installs and internet access run without asking. Deleting files still asks. Turn it off to choose each one below."
+        >
+          <Pick
+            value={trusted ? 'trusted' : 'careful'}
+            onChange={(v) => setTrusted(v === 'trusted')}
+            options={[
+              { value: 'careful', label: 'Ask me' },
+              { value: 'trusted', label: 'Trusted' }
+            ]}
+          />
+        </Row>
+      </Group>
+
       <Group title="When the AI wants to…">
         <Row title="Edit files" description="Ask me shows each change for you to keep or undo. Allow applies changes straight away.">
           <Pick

@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Bot, Columns2, Eraser, Sparkles, Square, SquareTerminal } from 'lucide-react'
-import { toast } from 'sonner'
+import { Bot, Columns2, Eraser, Square, SquareTerminal } from 'lucide-react'
 import { IconButton } from '@/components/layout/icon-button'
-import { useChatContext, useChatInsights } from '@/features/ai-assistant/chat-context'
+import { useChatInsights } from '@/features/ai-assistant/chat-context'
+import { useWorkspace } from '@/features/workspace/workspace-store'
+import { platform } from '@/lib/platform'
 import { cn } from '@/lib/utils'
 import { Ansi } from '../terminal/ansi'
+import { exampleCommand, promptGlyph, promptPath } from '../terminal/prompt'
 import {
   clearTerminal,
   ensureStarted,
-  recentOutput,
   runCommand,
   stopCommand,
   terminalAvailable,
@@ -18,11 +19,16 @@ import { useRightPanel } from '../store'
 import type { TabContentProps } from '../types'
 import { Chip, TabButton, TabEmpty, TabToolbar } from './tab-kit'
 
-/** Show the last two folders, like a shell prompt: …/acme-web/src */
-const shortPath = (p: string | null): string => {
-  if (!p) return '…'
-  const parts = p.replace(/\\/g, '/').split('/').filter(Boolean)
-  return parts.length <= 2 ? p : `…/${parts.slice(-2).join('/')}`
+/** The start of a line, the way this computer's shell writes it: `C:\\app>` on Windows, `~/app %` on a Mac, `~/app $` on Linux. */
+function Prompt({ cwd, className }: { cwd: string | null; className?: string }): React.JSX.Element {
+  return (
+    <span className={cn('inline-flex min-w-0 max-w-full items-baseline gap-1.5', className)}>
+      <span className="min-w-0 truncate text-[#6ea8fe]" title={cwd ?? undefined}>
+        {promptPath(cwd, platform)}
+      </span>
+      <span className="shrink-0 text-[#5fd17a]">{promptGlyph(platform)}</span>
+    </span>
+  )
 }
 
 function AiCommands(): React.JSX.Element {
@@ -40,7 +46,7 @@ function AiCommands(): React.JSX.Element {
         <div key={c.id}>
           <div className="flex items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-[#ececea]">
-              <span className="text-[#5fd17a]">$</span> {c.command}
+              <span className="text-[#5fd17a]">{promptGlyph(platform)}</span> {c.command}
             </span>
             <Chip tone={c.status === 'done' ? 'good' : c.status === 'error' ? 'bad' : 'warn'}>
               {c.status === 'done' ? 'Passed' : c.status === 'error' ? 'Failed' : 'Running'}
@@ -56,8 +62,9 @@ function AiCommands(): React.JSX.Element {
 /** Run commands in your project folder. Output keeps streaming while you look at other tabs. */
 export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
   const session = useTerminalSession(tabId)
-  const { ask, running: aiBusy } = useChatContext()
   const { splitTab } = useRightPanel()
+  const ws = useWorkspace()
+  const project = ws.groups.find((group) => group.id === ws.active.projectId)
   const [view, setView] = useState<'shell' | 'ai'>('shell')
   const [input, setInput] = useState('')
   const [cursor, setCursor] = useState<number | null>(null) // position while walking through history
@@ -66,8 +73,9 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
   const available = terminalAvailable()
 
   useEffect(() => {
-    void ensureStarted(tabId)
-  }, [tabId])
+    // Follows the open project: opening another project moves the terminal to its folder.
+    void ensureStarted(tabId, project?.folder ?? null)
+  }, [tabId, project?.folder])
 
   // stay pinned to the newest output
   useEffect(() => {
@@ -82,8 +90,7 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
   if (!available) {
     return (
       <TabEmpty icon={SquareTerminal} title="Terminal needs the desktop app">
-        This preview runs in a browser, which cannot start commands on your computer. Open MoreCode as
-        a desktop app to use the terminal.
+        This preview runs in a browser, which cannot start commands on your computer. Open MoreCode as a desktop app to use the terminal.
       </TabEmpty>
     )
   }
@@ -93,24 +100,6 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
     setInput('')
     setCursor(null)
     void runCommand(tabId, text)
-  }
-
-  /** Send what you selected, or else the last command and its output, to the AI. */
-  const sendToAi = (): void => {
-    const picked = window.getSelection()?.toString().trim()
-    const last = recentOutput(tabId)
-    const text = picked || last?.text
-    if (!text) {
-      toast('Run a command first, then send its output')
-      return
-    }
-    const failed = !picked && last?.failed
-    ask(
-      `Here is ${picked ? 'part of the output' : 'what happened'} in my terminal${session.cwd ? ` (in ${session.cwd})` : ''}:\n\n\`\`\`\n${text}\n\`\`\`\n\n` +
-        (failed
-          ? 'Explain in plain language what went wrong and fix it if you can.'
-          : 'Explain in plain language what this means and whether anything needs my attention.')
-    )
   }
 
   const walk = (dir: -1 | 1): void => {
@@ -154,14 +143,6 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
                 <Square className="h-2.5 w-2.5 fill-current" /> Stop
               </TabButton>
             )}
-            <TabButton
-              disabled={aiBusy || session.entries.length === 0}
-              onClick={sendToAi}
-              className="h-6 text-[11.5px]"
-              title="Send the last command and its output to the AI. Select text first to send just that."
-            >
-              <Sparkles className="h-3 w-3" /> Ask AI
-            </TabButton>
             <IconButton title="Open another terminal beside this one" onClick={() => splitTab('terminal')}>
               <Columns2 className="h-3.5 w-3.5" />
             </IconButton>
@@ -185,27 +166,18 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
         >
           {session.entries.length === 0 && (
             <p className="mb-2 font-sans text-[12px] text-muted-foreground">
-              Type a command and press Enter. Try <span className="font-mono text-[#d6d6d3]">dir</span>{' '}
+              Type a command and press Enter. Try <span className="font-mono text-[#d6d6d3]">{exampleCommand(platform)}</span>{' '}
               or <span className="font-mono text-[#d6d6d3]">npm run lint</span>.
             </p>
           )}
           {session.entries.map((e) =>
             e.kind === 'cmd' ? (
               <div key={e.id} className="mt-1.5 break-all text-[#ececea]">
-                <span className="text-[#6ea8fe]">{shortPath(e.cwd ?? null)}</span>{' '}
-                <span className="text-[#5fd17a]">$</span> {e.text}
+                <Prompt cwd={e.cwd ?? null} /> {e.text}
               </div>
             ) : e.failed ? (
               <div key={e.id} className="flex items-center gap-2 font-sans text-[12px] italic text-muted-foreground">
                 {e.text}
-                <button
-                  type="button"
-                  disabled={aiBusy}
-                  onClick={sendToAi}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-[5px] px-1.5 not-italic text-[#8ab8ff] transition-colors hover:bg-white/[0.07] disabled:opacity-40"
-                >
-                  <Sparkles className="h-3 w-3" /> Ask AI to fix it
-                </button>
               </div>
             ) : (
               <pre
@@ -221,8 +193,7 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
           )}
 
           <div className="mt-1.5 flex items-center gap-2">
-            <span className="shrink-0 text-[#6ea8fe]">{shortPath(session.cwd)}</span>
-            <span className="shrink-0 text-[#5fd17a]">$</span>
+            <Prompt cwd={session.cwd} className="max-w-[60%] shrink-0" />
             <input
               ref={field}
               value={input}

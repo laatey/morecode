@@ -1,5 +1,6 @@
+import { FileIcon } from '@/components/file-icon'
 import React, { useMemo, useState } from 'react'
-import { Check, ChevronRight, FileCode2, GitCompare, List, ListTree, Undo2 } from 'lucide-react'
+import { Check, ChevronRight, GitCompare, List, ListTree, Undo2 } from 'lucide-react'
 import { IconButton } from '@/components/layout/icon-button'
 import { DiffView, type FileDiff } from '@/components/diff-view'
 import { useChatContext, useChatInsights } from '@/features/ai-assistant/chat-context'
@@ -54,7 +55,7 @@ function FileCard({
           <ChevronRight
             className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')}
           />
-          <FileCode2 className="h-3.5 w-3.5 shrink-0 stroke-[1.6] text-[#a8a8a6]" />
+          <FileIcon name={name} />
           <span className="min-w-0 truncate text-[12.5px]">
             <span className={cn('font-medium text-[#ececea]', undone && 'text-muted-foreground line-through')}>
               {name}

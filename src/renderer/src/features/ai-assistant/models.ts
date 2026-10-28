@@ -1,26 +1,52 @@
+/**
+ * Where a model is reached from:
+ * - `claude`:     Anthropic's Claude models. Through your MoreCode plan, or directly with your own API key.
+ * - `gateway`:    an AI gateway you run yourself.
+ * - `openrouter`: OpenRouter's free model router, with your own OpenRouter key.
+ */
+export type ModelSource = 'claude' | 'gateway' | 'openrouter'
+
 export interface ModelInfo {
   /** The model name sent to the API. */
   id: string
   name: string
   description: string
+  source: ModelSource
 }
 
-export const KAGGLE_QWEN_MODEL = 'qwen2.5-coder-14b-kaggle'
 export const MORLINE_GATEWAY_MODEL = 'anthropic/claude-sonnet-5'
+export const OPENROUTER_FREE_MODEL = 'openrouter/free'
 
 export const MODELS: ModelInfo[] = [
-  { id: 'claude-opus-5-5', name: 'Opus 5.5', description: 'Most capable, for complex work' },
-  { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', description: 'Balanced speed and quality' },
-  { id: 'claude-haiku-5-5', name: 'Haiku 5.5', description: 'Fastest, for quick edits' },
+  {
+    id: 'claude-opus-5-5',
+    name: 'Opus 5.5',
+    description: 'Most capable, for complex work',
+    source: 'claude'
+  },
+  {
+    id: 'claude-sonnet-5-5',
+    name: 'Sonnet 5.5',
+    description: 'Balanced speed and quality',
+    source: 'claude'
+  },
+  {
+    id: 'claude-haiku-5-5',
+    name: 'Haiku 5.5',
+    description: 'Fastest, for quick edits',
+    source: 'claude'
+  },
   {
     id: MORLINE_GATEWAY_MODEL,
     name: 'Claude Sonnet (Gateway)',
-    description: 'Your separately deployed AI gateway service'
+    description: 'Through your own AI gateway',
+    source: 'gateway'
   },
   {
-    id: KAGGLE_QWEN_MODEL,
-    name: 'Qwen Coder 14B (Kaggle)',
-    description: 'Your temporary private Kaggle notebook endpoint'
+    id: OPENROUTER_FREE_MODEL,
+    name: 'OpenRouter Free',
+    description: 'Free community models, best for personal testing',
+    source: 'openrouter'
   }
 ]
 
@@ -32,5 +58,5 @@ export const resolveModel = (id: string): string =>
 
 export const modelName = (id: string): string => MODELS.find((m) => m.id === id)?.name ?? id
 
-export const isKaggleQwen = (id: string): boolean => id === KAGGLE_QWEN_MODEL
-export const isMorlineGateway = (id: string): boolean => id === MORLINE_GATEWAY_MODEL
+export const sourceOf = (id: string): ModelSource =>
+  MODELS.find((m) => m.id === id)?.source ?? 'claude'

@@ -55,7 +55,9 @@ export function useResponsiveSidebars(): {
   const rightRef = usePanelRef()
   const [initialWidths] = useState(loadWidths)
   const [leftCollapsed, setLeftCollapsed] = useState(false)
-  const [rightCollapsed, setRightCollapsed] = useState(false)
+  // The secondary sidebar has no useful empty state. Start it closed; opening a
+  // right-panel tab will reveal it through the shell's right-panel:reveal event.
+  const [rightCollapsed, setRightCollapsed] = useState(true)
 
   const widths = useRef<Record<Side, number>>({ ...initialWidths })
   const auto = useRef<Record<Side, boolean>>({ left: false, right: false })

@@ -33,6 +33,37 @@ const sessionStart = Date.now()
 let lastContext = 0
 let version = 0
 const listeners = new Set<() => void>()
+const sessionEdits = new Map<string, Map<string, { added: number; removed: number }>>()
+
+export interface SessionEditTotals {
+  added: number
+  removed: number
+}
+
+/** Count each applied edit once for this app session; undoing it removes its contribution. */
+export function recordSessionEdit(accountId: string, id: string, added: number, removed: number): void {
+  const edits = sessionEdits.get(accountId) ?? new Map<string, SessionEditTotals>()
+  if (edits.has(id)) return
+  edits.set(id, { added, removed })
+  sessionEdits.set(accountId, edits)
+  version++
+  listeners.forEach((l) => l())
+}
+
+export function forgetSessionEdit(accountId: string, id: string): void {
+  if (!sessionEdits.get(accountId)?.delete(id)) return
+  version++
+  listeners.forEach((l) => l())
+}
+
+export function getSessionEditTotals(accountId: string): SessionEditTotals {
+  const totals = { added: 0, removed: 0 }
+  for (const edit of sessionEdits.get(accountId)?.values() ?? []) {
+    totals.added += edit.added
+    totals.removed += edit.removed
+  }
+  return totals
+}
 
 export function load(accountId: string): UsageRecord[] {
   try {
@@ -81,6 +112,7 @@ const add = (t: Totals, r: UsageRecord): Totals => ({
 
 export interface UsageSummary {
   session: Totals
+  edits: SessionEditTotals
   today: Totals
   week: Totals
   byModel: Record<string, Totals>
@@ -96,6 +128,7 @@ export function summarize(accountId: string, now = Date.now()): UsageSummary {
   const weekAgo = now - 7 * 24 * 3_600_000
   const out: UsageSummary = {
     session: emptyTotals(),
+    edits: getSessionEditTotals(accountId),
     today: emptyTotals(),
     week: emptyTotals(),
     byModel: {},

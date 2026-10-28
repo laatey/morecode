@@ -21,9 +21,9 @@ export function UserMessage({
   const { running, edit, rewind } = useChatContext()
   const [editing, setEditing] = useState(false)
   const [confirm, setConfirm] = useState(false)
-  const [draft, setDraft] = useState(msg.text)
+  const [draft, setDraft] = useState(msg.shown ?? msg.text)
   const box = useRef<HTMLTextAreaElement>(null)
-  const hasText = msg.text.trim() && !ATTACH_ONLY.includes(msg.text)
+  const hasText = (msg.shown ?? msg.text).trim() && !ATTACH_ONLY.includes(msg.text)
 
   useEffect(() => {
     if (!editing) return
@@ -94,13 +94,13 @@ export function UserMessage({
     <div className="group/msg">
       <div className="flex items-start justify-end gap-1">
         <div className="mt-1 flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover/msg:opacity-100">
-          {hasText && <CopyButton text={msg.text} />}
+          {hasText && <CopyButton text={msg.shown ?? msg.text} />}
           {hasText && (
             <IconAction
               label="Edit"
               disabled={running}
               onClick={() => {
-                setDraft(msg.text)
+                setDraft(msg.shown ?? msg.text)
                 setEditing(true)
               }}
             >
@@ -111,7 +111,7 @@ export function UserMessage({
             <History className="h-3.5 w-3.5" />
           </IconAction>
         </div>
-        <UserBubble text={msg.text} images={msg.images}>
+        <UserBubble text={msg.shown ?? msg.text} images={msg.images}>
           {msg.attachments?.length ? (
             <div className="flex flex-wrap justify-end gap-1">
               {msg.attachments.map((a, i) => (
@@ -136,7 +136,7 @@ export function UserMessage({
             onClick={() => {
               const u = rewind(msg.id)
               setConfirm(false)
-              if (u) onRewound(u.text)
+              if (u) onRewound(u.shown ?? u.text)
             }}
             className={buttonVariants({ variant: 'secondary', size: 'xs', className: 'h-6 px-2' })}
           >

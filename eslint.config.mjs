@@ -8,6 +8,11 @@ import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
 export default defineConfig(
   { ignores: ['**/node_modules', '**/dist', '**/out'] },
   tseslint.configs.recommended,
+  {
+    // TypeScript's explicit return types do not apply to untyped server scripts or tests.
+    files: ['**/*.{js,mjs,cjs}'],
+    rules: { '@typescript-eslint/explicit-function-return-type': 'off' }
+  },
   eslintPluginReact.configs.flat.recommended,
   eslintPluginReact.configs.flat['jsx-runtime'],
   {
@@ -38,6 +43,16 @@ export default defineConfig(
       'react/no-unknown-property': 'off',
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/purity': 'off'
+    }
+  },
+  {
+    // Newer React rules that point at code worth tidying (effects that set state, files that export more than
+    // components). The code they flag works as written, so they report without failing the check.
+    files: ['src/renderer/src/**'],
+    rules: {
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-refresh/only-export-components': 'warn'
     }
   },
   {

@@ -18,10 +18,10 @@ export function ContextPanel({
 }): React.JSX.Element {
   useSyncExternalStore(subscribeUsage, getUsageVersion) // refresh while the AI works
   const { account } = useAuth()
-  const { rows, buffer, used, free } = getContextRows(ctx.totals)
+  const { rows, buffer, used, free } = getContextRows()
   const total = used
   const usedPercent = Math.round(percentOf(total, CONTEXT_WINDOW))
-  const plan = getUsageSnapshot(account, modelName(ctx.model), ctx.totals)
+  const plan = getUsageSnapshot(account, modelName(ctx.model))
 
   const legend = [
     ...rows,

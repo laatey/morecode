@@ -1,13 +1,13 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, Close, Plus, Stop } from 'fluid-icons/react'
-import { AppWindow, Asterisk, ChevronDown, Mic, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { AppWindow, Asterisk, ChevronDown, File as FileIcon, Folder, Image as ImageIcon, Mic, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ActionMenu } from '@/components/action-menu'
 import { cn } from '@/lib/utils'
 import { isMac } from '@/lib/platform'
 import { CommandPanel } from './panels/panel-shell'
-import { useAuth } from '@/features/auth/auth-store'
 import { useSettings } from '@/features/settings/settings-store'
 import { useWorkspace } from '@/features/workspace/workspace-store'
 import { AttachmentChip, folderFrom, pathFor, readDrop } from './attachments'
@@ -18,7 +18,8 @@ import { toDataUrl } from './image-utils'
 import { MentionMenu } from './mention-menu'
 import { CopyButton, IconAction } from './message-actions'
 import { ATTACH_ONLY, Markdown } from './message-parts'
-import { MODELS, modelName } from './models'
+import { modelName } from './models'
+import { useModelChoices } from './use-model-choices'
 import { SlashMenu } from './slash-menu'
 import {
   buildCommands,
@@ -27,10 +28,8 @@ import {
   type PanelId,
   type SlashCommand
 } from './slash-commands'
-import { useRightPanel } from '@/features/right-panel/store'
-import { NOTES_FILE, NOTES_STARTER, requestOpenDoc } from '@/features/right-panel/docs-request'
 import { useSkills } from '@/features/skills/skills-store'
-import { customPrompt, skillIcon, skillPrompt } from '@/features/skills/skills-data'
+import { customPrompt, skillIcon, skillPrompt, slashLabel } from '@/features/skills/skills-data'
 import { ThinkingGlyph } from './thinking-block'
 import { ToolRow } from './tool-rows'
 import { UserMessage } from './user-message'
@@ -49,6 +48,108 @@ const tokensLabel = (n?: number): string | null =>
 const SUGGESTIONS = ['Explain how this project is organised', 'Find and fix a bug', 'Add a feature']
 const MAX_ATTACHMENTS = 10
 
+function composerContent(root: HTMLElement): string {
+  const read = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.nodeValue ?? ''
+    if (!(node instanceof HTMLElement)) return ''
+    if (node.dataset.mentionToken) return node.dataset.mentionToken
+    if (node.tagName === 'BR') return '\n'
+    return Array.from(node.childNodes).map(read).join('')
+  }
+  return Array.from(root.childNodes).map(read).join('')
+}
+
+function composerOffset(root: HTMLElement): number {
+  const selection = window.getSelection()
+  if (!selection?.rangeCount) return composerContent(root).length
+  const range = selection.getRangeAt(0).cloneRange()
+  range.selectNodeContents(root)
+  range.setEnd(selection.anchorNode!, selection.anchorOffset)
+  return composerContent(range.cloneContents() as unknown as HTMLElement).length
+}
+
+function placeComposerCaret(root: HTMLElement, offset: number): void {
+  const selection = window.getSelection()
+  if (!selection) return
+  let remaining = offset
+  // the text inside a chip is not part of the message, so the walk skips it
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (n) =>
+      n.nodeType === Node.TEXT_NODE && (n.parentElement as HTMLElement | null)?.dataset.mentionToken
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT
+  })
+  let node: Node | null
+  while ((node = walker.nextNode())) {
+    if (node instanceof HTMLElement && node.dataset.mentionToken) {
+      const length = node.dataset.mentionToken.length
+      if (remaining < length) {
+        const range = document.createRange()
+        range.setStartBefore(node)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+        return
+      }
+      remaining -= length
+    } else if (node.nodeType === Node.TEXT_NODE) {
+      const length = node.nodeValue?.length ?? 0
+      if (remaining <= length) {
+        const range = document.createRange()
+        range.setStart(node, remaining)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+        return
+      }
+      remaining -= length
+    }
+  }
+  const range = document.createRange()
+  range.selectNodeContents(root)
+  range.collapse(false)
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
+/** The leading "/command" of the message, if it is a real command. */
+function slashToken(text: string, ids: string[]): string | null {
+  const m = /^\/([a-z0-9-]+)(?=\s|$)/.exec(text)
+  return m && ids.includes(m[1]) ? m[0] : null
+}
+
+function populateComposer(root: HTMLElement, text: string, slash: string | null = null): void {
+  root.replaceChildren()
+  const pattern = /(^|\s)(@[^\s@]+)/g
+  let cursor = 0
+  if (slash) {
+    // one block, like an @file chip: it is deleted whole with Backspace and the caret cannot enter it
+    const tag = document.createElement('span')
+    tag.contentEditable = 'false'
+    tag.dataset.slashToken = '1'
+    tag.dataset.mentionToken = slash
+    tag.className = 'inline-flex select-all items-center rounded-[5px] bg-[#3b82f6]/15 px-1 text-[#3b8cff]'
+    tag.textContent = slash
+    root.append(tag)
+    cursor = slash.length
+    pattern.lastIndex = cursor
+  }
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(text))) {
+    const tokenStart = match.index + match[1].length
+    if (tokenStart > cursor) root.append(document.createTextNode(text.slice(cursor, tokenStart)))
+    const token = match[2]
+    const chip = document.createElement('span')
+    chip.contentEditable = 'false'
+    chip.dataset.mentionToken = token
+    chip.className = 'inline-flex select-all items-center rounded-[5px] bg-[#3b82f6]/15 px-1.5 text-[#70a7ff]'
+    chip.textContent = token.slice(1)
+    root.append(chip)
+    cursor = tokenStart + token.length
+  }
+  if (cursor < text.length) root.append(document.createTextNode(text.slice(cursor)))
+}
+
 type AgentMsg = Extract<Msg, { role: 'agent' }>
 
 /** What the AI is doing right now, in plain words. */
@@ -61,6 +162,7 @@ function currentActivity(parts: Part[]): string {
     if (!('status' in t) || t.status !== 'running') continue
     if (t.kind === 'thinking') return 'Thinking…'
     if (t.kind === 'edit') return `Editing ${t.path.split('/').pop()}`
+    if (t.kind === 'agent') return 'A helper is researching'
     if (t.kind === 'read') return 'Reading files'
     if (t.kind === 'command') return t.label
   }
@@ -137,7 +239,7 @@ function AgentMessage({ msg, isLast }: { msg: AgentMsg; isLast: boolean }): Reac
                 label="Bad response"
                 active={msg.feedback === 'down'}
                 onClick={() => {
-                  if (msg.feedback !== 'down') toast('Thanks for the feedback')
+                  if (msg.feedback !== 'down') toast.success('Thanks for the feedback')
                   rate(msg.id, 'down')
                 }}
               >
@@ -171,13 +273,14 @@ export function AiAssistant(): React.JSX.Element {
     acceptAll,
     discardAll,
     stop,
-    clear,
     compact,
+    clear,
     model,
     setModel,
     autoAccept,
     setAutoAccept
   } = useChatContext()
+  const { choices: modelChoices, choose: chooseModel } = useModelChoices(setModel)
   const [input, setInput] = useState('')
   const [caret, setCaret] = useState(0)
   const [images, setImages] = useState<string[]>([])
@@ -189,25 +292,27 @@ export function AiAssistant(): React.JSX.Element {
   const [dismissed, setDismissed] = useState(false)
 
   const scroller = useRef<HTMLDivElement>(null)
-  const field = useRef<HTMLTextAreaElement>(null)
-  const card = useRef<HTMLDivElement>(null)
+  const field = useRef<HTMLDivElement>(null)
   const photoPicker = useRef<HTMLInputElement>(null)
   const filePicker = useRef<HTMLInputElement>(null)
   const folderPicker = useRef<HTMLInputElement>(null)
   const nextCaret = useRef<number | null>(null)
   const voiceBase = useRef('')
+  const dragDepth = useRef(0)
+  const dropHandlers = useRef<{
+    addFiles: (files: File[]) => Promise<void>
+    addAttachments: (items: Attachment[]) => void
+  } | null>(null)
 
-  const { spendMessage, account } = useAuth()
-  const { settings } = useSettings()
+  const { settings, openSettings } = useSettings()
   const ws = useWorkspace()
   const group = ws.groups.find((g) => g.id === ws.active.projectId)
-  const folder = group?.name ?? account?.project?.name ?? ''
-  const projectPath = account?.project?.path
+  const folder = group?.name ?? ''
+  const projectPath = group?.folder
   const files = useWorkspaceFiles(projectPath ?? '')
 
   const slashOpen = input.startsWith('/') && !/\s/.test(input) && !dismissed
   const skills = useSkills()
-  const { openTab } = useRightPanel()
   const commands = useMemo(
     () => buildCommands(skills.active, skills.commands),
     [skills.active, skills.commands]
@@ -249,18 +354,22 @@ export function AiAssistant(): React.JSX.Element {
     if (atBottom) scrollToEnd(false)
   }, [messages, atBottom])
 
-  useEffect(() => {
-    const el = field.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-  }, [input])
-
   // put the cursor where an inserted file name ends
   useLayoutEffect(() => {
-    if (nextCaret.current === null) return
-    field.current?.setSelectionRange(nextCaret.current, nextCaret.current)
-    setCaret(nextCaret.current)
+    const editor = field.current
+    if (!editor) return
+    const current = composerContent(editor)
+    const slash = slashToken(input, commands.map((c) => c.id))
+    const first = editor.firstChild
+    const shown = first instanceof HTMLElement && first.dataset.slashToken ? first.textContent : null
+    const inSync = current === input && shown === slash
+    if (inSync && nextCaret.current === null) return
+    const typing = current === input && document.activeElement === editor
+    const typedAt = typing ? composerOffset(editor) : input.length
+    if (!inSync) populateComposer(editor, input, slash)
+    const position = nextCaret.current ?? typedAt
+    placeComposerCaret(editor, position)
+    setCaret(position)
     nextCaret.current = null
   }, [input])
 
@@ -284,10 +393,57 @@ export function AiAssistant(): React.JSX.Element {
     if (!items.length) return
     setAttachments((l) => {
       const fresh = items.filter((a) => !l.some((x) => x.name === a.name && x.path === a.path))
-      if (l.length + fresh.length > MAX_ATTACHMENTS) toast(`You can attach up to ${MAX_ATTACHMENTS} items`)
+      if (l.length + fresh.length > MAX_ATTACHMENTS) toast.error(`You can attach up to ${MAX_ATTACHMENTS} items`)
       return [...l, ...fresh].slice(0, MAX_ATTACHMENTS)
     })
   }
+
+  useEffect(() => {
+    dropHandlers.current = { addFiles, addAttachments }
+  })
+
+  // Listen on the document so dropping anywhere in the app attaches files to the composer.
+  useEffect(() => {
+    const hasFiles = (e: DragEvent): boolean => Boolean(e.dataTransfer?.types.includes('Files'))
+    const enter = (e: DragEvent): void => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      dragDepth.current += 1
+      setDragging(true)
+    }
+    const over = (e: DragEvent): void => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+      setDragging(true)
+    }
+    const leave = (e: DragEvent): void => {
+      if (!hasFiles(e)) return
+      dragDepth.current = Math.max(0, dragDepth.current - 1)
+      const outside = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight
+      if (outside || dragDepth.current === 0) setDragging(false)
+    }
+    const drop = (e: DragEvent): void => {
+      if (!hasFiles(e) || !e.dataTransfer) return
+      e.preventDefault()
+      dragDepth.current = 0
+      setDragging(false)
+      const dropped = readDrop(e.dataTransfer)
+      void dropHandlers.current?.addFiles(dropped.images)
+      dropHandlers.current?.addAttachments(dropped.attachments)
+    }
+
+    document.addEventListener('dragenter', enter, true)
+    document.addEventListener('dragover', over, true)
+    document.addEventListener('dragleave', leave, true)
+    document.addEventListener('drop', drop, true)
+    return () => {
+      document.removeEventListener('dragenter', enter, true)
+      document.removeEventListener('dragover', over, true)
+      document.removeEventListener('dragleave', leave, true)
+      document.removeEventListener('drop', drop, true)
+    }
+  }, [])
 
   const { listening, toggle: toggleVoice, stop: stopVoice } = useDictation((spoken) =>
     setInput(voiceBase.current ? `${voiceBase.current} ${spoken}` : spoken)
@@ -295,13 +451,21 @@ export function AiAssistant(): React.JSX.Element {
 
   const submit = (raw: string): void => {
     let text = raw
+    let shown: string | undefined
     const parsed = parseSlash(commands, raw)
     if (parsed) {
       const { command: c, args } = parsed
-      if (c.kind === 'skill') text = skillPrompt(c.skill, args)
-      else if (c.kind === 'custom') text = customPrompt(c.command, args)
-      else if (c.kind === 'prompt') text = args ? `${c.prompt}\n\n${args}` : c.prompt
-      else {
+      if (c.kind === 'skill') {
+        text = skillPrompt(c.skill, args)
+        shown = slashLabel(c.id, args)
+      } else if (c.kind === 'custom') {
+        text = customPrompt(c.command, args)
+        shown = slashLabel(c.id, args)
+      } else if (c.kind === 'prompt') {
+        if (!args.trim() && !c.bare) return
+        text = args.trim() ? `${c.prompt}\n\n${args}` : c.prompt
+        shown = slashLabel(c.id, args)
+      } else {
         runCommand(c)
         return
       }
@@ -309,48 +473,40 @@ export function AiAssistant(): React.JSX.Element {
     const q = text.trim() || (images.length || attachments.length ? ATTACH_ONLY[0] : '')
     if (!q || running) return
     stopVoice()
-    if (!spendMessage()) return // out of messages for today: the plan dialog opens instead
-    send(q, images, model, autoAccept, attachments)
+    // not sent (out of messages, or the plan lacks this model): the plan dialog opens and the draft stays
+    if (!send(q, images, model, autoAccept, attachments, shown)) return
     setInput('')
     setImages([])
     setAttachments([])
     setAtBottom(true)
   }
 
-  /** /init: open the project notes (AGENTS.md) in the Docs tab, creating a starter file if needed. */
-  const openNotes = async (): Promise<void> => {
-    if (!window.api?.docs) {
-      submit(
-        'Explore this repository and write a concise AGENTS.md describing structure, commands and conventions.'
-      )
-      return
-    }
-    const found = await window.api.docs.read(NOTES_FILE)
-    if (!found.ok) {
-      const made = await window.api.docs.write(NOTES_FILE, NOTES_STARTER)
-      if (!made.ok) {
-        toast.error(made.error)
-        return
-      }
-      toast('Created project notes')
-    }
-    openTab('docs')
-    requestOpenDoc(NOTES_FILE, true)
-  }
-
   const runCommand = (c: SlashCommand): void => {
     setInput('')
     setPickIndex(0)
     if (c.kind === 'panel') setPanel(c.panel)
-    else if (c.kind === 'prompt') submit(c.prompt)
-    else if (c.kind === 'skill') submit(skillPrompt(c.skill, ''))
-    else if (c.kind === 'custom') submit(customPrompt(c.command, ''))
-    else if (c.action === 'notes') void openNotes()
-    else if (c.action === 'clear') clear()
-    else if (c.action === 'compact') compact()
-    else {
-      setAutoAccept((v) => !v)
-      toast(autoAccept ? 'Auto-accept off' : 'Auto-accept on')
+    else if (c.kind === 'prompt' && c.bare) {
+      if (!running) send(c.prompt, [], model, autoAccept, [], slashLabel(c.id, ''))
+    } else if (c.kind === 'prompt') {
+      nextCaret.current = c.id.length + 2
+      setInput(`/${c.id} `)
+      setDismissed(true)
+      requestAnimationFrame(() => field.current?.focus())
+    } else if (c.kind === 'prefill') {
+      window.dispatchEvent(new CustomEvent('assistant:prefill', { detail: c.text }))
+    }
+    else if (c.kind === 'skill' || c.kind === 'custom') {
+      // like Claude: picking a skill lets you say what to use it on, instead of firing it blindly
+      nextCaret.current = c.id.length + 2
+      setInput(`/${c.id} `)
+      setDismissed(true)
+      requestAnimationFrame(() => field.current?.focus())
+    } else if (c.action === 'compact') compact(model)
+    else if (c.action === 'permissions') openSettings('permissions')
+    else if (c.action === 'clear') {
+      if (running) toast.error('Stop the current run first')
+      else if (totals.files > 0) toast.error('Keep or undo the pending changes first')
+      else clear()
     }
   }
 
@@ -377,7 +533,9 @@ export function AiAssistant(): React.JSX.Element {
     }
     // panels can drop text into the message box ("Use it" on a skill)
     const onPrefill = (e: Event): void => {
-      setInput((e as CustomEvent<string>).detail)
+      const text = (e as CustomEvent<string>).detail
+      nextCaret.current = text.length
+      setInput(text)
       setDismissed(true)
       requestAnimationFrame(() => field.current?.focus())
     }
@@ -389,7 +547,7 @@ export function AiAssistant(): React.JSX.Element {
     }
   }, [])
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
     const menuSize = slashOpen ? slashList.length : mentionOpen ? mentionList.length : 0
     if (menuSize) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -419,6 +577,9 @@ export function AiAssistant(): React.JSX.Element {
       if (settings.sendWith === 'mod-enter' ? mod : !e.shiftKey) {
         e.preventDefault()
         submit(input)
+      } else {
+        e.preventDefault()
+        document.execCommand('insertLineBreak')
       }
     }
   }
@@ -434,6 +595,20 @@ export function AiAssistant(): React.JSX.Element {
         empty && 'justify-center'
       )}
     >
+      {dragging && createPortal(
+        <div className="pointer-events-none fixed inset-0 z-[9999] grid place-items-center bg-black/20 p-3">
+          <div className="absolute inset-3 rounded-[20px] border border-dashed border-[#3b82f6]/70 bg-[#3b82f6]/[0.04]" />
+          <div className="relative flex flex-col items-center gap-3 text-[#1683ff]">
+            <div className="flex items-center gap-7">
+              <ImageIcon className="h-9 w-9 stroke-[1.6]" />
+              <FileIcon className="h-9 w-9 stroke-[1.6]" />
+              <Folder className="h-9 w-9 stroke-[1.6]" />
+            </div>
+            <span className="text-[18px] font-medium text-[#5aa6ff]">Drop files here</span>
+          </div>
+        </div>,
+        document.body
+      )}
       {empty && (
         <div
           aria-hidden
@@ -465,12 +640,18 @@ export function AiAssistant(): React.JSX.Element {
                 onRewound={(text) => {
                   setInput(text)
                   field.current?.focus()
-                  toast('Rewound to before that message')
+                  toast.success('Rewound to before that message')
                 }}
               />
             ) : m.role === 'system' ? (
               <div key={m.id} className="text-center text-[11.5px] text-muted-foreground">
                 {m.text}
+                {m.summary && (
+                  <details className="mx-auto mt-1 max-w-[34rem] text-left">
+                    <summary className="cursor-pointer text-center hover:text-foreground">Show summary</summary>
+                    <p className="mt-1 whitespace-pre-wrap rounded-lg border border-white/[0.08] bg-[#242423] p-2.5 text-[12px] leading-5 text-[#b4b4b0]">{m.summary}</p>
+                  </details>
+                )}
               </div>
             ) : (
               <AgentMessage key={m.id} msg={m} isLast={i === messages.length - 1} />
@@ -479,19 +660,20 @@ export function AiAssistant(): React.JSX.Element {
         </div>
       </div>
 
-      {!atBottom && messages.length > 0 && (
-        <button
-          type="button"
-          aria-label="Scroll to latest"
-          onClick={() => scrollToEnd()}
-          className="absolute bottom-40 left-1/2 z-10 grid h-8 w-8 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-white/[0.12] bg-[#2b2b2a] text-muted-foreground shadow-md transition-colors hover:text-foreground"
-        >
-          <ArrowDown className="h-4 w-4" />
-        </button>
-      )}
-
-      <div className="shrink-0 px-3 pb-1 pt-1">
+      <div className="relative shrink-0 px-3 pb-1 pt-1">
+        {/* messages fade out above the message box instead of being cut off */}
+        {!empty && <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-full h-7 bg-gradient-to-t from-background to-transparent" />}
         <div className="relative mx-auto w-full max-w-[46rem]">
+          {!atBottom && messages.length > 0 && (
+            <button
+              type="button"
+              aria-label="Scroll to latest"
+              onClick={() => scrollToEnd()}
+              className="absolute bottom-full left-1/2 z-20 mb-3 grid h-8 w-8 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-white/[0.12] bg-[#2b2b2a] text-muted-foreground shadow-md transition-colors hover:text-foreground"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          )}
           {slashOpen && (
             <SlashMenu
               commands={slashList}
@@ -543,45 +725,21 @@ export function AiAssistant(): React.JSX.Element {
               removed={totals.removed}
               onAccept={() => {
                 acceptAll()
-                toast('Changes kept')
+                toast.success('Changes kept')
               }}
               onDiscard={() => {
                 discardAll()
-                toast('Changes undone')
+                toast.success('Changes undone')
               }}
             />
           )}
 
           <div
-            ref={card}
             data-tour="composer"
-            onDragOver={(e) => {
-              if (!e.dataTransfer.types.includes('Files')) return
-              e.preventDefault()
-              setDragging(true)
-            }}
-            onDragLeave={(e) => {
-              if (!card.current?.contains(e.relatedTarget as Node | null)) setDragging(false)
-            }}
-            onDrop={(e) => {
-              if (!e.dataTransfer.types.includes('Files')) return
-              e.preventDefault()
-              setDragging(false)
-              const dropped = readDrop(e.dataTransfer)
-              void addFiles(dropped.images)
-              addAttachments(dropped.attachments)
-            }}
             className={cn(
-              'relative rounded-3xl border bg-background p-3 shadow-sm transition-colors focus-within:border-primary/50',
-              dragging && 'border-primary/60'
+              'relative rounded-3xl border bg-background p-3 shadow-sm transition-colors focus-within:border-primary/50'
             )}
           >
-            {dragging && (
-              <div className="pointer-events-none absolute inset-1 z-10 grid place-items-center rounded-[20px] border border-dashed border-white/[0.25] bg-background/90 text-[12.5px] text-[#d6d6d3]">
-                Drop images, files or folders to attach
-              </div>
-            )}
-
             {images.length || attachments.length ? (
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 {images.map((src, i) => (
@@ -640,29 +798,48 @@ export function AiAssistant(): React.JSX.Element {
               }}
             />
 
-            <textarea
-              ref={field}
-              onPaste={(e) => {
-                const pasted = [...e.clipboardData.files]
-                if (pasted.length) {
-                  e.preventDefault()
-                  void addFiles(pasted)
-                }
-              }}
-              aria-label="Ask AI anything"
-              rows={1}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                setCaret(e.target.selectionStart)
-                setPickIndex(0)
-                setDismissed(false)
-              }}
-              onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
-              onKeyDown={onKeyDown}
-              placeholder={listening ? 'Listening…' : 'Ask AI anything'}
-              className="block max-h-40 w-full resize-none bg-transparent px-1 py-1 text-sm leading-6 outline-none placeholder:text-muted-foreground"
-            />
+            <div className="relative">
+              <div
+                ref={field}
+                contentEditable
+                suppressContentEditableWarning
+                role="textbox"
+                aria-multiline="true"
+                onPaste={(e) => {
+                  const pasted = [...e.clipboardData.files]
+                  if (pasted.length) {
+                    e.preventDefault()
+                    void addFiles(pasted)
+                  } else {
+                    const text = e.clipboardData.getData('text/plain')
+                    if (text) {
+                      e.preventDefault()
+                      document.execCommand('insertText', false, text)
+                    }
+                  }
+                }}
+                onInput={(e) => {
+                  const value = composerContent(e.currentTarget)
+                  const position = composerOffset(e.currentTarget)
+                  setInput(value)
+                  setCaret(position)
+                  setPickIndex(0)
+                  setDismissed(false)
+                }}
+                onBlur={(e) => {
+                  const value = composerContent(e.currentTarget)
+                  if (!value) e.currentTarget.replaceChildren()
+                }}
+                aria-label="Ask AI anything"
+                onSelect={(e) => {
+                  setCaret(composerOffset(e.currentTarget))
+                }}
+                onKeyDown={onKeyDown}
+                spellCheck={false}
+                data-placeholder={listening ? 'Listening…' : 'Ask AI anything'}
+                className="composer-editor relative z-10 block max-h-40 min-h-6 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent px-1 py-1 text-sm leading-6 text-foreground outline-none"
+              />
+            </div>
 
             <div className="mt-2 flex items-center justify-between">
               <ActionMenu
@@ -741,7 +918,7 @@ export function AiAssistant(): React.JSX.Element {
                     label: revealLabel,
                     onClick: () => {
                       if (window.api?.workspace?.reveal) void window.api.workspace.reveal(projectPath)
-                      else toast('Available in the desktop app')
+                      else toast.error('Available in the desktop app')
                     }
                   },
                   {
@@ -750,7 +927,7 @@ export function AiAssistant(): React.JSX.Element {
                     disabled: !projectPath,
                     onClick: () => {
                       if (projectPath) {
-                        void navigator.clipboard.writeText(projectPath).then(() => toast('Path copied'))
+                        void navigator.clipboard.writeText(projectPath).then(() => toast.success('Path copied'))
                       }
                     }
                   }
@@ -791,12 +968,12 @@ export function AiAssistant(): React.JSX.Element {
               side="top"
               align="end"
               contentClassName="min-w-[230px]"
-              items={MODELS.map((m) => ({
-                id: m.id,
-                label: m.name,
-                description: m.description,
-                checked: m.id === model,
-                onClick: () => setModel(m.id)
+              items={modelChoices.map((c) => ({
+                id: c.model.id,
+                label: c.model.name,
+                description: c.locked ? `${c.model.description} · Upgrade to use` : c.model.description,
+                checked: c.model.id === model,
+                onClick: () => chooseModel(c)
               }))}
               trigger={
                 <button

@@ -1,3 +1,4 @@
+import { SECRET_NAMES, secrets } from '@/lib/secrets'
 import { AuthError, mockAuthService, type Account, type AuthErrorCode, type AuthService, type BillingService, type PaymentStatus } from './auth-service'
 
 /**
@@ -8,8 +9,10 @@ import { AuthError, mockAuthService, type Account, type AuthErrorCode, type Auth
 const API = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '')
 export const HOSTED = Boolean(API)
 
-const SESSIONS = 'morecode:sessions:v1'
-const KEYS = 'morecode:keys:v1'
+const SESSIONS = SECRET_NAMES.sessions
+const KEYS = SECRET_NAMES.keys
+/** Sign-in sessions and your own API keys are secrets: they go in the encrypted store when the computer has one. */
+const isSecret = (key: string): boolean => secrets.secure && (key === SESSIONS || key === KEYS)
 
 interface Saved {
   current: string | null
@@ -18,17 +21,21 @@ interface Saved {
 
 const read = <T,>(key: string, fallback: T): T => {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = isSecret(key) ? secrets.get(key) : localStorage.getItem(key)
     return raw ? (JSON.parse(raw) as T) : fallback
   } catch {
     return fallback
   }
 }
 const write = (key: string, value: unknown): void => {
+  if (isSecret(key)) {
+    secrets.set(key, JSON.stringify(value))
+    return
+  }
   try {
     localStorage.setItem(key, JSON.stringify(value))
   } catch {
-    // storage unavailable: the person simply has to sign in again next time
+    // storage full or blocked: this session lasts until the app closes
   }
 }
 
@@ -293,4 +300,7 @@ export const httpAuthService: AuthService = {
 }
 
 /** Server accounts when VITE_API_URL is set, built-in demo accounts otherwise. */
-export const defaultAuthService: AuthService = HOSTED ? httpAuthService : mockAuthService
+// The built-in demo accounts (no server, anyone can pick any plan) are for development only. An installed build
+// that was made without a server address says it is not connected instead of handing out plans.
+export const defaultAuthService: AuthService =
+  HOSTED || import.meta.env.PROD ? httpAuthService : mockAuthService

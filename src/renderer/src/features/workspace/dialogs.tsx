@@ -1,16 +1,17 @@
+import { ModalOverlay } from '@/components/modal-overlay'
 import React, { useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { FolderOpen } from 'lucide-react'
+import { FolderOpen, FolderPlus, Laptop, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from './workspace-store'
 import { CommandPalette } from '@/features/palette/command-palette'
 
 const SURFACE =
-  'fixed left-1/2 z-50 w-[min(440px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-xl border border-white/[0.09] bg-[#262625] shadow-[0_16px_50px_rgba(0,0,0,0.55)] outline-none'
+  'fixed left-1/2 z-50 w-[min(440px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-[11px] border border-white/[0.09] bg-[#262625] shadow-[0_16px_50px_rgba(0,0,0,0.55)] outline-none'
 
 const Overlay = (): React.JSX.Element => (
-  <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+  <ModalOverlay tone="light" />
 )
 
 /** One-line text prompt: new project, rename project. */
@@ -36,20 +37,137 @@ export function NameDialog({
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
         <Overlay />
-        <Dialog.Content className={cn(SURFACE, 'top-[22vh] p-4')} aria-describedby={undefined}>
-          <Dialog.Title className="mb-3 text-[13.5px] font-medium text-[#ececea]">
+        <Dialog.Content
+          className={cn(
+            SURFACE,
+            title === 'New project'
+              ? 'top-1/2 w-[min(420px,calc(100vw-32px))] -translate-y-1/2 p-3.5'
+              : 'top-[22vh] p-4'
+          )}
+          aria-describedby={undefined}
+        >
+          <Dialog.Title className={cn('mb-2 font-medium text-[#ececea]', title === 'New project' ? 'text-[15px]' : 'text-[13.5px]')}>
             {title}
           </Dialog.Title>
-          <NameForm
-            initial={initial}
-            confirm={confirm}
-            onClose={onClose}
-            onSubmit={onSubmit}
-            chooseFolder={chooseFolder}
-          />
+          {title === 'New project' ? (
+            <ProjectForm confirm={confirm} onClose={onClose} onSubmit={onSubmit} />
+          ) : (
+            <NameForm
+              initial={initial}
+              confirm={confirm}
+              onClose={onClose}
+              onSubmit={onSubmit}
+              chooseFolder={chooseFolder}
+            />
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  )
+}
+
+function ProjectForm({
+  confirm,
+  onClose,
+  onSubmit
+}: {
+  confirm: string
+  onClose: () => void
+  onSubmit: (name: string, folder?: string) => void
+}): React.JSX.Element {
+  const [name, setName] = useState('')
+  const [folder, setFolder] = useState<string | undefined>()
+
+  const browse = async (): Promise<void> => {
+    const chosen = await window.api?.workspace?.choose()
+    if (chosen) {
+      setFolder(chosen.root)
+      setName((current) => current || chosen.name)
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (name.trim()) onSubmit(name, folder)
+      }}
+    >
+      <div className="flex h-9 items-center overflow-hidden rounded-[8px] border border-white/[0.12] bg-white/[0.035] focus-within:border-[#3b82f6]/80">
+        <span className="grid h-full w-9 shrink-0 place-items-center border-r border-white/[0.08] text-[#b7b7b3]">
+          <FolderOpen className="h-4 w-4" />
+        </span>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          aria-label="Project name"
+          placeholder="Project name"
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-[13px] outline-none placeholder:text-[#858581]"
+        />
+      </div>
+
+      <div className="mb-1 mt-2.5 flex items-center justify-between">
+        <h3 className="text-[11.5px] font-semibold text-[#e6e6e3]">Source folder</h3>
+        <span className="flex items-center gap-1.5 text-[11px] text-[#aaa9a5]">
+          <Laptop className="h-3 w-3" /> This computer
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-[8px] border border-white/[0.1] bg-white/[0.015]">
+        {folder ? (
+          <div className="flex h-9 items-center gap-2 px-2.5">
+            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-[#aaa9a5]" />
+            <span className="min-w-0 flex-1 truncate text-[12px] text-[#e0e0dd]" title={folder}>
+              {folder.split(/[\\/]/).filter(Boolean).at(-1) || folder}
+            </span>
+            <button
+              type="button"
+              aria-label="Remove source folder"
+              onClick={() => setFolder(undefined)}
+              className="grid h-6 w-6 cursor-pointer place-items-center rounded-md text-[#8c8c87] hover:bg-white/[0.07] hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex min-h-[44px] items-center justify-center px-2">
+            <button
+              type="button"
+              onClick={() => void browse()}
+              className="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[12px] text-[#bcbcb8] hover:bg-white/[0.07] hover:text-foreground"
+            >
+              <FolderPlus className="h-4 w-4" /> Add a folder on this computer
+            </button>
+          </div>
+        )}
+        {folder && (
+          <button
+            type="button"
+            onClick={() => void browse()}
+            className="flex h-8 w-full cursor-pointer items-center gap-2 border-t border-white/[0.08] px-2.5 text-left text-[12px] text-[#bcbcb8] hover:bg-white/[0.04] hover:text-foreground"
+          >
+            <FolderPlus className="h-4 w-4" /> Change folder
+          </button>
+        )}
+      </div>
+
+      <div className="mt-2.5 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-7 cursor-pointer rounded-md px-2.5 text-[12px] text-[#a5a5a1] hover:bg-white/[0.05] hover:text-foreground"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={!name.trim()}
+          className="h-7 cursor-pointer rounded-md bg-white px-3 text-[12px] font-medium text-[#252524] hover:bg-[#e5e5e3] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {confirm} project
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -258,7 +376,7 @@ export function WorkspaceDialogs(): React.JSX.Element {
             const created = folder ? null : await window.api?.workspace?.createProject(name)
             const projectFolder = folder ?? created?.root
             if (!projectFolder) {
-              toast('Could not create a project folder in Documents')
+              toast.error('Could not create a project folder in Documents')
               return
             }
             const id = ws.addGroup(name, projectFolder)

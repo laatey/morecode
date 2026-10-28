@@ -322,9 +322,9 @@ export const mockAuthService: AuthService = {
       throw new AuthError('bad-key', 'That does not look like a valid key. Keys start with “sk-”.')
     }
     // in the desktop app, make a tiny real request so a wrong or expired key is caught now
-    const test = typeof window !== 'undefined' ? window.api?.agent?.testKey : undefined
+    const test = typeof window !== 'undefined' ? window.api?.agent?.testProvider : undefined
     if (test) {
-      const r = await test(key.trim())
+      const r = await test({ provider: 'anthropic', key: key.trim() })
       if (!r.ok) throw new AuthError('bad-key', r.message ?? 'That key was not accepted.')
     } else {
       await wait(600)

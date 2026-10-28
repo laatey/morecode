@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from 'react'
+import { platform } from '@/lib/platform'
+import { promptGlyph } from './prompt'
 
 /**
  * Terminal sessions live here, not in the component, so a command keeps running and its output
@@ -17,6 +19,8 @@ export interface TermEntry {
 export interface TermSession {
   entries: TermEntry[]
   cwd: string | null
+  /** The project folder this terminal was started for. Opening another project moves the terminal there. */
+  base: string | null
   /** Id of the running command, if any. */
   running: string | null
   history: string[]
@@ -28,7 +32,7 @@ const listeners = new Set<() => void>()
 let nextEntry = 1
 let wired = false
 
-const empty = (): TermSession => ({ entries: [], cwd: null, running: null, history: [] })
+const empty = (): TermSession => ({ entries: [], cwd: null, base: null, running: null, history: [] })
 const emit = (): void => listeners.forEach((l) => l())
 const term = (): Window['api']['terminal'] | undefined => window.api?.terminal
 
@@ -85,12 +89,20 @@ function wire(): void {
 
 export const terminalAvailable = (): boolean => Boolean(term())
 
-export async function ensureStarted(tabId: string): Promise<void> {
+/**
+ * Start a terminal in a project's folder. The same project keeps wherever the person has `cd`-ed to;
+ * a different project moves the terminal to that project's folder.
+ */
+export async function ensureStarted(tabId: string, folder: string | null): Promise<void> {
   wire()
   const s = session(tabId)
-  if (s.cwd || !term()) return
-  const cwd = await term()!.startDir()
-  update(tabId, (cur) => ({ ...cur, cwd: cur.cwd ?? cwd }))
+  const base = folder ?? ''
+  if (!term() || s.running) return
+  if (s.cwd && s.base === base) return
+  const cwd = await term()!.startDir(folder)
+  const switching = s.cwd !== null
+  update(tabId, (cur) => ({ ...cur, cwd, base }))
+  if (switching) add(tabId, 'info', `Moved to ${cwd}`)
 }
 
 export async function runCommand(tabId: string, raw: string): Promise<void> {
@@ -106,7 +118,9 @@ export async function runCommand(tabId: string, raw: string): Promise<void> {
 
   // built-ins that change the shell itself rather than run a program
   if (/^cls$|^clear$/i.test(command)) return clearTerminal(tabId)
-  const cd = /^cd(?:\s+(.*))?$/i.exec(command)
+  // a plain "cd x" (or a bare drive like "D:") moves this terminal; "cd x && npm i" runs as a normal command
+  const chained = /&&|\|\||[;|&]/.test(command)
+  const cd = chained ? null : /^cd(?:\s+(.*))?$/i.exec(command) ?? (/^[a-z]:$/i.test(command) ? ['', command] : null)
   if (cd) {
     const res = await t.cd(s.cwd, cd[1] ?? '')
     if (res.ok) update(tabId, (cur) => ({ ...cur, cwd: res.cwd }))
@@ -158,7 +172,7 @@ export function recentOutput(tabId: string): { text: string; failed: boolean } |
   if (start < 0) return null
   const block = entries.slice(start)
   const text = block
-    .map((e) => (e.kind === 'cmd' ? `$ ${e.text}` : e.text.replace(ANSI, '')))
+    .map((e) => (e.kind === 'cmd' ? `${promptGlyph(platform)} ${e.text}` : e.text.replace(ANSI, '')))
     .join('\n')
     .trim()
   return {

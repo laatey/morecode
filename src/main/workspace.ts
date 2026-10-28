@@ -36,7 +36,7 @@ export function getNewProjectRoot(): string {
   try {
     mkdirSync(folder, { recursive: true })
   } catch {
-    // The create-project tool will report a useful error if Documents is unavailable.
+    // Commands will report a useful error if Documents is unavailable.
   }
   return folder
 }
@@ -192,7 +192,7 @@ function searchDocs(query: string): DocMatch[] {
     if (out.length >= 80) break
     if (doc.path.toLowerCase().includes(q)) out.push({ path: doc.path, line: 0, text: doc.name })
     if (doc.size > MAX_BYTES) continue
-    let text = ''
+    let text: string
     try {
       text = readFileSync(join(base, doc.path), 'utf8')
     } catch {
@@ -222,6 +222,8 @@ const cleanDocName = (raw: string): string | null => {
     .trim()
     .replace(/\\/g, '/')
     .split('/')
+    // control characters are exactly what is being stripped from file names here
+    // eslint-disable-next-line no-control-regex
     .map((p) => p.trim().replace(/[<>:"|?*\u0000-\u001f]/g, ''))
     .filter((p) => p && p !== '.' && p !== '..')
   if (!parts.length) return null

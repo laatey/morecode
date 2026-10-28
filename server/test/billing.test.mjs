@@ -203,6 +203,16 @@ try {
     charges.set(r3, { ...charge(b, r3, { plan: 'max' }), status: 'failed' })
     const s3 = await call('GET', `/v1/billing/status?reference=${r3}`, { token: b.token })
     ok('a failed payment is reported and changes nothing', s3.json.status === 'failed' && s3.json.account.plan === 'free')
+    // Paystack reports a payment the customer has not finished yet as "abandoned". The app polls while the
+    // Paystack page is still open, so that must read as "keep waiting", not "failed" - and the same payment
+    // must still go through once the customer completes it.
+    const r4 = (await call('POST', '/v1/billing/checkout', { token: b.token, body: { plan: 'pro' } })).json.reference
+    charges.set(r4, { ...charge(b, r4, { plan: 'pro' }), status: 'abandoned' })
+    const s4 = await call('GET', `/v1/billing/status?reference=${r4}`, { token: b.token })
+    ok('a payment still being made is pending, not failed', s4.json.status === 'pending' && s4.json.account.plan === 'free', s4.json.status)
+    charges.set(r4, charge(b, r4, { plan: 'pro' }))
+    const s5 = await call('GET', `/v1/billing/status?reference=${r4}`, { token: b.token })
+    ok('the same payment switches the plan on once it is completed', s5.json.status === 'success' && s5.json.account.plan === 'pro', s5.json.status)
     ok('an unknown reference is just unknown', (await call('GET', '/v1/billing/status?reference=mc_doesnotexist', { token: b.token })).json.status === 'unknown')
     ok('a malformed reference is refused without calling Paystack', (await call('GET', '/v1/billing/status?reference=../../x', { token: b.token })).json.status === 'unknown')
     const c = await newUser()

@@ -1,6 +1,6 @@
 import { ipcMain, type WebContents } from 'electron'
-import { getNewProjectRoot, getWorkspaceRoot } from '../workspace'
-import { ApiFailure } from './anthropic'
+import { getNewProjectRoot } from '../workspace'
+import { ApiFailure, looksDropped } from './anthropic'
 import { runAgent, type RunInput, type Style } from './run'
 import { keepEdit, revertEdit, type Decision } from './tools'
 
@@ -13,7 +13,8 @@ const runs = new Map<string, Live>()
 
 type Payload = Omit<RunInput, 'cwd'>
 
-const MODELS = /^(claude-[a-z0-9.-]+|qwen2\.5-coder-14b-kaggle|anthropic\/claude-sonnet-5)$/i
+// Keep in step with the model ids in the app (renderer/features/ai-assistant/models.ts).
+const MODELS = /^(claude-[a-z0-9.-]+|anthropic\/claude-sonnet-5|openrouter\/free)$/i
 
 function valid(p: unknown): p is Payload {
   const x = p as Payload
@@ -39,6 +40,80 @@ function valid(p: unknown): p is Payload {
   )
 }
 
+export type CheckResult = { ok: boolean; message?: string }
+
+type ProviderCheck =
+  | { provider: 'anthropic' | 'openrouter'; key: string }
+  | { provider: 'gateway'; key: string; endpoint: string }
+
+const PROVIDER_NAME = { anthropic: 'API', openrouter: 'OpenRouter', gateway: 'gateway' } as const
+
+function shape(c: unknown): ProviderCheck | null {
+  const x = c as Partial<ProviderCheck> | null
+  if (!x || typeof x.key !== 'string') return null
+  const key = x.key.trim()
+  if (key.length < 20 || key.length > 300) return null
+  if (x.provider === 'anthropic' || x.provider === 'openrouter')
+    return { provider: x.provider, key }
+  if (
+    x.provider === 'gateway' &&
+    typeof x.endpoint === 'string' &&
+    /^https:\/\//i.test(x.endpoint)
+  ) {
+    return { provider: 'gateway', key, endpoint: x.endpoint.trim().replace(/\/$/, '') }
+  }
+  return null
+}
+
+/** One cheap request per provider: a one-token message, or the gateway's health page. Sends no project data. */
+async function checkProvider(raw: unknown): Promise<CheckResult> {
+  const c = shape(raw)
+  if (!c) return { ok: false, message: 'That does not look like a valid key.' }
+  const name = PROVIDER_NAME[c.provider]
+  const message = JSON.stringify({
+    model: c.provider === 'openrouter' ? 'openrouter/free' : 'claude-haiku-5-5',
+    max_tokens: 1,
+    messages: [{ role: 'user', content: 'hi' }]
+  })
+  try {
+    const res =
+      c.provider === 'gateway'
+        ? await fetch(`${c.endpoint}/health`, {
+            headers: { 'x-api-key': c.key },
+            signal: AbortSignal.timeout(20_000)
+          })
+        : await fetch(
+            c.provider === 'openrouter'
+              ? 'https://openrouter.ai/api/v1/messages'
+              : 'https://api.anthropic.com/v1/messages',
+            {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                'anthropic-version': '2023-06-01',
+                ...(c.provider === 'openrouter'
+                  ? { authorization: `Bearer ${c.key}` }
+                  : { 'x-api-key': c.key })
+              },
+              body: message,
+              signal: AbortSignal.timeout(20_000)
+            }
+          )
+    if (res.ok || (res.status === 429 && c.provider !== 'gateway')) return { ok: true } // a busy key is still a real key
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, message: `That ${name} key was not accepted. Check it and try again.` }
+    return { ok: false, message: `The ${name} could not be checked right now (${res.status}).` }
+  } catch {
+    return {
+      ok: false,
+      message:
+        c.provider === 'gateway'
+          ? 'Could not reach the gateway. Check its address and that it is running.'
+          : `Could not reach ${name === 'API' ? 'the AI service' : name} to check the key. Check your connection.`
+    }
+  }
+}
+
 export function registerAgentIpc(): void {
   ipcMain.handle('agent:start', (event, payload: unknown): boolean => {
     if (!valid(payload) || runs.has(payload.runId)) return false
@@ -50,7 +125,12 @@ export function registerAgentIpc(): void {
     }
 
     void runAgent(
-      { ...payload, cwd: getWorkspaceRoot(), newProjectRoot: getNewProjectRoot() },
+      {
+        ...payload,
+        // Loose chats run from the neutral Documents\MoreCode Projects parent, never from the
+        // last project folder that happened to be open in the app.
+        cwd: payload.projectPath ?? getNewProjectRoot()
+      },
       {
         signal: live.abort.signal,
         emit: (evt) => send({ kind: 'evt', evt }),
@@ -66,11 +146,16 @@ export function registerAgentIpc(): void {
       .catch((err: Error) => {
         if (err.name === 'AbortError' || live.abort.signal.aborted) return send({ kind: 'done' })
         const known = err instanceof ApiFailure
+        const dropped = !known && looksDropped(err.message)
         send({
           kind: 'error',
           error: {
-            kind: known ? err.kind : 'failed',
-            message: known ? err.message : 'Something went wrong running that request.',
+            kind: known ? err.kind : dropped ? 'interrupted' : 'failed',
+            message: known
+              ? err.message
+              : dropped
+                ? 'The connection to the AI dropped before it finished.'
+                : 'Something went wrong running that request.',
             retryAfter: known ? err.retryAfter : undefined
           }
         })
@@ -90,69 +175,9 @@ export function registerAgentIpc(): void {
 
   ipcMain.on('agent:abort', (_e, runId: string) => runs.get(runId)?.abort.abort())
 
-  // One-token request to find out whether a key really works before it is saved.
-  ipcMain.handle(
-    'agent:test-key',
-    async (_e, key: unknown): Promise<{ ok: boolean; message?: string }> => {
-      if (typeof key !== 'string' || key.length < 20 || key.length > 300)
-        return { ok: false, message: 'That does not look like a valid key.' }
-      try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-api-key': key,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-haiku-5-5',
-            max_tokens: 1,
-            messages: [{ role: 'user', content: 'hi' }]
-          }),
-          signal: AbortSignal.timeout(15_000)
-        })
-        if (res.ok || res.status === 429) return { ok: true } // a busy key is still a real key
-        if (res.status === 401 || res.status === 403)
-          return { ok: false, message: 'That key was not accepted. Check it and try again.' }
-        return { ok: false, message: `The key could not be checked right now (${res.status}).` }
-      } catch {
-        return {
-          ok: false,
-          message: 'Could not reach the AI service to check the key. Check your connection.'
-        }
-      }
-    }
-  )
-
-  /** Check a configured personal endpoint without sending any project data. */
-  ipcMain.handle(
-    'agent:test-endpoint',
-    async (_e, endpoint: unknown, token: unknown): Promise<{ ok: boolean; message?: string }> => {
-      if (
-        typeof endpoint !== 'string' ||
-        !/^https:\/\//i.test(endpoint) ||
-        typeof token !== 'string' ||
-        token.length < 20
-      ) {
-        return { ok: false, message: 'Enter the HTTPS endpoint and its access key.' }
-      }
-      try {
-        const res = await fetch(`${endpoint.replace(/\/$/, '')}/health`, {
-          headers: { 'x-api-key': token },
-          signal: AbortSignal.timeout(20_000)
-        })
-        if (res.ok) return { ok: true }
-        if (res.status === 401 || res.status === 403)
-          return { ok: false, message: 'That endpoint key was not accepted.' }
-        return { ok: false, message: `The endpoint did not become ready (${res.status}).` }
-      } catch {
-        return {
-          ok: false,
-          message:
-            'Could not reach the endpoint. Check its URL and that it is running.'
-        }
-      }
-    }
+  // Find out whether a key really works before it is saved. One handler for every provider the app can use.
+  ipcMain.handle('agent:test-provider', (_e, check: unknown): Promise<CheckResult> =>
+    checkProvider(check)
   )
 
   ipcMain.handle('agent:revert', (_e, id: string): boolean =>

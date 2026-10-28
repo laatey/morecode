@@ -124,7 +124,9 @@ export function createBilling({ config, repo, paystack, log = console }) {
 
   /** Applies one successful charge (from a webhook or from verify). Safe to call twice with the same charge. */
   async function applyCharge(data) {
-    if (!data || data.status !== 'success') return { status: data?.status === 'failed' || data?.status === 'abandoned' ? 'failed' : 'pending' }
+    // Only "failed" is final. Paystack calls a payment the customer has not finished yet "abandoned" (and it can
+    // still be completed on the page that is open), so that must read as "keep waiting" - the app stops asking on "failed".
+    if (!data || data.status !== 'success') return { status: data?.status === 'failed' ? 'failed' : 'pending' }
     const reject = (why) => {
       log.warn(`Paystack: ignored charge ${data.reference}: ${why}`)
       return { status: 'rejected' }

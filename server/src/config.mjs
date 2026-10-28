@@ -2,6 +2,12 @@ import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
+const proxyHops = (v) => {
+  const n = Number(v || 0)
+  if (!Number.isInteger(n) || n < 0 || n > 5) throw new Error('TRUST_PROXY_HOPS must be a whole number from 0 to 5')
+  return n
+}
+
 /** All settings come from environment variables, so nothing secret is ever in the code. */
 export function loadConfig(env = process.env) {
   const production = env.NODE_ENV === 'production'
@@ -41,6 +47,12 @@ export function loadConfig(env = process.env) {
     port: Number(env.PORT || 8787),
     /** New accounts allowed per hour from one address. */
     signupsPerHour: Number(env.SIGNUPS_PER_HOUR || 10),
+    /**
+     * How many reverse proxies (a load balancer, Cloudflare, a platform router) sit in front of this server.
+     * With 0 the connection's own address is the person's; with 1 or more it is read from X-Forwarded-For, counted
+     * from the end so a header the person sent themselves cannot be used to dodge the rate limits.
+     */
+    trustProxyHops: proxyHops(env.TRUST_PROXY_HOPS),
     dataFile,
     /** PostgreSQL connection string. Without it the server uses a local SQLite file (development and tests only). */
     databaseUrl,
@@ -84,7 +96,9 @@ export function loadConfig(env = process.env) {
         'max:yearly': env.PAYSTACK_PLAN_MAX_YEARLY || ''
       }
     },
-    origins: (env.ALLOWED_ORIGINS || '*').split(',').map((s) => s.trim())
+    // The desktop app reaches this server from its main process, which has no CORS rules, so no web origin needs access.
+    // Development allows any origin for convenience; production allows only what ALLOWED_ORIGINS lists.
+    origins: (env.ALLOWED_ORIGINS || (production ? '' : '*')).split(',').map((s) => s.trim()).filter(Boolean)
   }
 }
 

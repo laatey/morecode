@@ -27,6 +27,11 @@ export interface ActionMenuProps {
   onOpenChange?: (open: boolean) => void
 }
 
+export const ACTION_MENU_SURFACE =
+  'rounded-lg border border-white/[0.12] bg-[#323230] p-1 text-foreground shadow-xl backdrop-blur-md outline-none select-none'
+export const ACTION_MENU_ITEM =
+  'flex items-center gap-2 rounded-md px-2.5 py-1 text-[13px] transition-colors outline-none'
+
 export function ActionMenu({
   trigger,
   items,
@@ -64,7 +69,7 @@ export function ActionMenu({
           alignOffset={alignOffset}
           side={side}
           sideOffset={sideOffset}
-          className={`z-50 min-w-[148px] rounded-lg bg-[#323230] border border-white/[0.12] p-1 text-foreground shadow-xl backdrop-blur-md outline-none select-none animate-in fade-in-0 zoom-in-95 ${contentClassName}`}
+          className={`z-50 min-w-[148px] ${ACTION_MENU_SURFACE} animate-in fade-in-0 zoom-in-95 ${contentClassName}`}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           {items.map((item, index) => (
@@ -75,7 +80,7 @@ export function ActionMenu({
               <DropdownMenu.Item
                 disabled={item.disabled}
                 onClick={item.onClick}
-                className={`flex items-center justify-between px-2.5 py-1 text-[13px] rounded-md cursor-pointer transition-colors outline-none ${
+                className={`${ACTION_MENU_ITEM} justify-between cursor-pointer ${
                   item.disabled ? 'opacity-40 pointer-events-none' : ''
                 } ${
                   item.danger

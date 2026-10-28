@@ -9,13 +9,17 @@ import { highlightLines, languageForName } from '@/lib/highlight'
 export const ATTACH_ONLY = ['See the attached.', 'See the attached image.']
 
 /** Text with @file mentions picked out so they read as references. */
-function WithMentions({ text }: { text: string }): React.JSX.Element {
+export function WithMentions({ text }: { text: string }): React.JSX.Element {
   return (
     <>
       {text.split(/((?<=^|\s)@[^\s@]+)/g).map((part, i) =>
         i % 2 ? (
-          <span key={i} className="rounded-[4px] border border-[#4f8cff]/20 bg-[#1d4ed8]/15 px-1 text-[#8ab4ff]">
-            {part}
+          <span
+            key={i}
+            title={part.slice(1)}
+            className="inline-block max-w-full truncate align-middle rounded-[5px] bg-[#1d4ed8]/30 px-1 py-0 text-[#a9c8ff]"
+          >
+            {part.slice(1)}
           </span>
         ) : (
           part
@@ -150,10 +154,10 @@ export function Markdown({ text }: { text: string }): React.JSX.Element {
             return (
               <code
                 className={cn(
-                  'rounded border px-1.5 py-0.5 font-mono text-[12px]',
+                  'rounded-[6px] border px-1.5 py-0.5 font-mono text-[12px]',
                   isFileReference
-                    ? 'border-[#4f8cff]/25 bg-[#1d4ed8]/15 text-[#8ab4ff]'
-                    : 'border-white/[0.08] bg-white/[0.06] text-[#b9cdfd]'
+                    ? 'border-[#5793ff]/65 bg-[#1d4ed8]/25 text-[#a9c8ff]'
+                    : 'border-white/[0.22] bg-white/[0.1] text-[#e1e7ff]'
                 )}
               >
                 {children}

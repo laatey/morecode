@@ -12,8 +12,10 @@ export interface RealConfig {
   /** Set when the AI is reached through the MoreCode server instead of directly. */
   baseUrl?: string
   hosted?: boolean
-  /** The plan only includes this model. */
-  forceModel?: string
+  /** What is missing before this can run (shown in the chat when there is no key or sign-in). */
+  missing?: string | null
+  /** Set only for a chat that was explicitly added to a project. */
+  projectPath?: string
   /** Called with the real token counts after every step the AI takes. */
   onUsage: (detail: UsageDetail) => void
 }
@@ -27,7 +29,10 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
     const api = window.api.agent
     const cfg = getConfig()
     if (!cfg.apiKey) {
-      throw new AgentError('failed', 'Add your API key in Settings, under Models, to start chatting.')
+      throw new AgentError(
+        'failed',
+        cfg.missing ?? 'Add your API key in Settings, under Models, to start chatting.'
+      )
     }
 
     const runId = crypto.randomUUID()
@@ -57,13 +62,16 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
       const started = await api.start({
         runId,
         apiKey: cfg.apiKey,
-        model: cfg.forceModel ?? req.model,
+        model: req.model,
         baseUrl: cfg.baseUrl,
+        projectPath: cfg.projectPath,
         headers: cfg.hosted ? { 'x-morecode-run': runId, 'x-tz-offset': String(new Date().getTimezoneOffset()) } : undefined,
         prompt: req.prompt,
         images: req.images,
         attachments: req.attachments.map((a) => ({ kind: a.kind, name: a.name, path: a.path })),
         history: req.history,
+        progress: req.progress,
+        noTools: req.noTools,
         style: cfg.style
       })
       if (!started) throw new AgentError('failed', 'Could not start the AI. Please try again.')

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node --no-warnings src/main.mjs",
-    "test": "node --no-warnings test/server.test.mjs && node --no-warnings test/billing.test.mjs && node --no-warnings test/repo.test.mjs",
+    "test": "node --no-warnings test/server.test.mjs && node --no-warnings test/billing.test.mjs && node --no-warnings test/repo.test.mjs && node --no-warnings test/proxy.test.mjs",
     "backup": "node --no-warnings scripts/backup.mjs"
   },
   "dependencies": {

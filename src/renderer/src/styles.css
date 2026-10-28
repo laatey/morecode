@@ -5,6 +5,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.composer-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
 /*
  * Cutline design system — Morline aesthetic.
  * DM Sans for UI/chat, Bricolage Grotesque for display, JetBrains Mono for coordinates & code.
@@ -509,6 +515,38 @@
 .slim-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+/* Error notifications use the compact red banner treatment from the reference. */
+[data-sonner-toast][data-type='success'] {
+  background: #102117 !important;
+  border-color: #27623c !important;
+  color: #79d99a !important;
+}
+[data-sonner-toast][data-type='success'] [data-title] {
+  color: #79d99a !important;
+  font-weight: 600;
+}
+[data-sonner-toast][data-type='success'] [data-description] {
+  color: #a5cdb0 !important;
+}
+[data-sonner-toast][data-type='success'] [data-close-button] {
+  color: #8bd9a3 !important;
+}
+[data-sonner-toast][data-type='error'] {
+  background: #210d0d !important;
+  border-color: #7f1d1d !important;
+  color: #ff5b5b !important;
+}
+[data-sonner-toast][data-type='error'] [data-title] {
+  color: #ff5b5b !important;
+  font-weight: 600;
+}
+[data-sonner-toast][data-type='error'] [data-description] {
+  color: #d6a0a0 !important;
+}
+[data-sonner-toast][data-type='error'] [data-close-button] {
+  color: #ff7777 !important;
 }
 
 /* Indeterminate page-loading bar in the Browser tab. */

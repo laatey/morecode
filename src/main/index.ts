@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, Menu } from 'electron'
+import { existsSync } from 'fs'
 import { join } from 'path'
-import icon from '../../resources/icon.png?asset'
 import { buildAppMenu, registerMenuIpc } from './menu'
 import { registerGitIpc } from './git'
 import { registerAgentIpc, stopAllAgents } from './agent/ipc'
@@ -8,6 +8,7 @@ import { registerApiProxy } from './api-proxy'
 import { registerTerminalIpc } from './terminal'
 import { registerWorkspaceIpc } from './workspace'
 import { registerAppIpc } from './app-info'
+import { registerSecretsIpc } from './secrets'
 import { loadWindowState, trackWindowState, MIN_HEIGHT, MIN_WIDTH } from './window-state'
 
 const BG_COLOR = '#272726'
@@ -15,6 +16,7 @@ const TITLEBAR_HEIGHT = 38
 
 function createWindow(): void {
   const state = loadWindowState()
+  const iconPath = join(__dirname, '../../resources/icon.png')
 
   const mainWindow = new BrowserWindow({
     width: state.width,
@@ -28,10 +30,11 @@ function createWindow(): void {
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: BG_COLOR, symbolColor: '#9ca3af', height: TITLEBAR_HEIGHT },
-    icon,
+    ...(existsSync(iconPath) ? { icon: iconPath } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      // the preload only uses Electron's own bridge, so the window can run in Chromium's sandbox
+      sandbox: true,
       // lets the Browser tab show real web pages (locked down in will-attach-webview below)
       webviewTag: true
     }
@@ -47,6 +50,13 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // The window may only ever show the app itself. A link or script that tries to navigate it elsewhere is stopped,
+  // because this window has the app's private bridge to the computer.
+  const ownPage = process.env['ELECTRON_RENDERER_URL']
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://') && !(ownPage && url.startsWith(ownPage))) event.preventDefault()
+  })
+
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     void mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -57,15 +67,17 @@ function createWindow(): void {
 app.whenReady().then(() => {
   if (process.platform === 'win32') app.setAppUserModelId('com.morecode.app')
 
-  // F12 toggles DevTools
-  app.on('browser-window-created', (_, window) => {
-    window.webContents.on('before-input-event', (event, input) => {
-      if (input.key === 'F12' && input.type === 'keyDown') {
-        window.webContents.toggleDevTools()
-        event.preventDefault()
-      }
+  // F12 toggles DevTools while developing. Installed copies do not get it.
+  if (!app.isPackaged) {
+    app.on('browser-window-created', (_, window) => {
+      window.webContents.on('before-input-event', (event, input) => {
+        if (input.key === 'F12' && input.type === 'keyDown') {
+          window.webContents.toggleDevTools()
+          event.preventDefault()
+        }
+      })
     })
-  })
+  }
 
   registerWorkspaceIpc()
   registerTerminalIpc()
@@ -74,6 +86,7 @@ app.whenReady().then(() => {
   app.on('before-quit', stopAllAgents)
   registerGitIpc()
   registerAppIpc()
+  registerSecretsIpc()
 
   // Pages shown in the Browser tab get no access to Node or to this app's own bridge.
   app.on('web-contents-created', (_, contents) => {

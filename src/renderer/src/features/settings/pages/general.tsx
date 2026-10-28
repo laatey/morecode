@@ -33,7 +33,7 @@ export function GeneralPage(): React.JSX.Element {
             <Btn
               variant="primary"
               onClick={() => {
-                void update({ name: name.trim() }).then(() => toast('Name updated'))
+                void update({ name: name.trim() }).then(() => toast.success('Name updated'))
               }}
             >
               Save

@@ -6,7 +6,6 @@ import { HelpPanel } from './help-panel'
 import { ModelPanel } from './model-panel'
 import { UsagePanel } from './usage-panel'
 import { SkillsPanel } from './skills-panel'
-import { StatusPanel } from './status-panel'
 
 export interface PanelContext {
   model: string
@@ -34,10 +33,8 @@ export function CommandPanel({
       return <UsagePanel ctx={ctx} onClose={onClose} />
     case 'model':
       return <ModelPanel ctx={ctx} onClose={onClose} />
-    case 'status':
-      return <StatusPanel ctx={ctx} onClose={onClose} />
     case 'skills':
-      return <SkillsPanel initialTab="discover" onClose={onClose} />
+      return <SkillsPanel initialTab="mine" onClose={onClose} />
     case 'commands':
       return <SkillsPanel initialTab="commands" onClose={onClose} />
     case 'help':

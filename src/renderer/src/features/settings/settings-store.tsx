@@ -1,3 +1,4 @@
+import { SECRET_NAMES, secrets } from '@/lib/secrets'
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { DEFAULT_MODEL } from '@/features/ai-assistant/models'
 import { SETTINGS_KEY } from '@/lib/storage-keys'
@@ -20,12 +21,11 @@ export type ContentWidth = 'narrow' | 'default' | 'wide'
 export interface Settings {
   sendWith: 'enter' | 'mod-enter'
   model: string
-  /** Temporary personal endpoint used by the Kaggle Qwen experiment. Stored only in this app's local settings. */
-  kaggleEndpoint: string
-  kaggleToken: string
   /** Dedicated AI gateway address and its client key. */
   morlineGatewayUrl: string
   morlineGatewayKey: string
+  /** Personal OpenRouter key, kept in this app's local settings. */
+  openRouterKey: string
   autoAccept: boolean
   interfaceSize: InterfaceSize
   /** How wide the conversation and message box get. */
@@ -44,10 +44,9 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   sendWith: 'enter',
   model: DEFAULT_MODEL,
-  kaggleEndpoint: '',
-  kaggleToken: '',
   morlineGatewayUrl: '',
   morlineGatewayKey: '',
+  openRouterKey: '',
   autoAccept: false,
   interfaceSize: 'default',
   contentWidth: 'default',
@@ -70,12 +69,18 @@ function load(): Settings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (raw) {
-      const saved = JSON.parse(raw) as Partial<Settings>
+      const saved = JSON.parse(raw) as Partial<Settings> & Record<string, unknown>
+      // the retired Kaggle experiment: its saved address and token are wiped rather than left behind on disk
+      delete saved.kaggleEndpoint
+      delete saved.kaggleToken
       return {
         ...DEFAULT_SETTINGS,
         ...saved,
         rules: { ...DEFAULT_SETTINGS.rules, ...saved.rules },
-        notify: { ...DEFAULT_SETTINGS.notify, ...saved.notify }
+        notify: { ...DEFAULT_SETTINGS.notify, ...saved.notify },
+        // keys come from the encrypted store; a plain-text copy from an older version is used once, then moved
+        openRouterKey: secrets.get(SECRET_NAMES.openRouter) ?? saved.openRouterKey ?? '',
+        morlineGatewayKey: secrets.get(SECRET_NAMES.gateway) ?? saved.morlineGatewayKey ?? ''
       }
     }
   } catch {
@@ -103,8 +108,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   const [tab, setTab] = useState<SettingsTab>('general')
 
   useEffect(() => {
+    // keys go to the encrypted store when there is one, and are left out of the plain copy
+    const keep = (name: string, value: string): void => {
+      if ((secrets.get(name) ?? '') !== value) secrets.set(name, value || null)
+    }
+    keep(SECRET_NAMES.openRouter, settings.openRouterKey)
+    keep(SECRET_NAMES.gateway, settings.morlineGatewayKey)
+    const plain: Partial<Settings> = { ...settings }
+    if (secrets.secure) {
+      delete plain.openRouterKey
+      delete plain.morlineGatewayKey
+    }
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(plain))
     } catch {
       // storage full or blocked: settings last until the app closes
     }

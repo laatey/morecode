@@ -27,6 +27,15 @@ const stop = () => {
     await repo.close()
     process.exit(0)
   })
+  server.closeIdleConnections()
+  // an AI answer still streaming must not keep the server from stopping when the host asks it to
+  setTimeout(() => process.exit(0), 10_000).unref()
 }
 process.on('SIGINT', stop)
 process.on('SIGTERM', stop)
+
+// a bug in one request must not leave the server half-working: log it and let the host restart a clean process
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection:', err)
+  process.exit(1)
+})

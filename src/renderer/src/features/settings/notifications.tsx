@@ -35,7 +35,7 @@ export function useNotify(): (kind: NotifyKind, title: string, body?: string) =>
       if (kind === 'finished' && !notify.finished) return
       if (kind === 'permission' && !notify.permission) return
       const away = document.hidden || !document.hasFocus()
-      if (kind === 'test') toast(title, { description: body })
+      if (kind === 'test') toast.success(title, { description: body })
       if ((away || kind === 'test') && 'Notification' in window) {
         const send = (): void => {
           new Notification(title, { body, silent: true })

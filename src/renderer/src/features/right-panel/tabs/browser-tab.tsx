@@ -9,7 +9,6 @@ import {
   Lock,
   RotateCw,
   Search,
-  Sparkles,
   SquareCode,
   Star,
   TriangleAlert,
@@ -18,7 +17,6 @@ import {
 import { toast } from 'sonner'
 import { ActionMenu, type ActionMenuItem } from '@/components/action-menu'
 import { IconButton } from '@/components/layout/icon-button'
-import { useChatContext } from '@/features/ai-assistant/chat-context'
 import { cn } from '@/lib/utils'
 import { useRightPanel } from '../store'
 import type { TabContentProps } from '../types'
@@ -62,7 +60,6 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
   const [url, setUrl] = useState(start)
   const [text, setText] = useState(start)
   const [pageTitle, setPageTitle] = useState('')
-  const { ask, running: aiBusy } = useChatContext()
   const { setAutoTitle } = useRightPanel()
   const { bookmarks, has, toggle, remove } = useBookmarks()
   const [loading, setLoading] = useState(false)
@@ -147,38 +144,11 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
       if (el.isDevToolsOpened()) el.closeDevTools()
       else el.openDevTools()
     } catch {
-      toast('Open a page first')
+      toast.error('Open a page first')
     }
-  }
-
-  /** Hand the AI the address, the title and the start of the page's text. */
-  const askAboutPage = async (): Promise<void> => {
-    const el = view.current
-    if (!el || !url) return
-    let excerpt = ''
-    try {
-      const body = (await el.executeJavaScript('document.body ? document.body.innerText : ""')) as unknown
-      excerpt = typeof body === 'string' ? body.replace(/\n{3,}/g, '\n\n').trim().slice(0, 4000) : ''
-    } catch {
-      // some pages block script access: the address and title still help
-    }
-    ask(
-      `I'm looking at a page in the browser tab: ${pageTitle || url}\n${url}\n\n` +
-        (excerpt
-          ? `Here is the start of its text:\n\n${excerpt}\n\n`
-          : 'I could not read its text, so work from the address and title.\n\n') +
-        'Tell me in plain language what this page is, and whether anything on it looks wrong or needs attention.'
-    )
   }
 
   const moreItems: ActionMenuItem[] = [
-    {
-      id: 'ask',
-      label: 'Ask AI about this page',
-      icon: <Sparkles className="h-3.5 w-3.5" />,
-      disabled: !opened || aiBusy,
-      onClick: () => void askAboutPage()
-    },
     {
       id: 'devtools',
       label: 'Developer tools',
@@ -277,6 +247,7 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
           <webview
             ref={view as React.Ref<HTMLElement>}
             src={src}
+            // eslint-disable-next-line react/no-unknown-property -- a <webview> attribute, not a DOM one
             partition="persist:browser"
             style={{ width: '100%', height: '100%', display: error ? 'none' : 'inline-flex' }}
           />

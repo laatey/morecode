@@ -41,7 +41,7 @@ const listeners = new Set<() => void>()
 let cache: { raw: string | null; list: Bookmark[] } = { raw: null, list: [] }
 
 function read(): Bookmark[] {
-  let raw: string | null = null
+  let raw: string | null
   try {
     raw = localStorage.getItem(BOOKMARKS_KEY)
   } catch {

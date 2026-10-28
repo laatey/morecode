@@ -52,7 +52,7 @@ function CardForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => vo
         const billing = account.billing ?? EMPTY_BILLING
         setTimeout(() => {
           void update({ billing: { ...billing, card: toCard(number, expiry) } }).then(() => {
-            toast('Payment method saved')
+            toast.success('Payment method saved')
             onDone()
           })
         }, 700)
@@ -126,7 +126,7 @@ export function BillingPage(): React.JSX.Element {
     service.billing
       .cardLink()
       .then((url) => window.open(url, '_blank'))
-      .catch((e) => toast(errorText(e)))
+      .catch((e) => toast.error(errorText(e)))
       .finally(() => setCardBusy(false))
   }
   return (
@@ -173,9 +173,9 @@ export function BillingPage(): React.JSX.Element {
             onConfirm={async () => {
               try {
                 await cancelPlan()
-                toast(real ? 'Cancelled. Your plan stays until the end of the period.' : 'You’re on Free')
+                toast.success(real ? 'Cancelled. Your plan stays until the end of the period.' : 'You’re on Free')
               } catch (e) {
-                toast(errorText(e))
+                toast.error(errorText(e))
               }
             }}
           />
@@ -192,7 +192,7 @@ export function BillingPage(): React.JSX.Element {
           </div>
           {!account.apiKey && <Bar percent={pct} tone={limitTone(pct)} label="Messages used today" />}
         </div>
-        <div className="border-t border-white/[0.07] py-4">
+        <div className="py-4">
           <div className="mb-3 flex items-center justify-between text-[12px]">
             <span className="font-medium text-[#d7d7d3]">Usage history</span>
             <span className="text-[#777773]">Last 14 days</span>
@@ -245,7 +245,7 @@ export function BillingPage(): React.JSX.Element {
             <Btn
               variant="danger"
               onClick={() => {
-                void update({ billing: { ...billing, card: null } }).then(() => toast('Card removed'))
+                void update({ billing: { ...billing, card: null } }).then(() => toast.success('Card removed'))
               }}
             >
               Remove

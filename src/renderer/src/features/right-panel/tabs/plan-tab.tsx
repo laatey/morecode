@@ -6,7 +6,6 @@ import { IconButton } from '@/components/layout/icon-button'
 import { cn } from '@/lib/utils'
 import { planPrompt, updatePlanSteps, usePlanHistory, type SavedPlan } from '../plan-history'
 import { useChatContext, useChatInsights } from '@/features/ai-assistant/chat-context'
-import { PLAN_PROMPT } from '@/features/ai-assistant/slash-commands'
 import type { ToolBlock } from '@/features/ai-assistant/types'
 import { Chip, TabButton, TabEmpty, TabToolbar } from './tab-kit'
 
@@ -151,7 +150,7 @@ function HistoryDetail({ plan, onBack }: { plan: SavedPlan; onBack: () => void }
           title="Copy steps"
           onClick={() => {
             void navigator.clipboard.writeText(plan.steps.map((s, i) => `${i + 1}. ${s}`).join('\n'))
-            toast('Steps copied')
+            toast.success('Steps copied')
           }}
         >
           <Copy className="h-3.5 w-3.5" />
@@ -260,7 +259,6 @@ function HistoryList({ onPick }: { onPick: (p: SavedPlan) => void }): React.JSX.
 /** "Plan": look over, edit and approve the AI's approach before it touches any files. */
 export function PlanTab(): React.JSX.Element {
   const { plan } = useChatInsights()
-  const { ask, running } = useChatContext()
   const { plans } = usePlanHistory()
   const [view, setView] = useState<'current' | 'history'>('current')
   const [picked, setPicked] = useState<SavedPlan | null>(null)
@@ -269,14 +267,9 @@ export function PlanTab(): React.JSX.Element {
     <TabEmpty
       icon={ClipboardList}
       title="No plan yet"
-      action={
-        <TabButton tone="primary" disabled={running} onClick={() => ask(PLAN_PROMPT)}>
-          Make a plan
-        </TabButton>
-      }
     >
-      Ask the AI to plan first. You can read it, change any step, and approve it before it edits a
-      single file. You can also type <span className="text-[#d6d6d3]">/plan</span> in the chat.
+      Ask for a plan in chat when you want to review an approach before work begins. You can change
+      its steps and approve it before it edits any files.
     </TabEmpty>
   ) : (
     // keyed so a new plan starts with its own steps instead of the previous one's edits

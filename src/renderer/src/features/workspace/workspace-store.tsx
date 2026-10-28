@@ -161,25 +161,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
 
   useEffect(persist, [chats, groups, activeId, persist])
 
-  // The folder chosen during onboarding is a real project, not merely a working directory.
-  // Put the first empty chat inside that project so the sidebar matches what the person chose.
+  // The folder chosen during onboarding is a real project, but chats always begin loose.
+  // A person chooses when a chat belongs to a project by creating it there or moving it there.
   const projectPath = account?.project?.path
   useEffect(() => {
     const project = account?.project
     if (!project || groups.some((group) => group.folder === project.path)) return
     const id = uid()
     setGroups((current) => [...current, { id, name: project.name, folder: project.path }])
-    setChats((current) =>
-      current.map((chat) =>
-        chat.id === activeId &&
-        chat.projectId === null &&
-        chat.title === NEW_CHAT_TITLE &&
-        !messages.current[chat.id]?.length
-          ? { ...chat, projectId: id }
-          : chat
-      )
-    )
-  }, [account?.project, activeId, groups, projectPath])
+  }, [account?.project, groups, projectPath])
 
   // chats from other computers: newer copies replace older ones; the chat on screen is left alone
   const applyRemote = useCallback(
@@ -221,6 +211,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   })
 
   const active = chats.find((c) => c.id === activeId) ?? chats[0]
+
+  // Switching to a chat in another project must point the app's file access at that project's folder.
+  const activeFolder = groups.find((g) => g.id === active.projectId)?.folder
+  const syncedFolder = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!activeFolder || activeFolder === syncedFolder.current) return
+    syncedFolder.current = activeFolder
+    const api = window.api?.workspace
+    if (!api?.open) return
+    void api.open(activeFolder).then(() => window.dispatchEvent(new CustomEvent('workspace:changed')))
+  }, [activeFolder])
 
   const go = useCallback((id: string, push: boolean) => {
     setActiveId(id)
@@ -296,7 +297,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       const c = latest.current.chats.find((x) => x.id === id)
       if (!c) return
       patch(id, { pinned: !c.pinned })
-      toast(c.pinned ? 'Unpinned' : 'Pinned to the top')
+      toast.success(c.pinned ? 'Unpinned' : 'Pinned to the top')
     },
     [patch]
   )
@@ -319,10 +320,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       patch(id, { archived: !c.archived })
       if (!c.archived) {
         leave(id)
-        toast('Chat archived', {
+        toast.success('Chat archived', {
           action: { label: 'Undo', onClick: () => patch(id, { archived: false }) }
         })
-      } else toast('Chat restored')
+      } else toast.success('Chat restored')
     },
     [patch, leave]
   )
@@ -335,7 +336,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       leave(id)
       setChats((l) => l.filter((x) => x.id !== id))
       delete messages.current[id]
-      toast('Chat deleted', {
+      toast.success('Chat deleted', {
         action: {
           label: 'Undo',
           onClick: () => {
@@ -352,7 +353,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     (id: string, projectId: string | null) => {
       patch(id, { projectId })
       const name = latest.current.groups.find((g) => g.id === projectId)?.name
-      toast(name ? `Moved to ${name}` : 'Removed from project')
+      toast.success(name ? `Moved to ${name}` : 'Removed from project')
     },
     [patch]
   )
@@ -378,7 +379,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     const affected = latest.current.chats.filter((c) => c.projectId === id).map((c) => c.id)
     setGroups((l) => l.filter((x) => x.id !== id))
     setChats((l) => l.map((c) => (c.projectId === id ? { ...c, projectId: null } : c)))
-    toast(`Project “${g?.name ?? ''}” removed`, {
+    toast.success(`Project “${g?.name ?? ''}” removed`, {
       description: 'Its chats are still in your list.',
       action: {
         label: 'Undo',

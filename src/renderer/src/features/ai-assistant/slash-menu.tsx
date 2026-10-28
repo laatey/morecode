@@ -42,7 +42,7 @@ export function SlashMenu({
       aria-label="Commands"
       className="absolute bottom-full left-0 z-30 mb-1.5 w-[240px] max-w-full overflow-hidden rounded-[11px] border border-white/[0.12] bg-[#30302e] shadow-[0_10px_32px_rgba(0,0,0,0.5)] animate-in fade-in-0 slide-in-from-bottom-1 duration-100"
     >
-      <div className="slim-scroll max-h-[220px] overflow-y-auto p-1">
+      <div className="slim-scroll max-h-[180px] overflow-y-auto p-1">
         {commands.length === 0 && (
           <div className="px-2 py-1.5 text-[11.5px] text-[#8d8d8a]">
             Nothing matches “/{query}”.{' '}

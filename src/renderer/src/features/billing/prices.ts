@@ -16,12 +16,15 @@ const DEMO: BillingConfig = {
 let loaded: BillingConfig | null = null
 let loading: Promise<BillingConfig> | null = null
 
+/** With no server: demo prices while developing, and no payments at all in an installed build. */
+const STANDALONE: BillingConfig = import.meta.env.PROD ? { ...DEMO, billing: 'off' } : DEMO
+
 /**
  * How the server takes payment and what it charges. Fetched once. If the server cannot be reached this says
  * "off" (rather than guessing) and is not remembered, so the next look tries again.
  */
 export function loadBillingConfig(): Promise<BillingConfig> {
-  if (!HOSTED) return Promise.resolve(DEMO)
+  if (!HOSTED) return Promise.resolve(STANDALONE)
   if (loaded) return Promise.resolve(loaded)
   loading ??= hostedRequest<Partial<BillingConfig>>('GET', '/v1/config')
     .then((c) => {
@@ -38,7 +41,7 @@ export function loadBillingConfig(): Promise<BillingConfig> {
 
 /** `ready` is false only while a hosted server is being asked, so no wrong price is flashed first. */
 export function useBillingConfig(): { cfg: BillingConfig; ready: boolean } {
-  const [cfg, setCfg] = useState<BillingConfig | null>(HOSTED ? loaded : DEMO)
+  const [cfg, setCfg] = useState<BillingConfig | null>(HOSTED ? loaded : STANDALONE)
   useEffect(() => {
     if (cfg) return
     let live = true

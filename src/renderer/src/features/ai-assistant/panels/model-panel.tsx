@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { MODELS } from '../models'
+import { useModelChoices } from '../use-model-choices'
 import type { PanelContext } from './panel-shell'
 import { KeyChip, PanelFrame } from './ui'
 
-/** Pick a model with the mouse, or ↑ ↓ and Enter. */
+/** Pick a model with the mouse, or ↑ ↓ and Enter. Models your plan does not include are shown locked, not hidden. */
 export function ModelPanel({
   ctx,
   onClose
@@ -13,19 +13,21 @@ export function ModelPanel({
   ctx: PanelContext
   onClose: () => void
 }): React.JSX.Element {
+  const { choices: rows, choose: pick } = useModelChoices(ctx.onModel)
+
   const [index, setIndex] = useState(
     Math.max(
       0,
-      MODELS.findIndex((m) => m.id === ctx.model)
+      rows.findIndex((r) => r.model.id === ctx.model)
     )
   )
   const list = useRef<HTMLDivElement>(null)
 
   useEffect(() => list.current?.focus(), [])
 
-  const choose = (id: string): void => {
-    ctx.onModel(id)
+  const choose = (i: number): void => {
     onClose()
+    pick(rows[i])
   }
 
   return (
@@ -39,35 +41,50 @@ export function ModelPanel({
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault()
             const d = e.key === 'ArrowDown' ? 1 : -1
-            setIndex((i) => (i + d + MODELS.length) % MODELS.length)
+            setIndex((i) => (i + d + rows.length) % rows.length)
           } else if (e.key === 'Enter') {
             e.preventDefault()
-            choose(MODELS[index].id)
+            choose(index)
           }
         }}
-        className="-mx-1 space-y-0.5 outline-none"
+        className="-mx-1 outline-none"
       >
-        {MODELS.map((m, i) => {
+        {rows.map((row, i) => {
+          const { model: m } = row
           const current = m.id === ctx.model
           return (
-            <button
-              key={m.id}
-              type="button"
-              role="option"
-              aria-selected={current}
-              onMouseEnter={() => setIndex(i)}
-              onClick={() => choose(m.id)}
-              className={cn(
-                'flex w-full cursor-pointer items-center gap-3 rounded-[8px] px-3 py-2 text-left transition-colors',
-                i === index ? 'bg-white/[0.07]' : 'bg-transparent'
+            <React.Fragment key={m.id}>
+              {row.group !== rows[i - 1]?.group && (
+                <div className="px-3 pb-1 pt-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#77776f]">
+                  {row.group}
+                </div>
               )}
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] text-[#ececea]">{m.name}</span>
-                <span className="block text-[12px] text-[#8d8d8a]">{m.description}</span>
-              </span>
-              {current && <Check className="h-4 w-4 shrink-0 text-[#5aa6ff]" />}
-            </button>
+              <button
+                type="button"
+                role="option"
+                aria-selected={current}
+                onMouseEnter={() => setIndex(i)}
+                onClick={() => choose(i)}
+                className={cn(
+                  'flex w-full cursor-pointer items-center gap-3 rounded-[8px] px-3 py-2 text-left transition-colors',
+                  i === index ? 'bg-white/[0.07]' : 'bg-transparent'
+                )}
+              >
+                <span className={cn('min-w-0 flex-1', row.locked && 'opacity-60')}>
+                  <span className="block text-[13px] text-[#ececea]">{m.name}</span>
+                  <span className="block text-[12px] text-[#8d8d8a]">{m.description}</span>
+                </span>
+                {row.locked && (
+                  <span className="flex shrink-0 items-center gap-1 text-[11.5px] text-[#8d8d8a]">
+                    <Lock className="h-3 w-3" /> Upgrade
+                  </span>
+                )}
+                {!row.locked && row.needsSetup && (
+                  <span className="shrink-0 text-[11.5px] text-[#8d8d8a]">Needs a key</span>
+                )}
+                {current && <Check className="h-4 w-4 shrink-0 text-[#5aa6ff]" />}
+              </button>
+            </React.Fragment>
           )
         })}
       </div>

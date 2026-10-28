@@ -1,12 +1,12 @@
 import { spawn, execFile, type ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'fs'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
-import { setWorkspaceRoot } from '../workspace'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { ToolDef } from './anthropic'
 import { diffFiles } from './diff'
 
 /**
- * The things the AI is allowed to do, all confined to the project folder.
+ * The things the AI is allowed to do. Reading is free anywhere on the computer; the file-edit
+ * tools stay inside the project folder; run_command is unrestricted (it asks first, per settings).
  * Every function returns text for the model; what the person sees goes out through `ctx.emit`.
  */
 
@@ -15,8 +15,10 @@ export type PermissionAction = 'command' | 'install' | 'remove' | 'network'
 
 export interface ToolContext {
   cwd: string
-  /** Documents-based parent for new standalone projects. */
-  newProjectRoot?: string
+  /** Hand a read-only research job to a helper. Set by the run, which enforces the limits. */
+  delegate?: (id: string, task: string) => Promise<string>
+  /** How many edit_file attempts have failed per file in this run. */
+  editFailures?: Map<string, number>
   signal: AbortSignal
   emit: (tool: Record<string, unknown>) => void
   ask: (req: { id: string; action: PermissionAction; title: string; command: string; reason?: string }) => Promise<Decision>
@@ -33,22 +35,27 @@ export interface ToolResult {
 const MAX_READ_BYTES = 200_000
 const MAX_WRITE_BYTES = 1_000_000
 const MAX_OUTPUT_CHARS = 12_000
-const SKIP_DIRS = new Set(['node_modules', '.git', 'out', 'dist', 'build', '.next', '.cache', 'coverage', '.venv', 'venv', 'target', '__pycache__'])
+export const SKIP_DIRS = new Set(['node_modules', '.git', 'out', 'dist', 'build', '.next', '.cache', 'coverage', '.venv', 'venv', 'target', '__pycache__'])
 
 /* ---------- keeping the AI inside the project folder ---------- */
 
 /** Resolve a path the model gave us; refuse anything outside the project (including via symlinks). */
 export function resolveSafe(cwd: string, p: string): string {
   const root = realpathSync(cwd)
-  const abs = isAbsolute(p) ? resolve(p) : resolve(root, p)
-  // follow symlinks on the part that already exists
-  let probe = abs
-  while (!existsSync(probe) && dirname(probe) !== probe) probe = dirname(probe)
-  const real = existsSync(probe) ? realpathSync(probe) : probe
-  const tail = relative(probe, abs)
-  const finalPath = resolve(real, tail)
-  if (finalPath !== root && !finalPath.startsWith(root + sep)) {
-    throw new Error(`“${p}” is outside the project folder, so it is off limits.`)
+  const attempt = (raw: string): string | null => {
+    const abs = isAbsolute(raw) ? resolve(raw) : resolve(root, raw)
+    // follow symlinks on the part that already exists
+    let probe = abs
+    while (!existsSync(probe) && dirname(probe) !== probe) probe = dirname(probe)
+    const real = existsSync(probe) ? realpathSync(probe) : probe
+    const finalPath = resolve(real, relative(probe, abs))
+    return finalPath === root || finalPath.startsWith(root + sep) ? finalPath : null
+  }
+  // "/src/app.js" or "\\src\\app.js" almost always means "inside the project", so treat it that way
+  const rooted = /^[\\/][^\\/]/.test(p)
+  const finalPath = attempt(p) ?? (rooted ? attempt(p.replace(/^[\\/]+/, '')) : null)
+  if (!finalPath) {
+    throw new Error(`“${p}” is outside the project folder, so the edit tools cannot change it. Use a path relative to the project root (for example src/main.js). To create or change files elsewhere, use run_command.`)
   }
   if (relative(root, finalPath).split(sep)[0] === '.git') {
     throw new Error('The .git folder is managed by git and cannot be changed here.')
@@ -56,7 +63,17 @@ export function resolveSafe(cwd: string, p: string): string {
   return finalPath
 }
 
-const rel = (cwd: string, abs: string): string => relative(realpathSync(cwd), abs).split(sep).join('/') || '.'
+/** Reading may go anywhere on the computer. Only the edit tools use resolveSafe. */
+export function resolveRead(cwd: string, p: string): string {
+  return isAbsolute(p) ? resolve(p) : resolve(realpathSync(cwd), p)
+}
+
+/** A path as shown to the person and the AI: relative inside the project, full path outside it. */
+const rel = (cwd: string, abs: string): string => {
+  const r = relative(realpathSync(cwd), abs)
+  if (r.startsWith('..') || isAbsolute(r)) return abs
+  return r.split(sep).join('/') || '.'
+}
 
 const looksBinary = (buf: Buffer): boolean => buf.subarray(0, 8000).includes(0)
 
@@ -71,6 +88,11 @@ interface Snapshot {
   original: string | null
 }
 const snapshots = new Map<string, Snapshot>()
+/** What each file looked like before its first edit that is still waiting for review, to count the real net change. */
+const baselines = new Map<string, string | null>()
+const releaseBaseline = (abs: string): void => {
+  if (![...snapshots.values()].some((s) => s.abs === abs)) baselines.delete(abs)
+}
 
 /** Put a file back the way it was before one edit. Returns false if there is nothing to undo. */
 export function revertEdit(id: string): boolean {
@@ -86,12 +108,15 @@ export function revertEdit(id: string): boolean {
     return false
   }
   snapshots.delete(id)
+  releaseBaseline(snap.abs)
   return true
 }
 
 /** The person kept an edit; the undo copy is no longer needed. */
 export function keepEdit(id: string): void {
+  const snap = snapshots.get(id)
   snapshots.delete(id)
+  if (snap) releaseBaseline(snap.abs)
 }
 
 /* ---------- classifying commands for the permission prompt ---------- */
@@ -130,67 +155,8 @@ const str = (v: unknown, name: string): string => {
   return v
 }
 
-const PROJECT_TEMPLATES = new Set(['vanilla', 'vanilla-ts', 'vue', 'vue-ts', 'react', 'react-ts', 'svelte', 'svelte-ts'])
-const projectSlug = (raw: string): string =>
-  raw
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-
-/** Create a standalone Vite project under Documents, then move the agent into it. */
-async function createProject(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
-  const name = projectSlug(str(i.name, 'name'))
-  const template = typeof i.template === 'string' ? i.template : 'react-ts'
-  if (!name) throw new Error('Use a short project name made from letters or numbers.')
-  if (!PROJECT_TEMPLATES.has(template)) throw new Error(`“${template}” is not a supported Vite template.`)
-  if (!ctx.newProjectRoot) throw new Error('The Documents project folder is not available in this version of MoreCode.')
-  const parent = resolve(ctx.newProjectRoot)
-  const target = join(parent, name)
-  if (existsSync(target)) throw new Error(`${target} already exists. Choose another name or open that folder.`)
-
-  const command = `npm create vite@latest ${JSON.stringify(target)} -- --template ${template}`
-  const decision = await ctx.ask({
-    id: `perm-${id}`,
-    action: 'install',
-    title: 'Create a new project',
-    command,
-    reason: `Create ${name} in Documents\\MoreCode Projects with the ${template} template.`
-  })
-  if (decision === 'deny') return { content: 'The person did not allow the project to be created.', isError: true }
-
-  ctx.emit({ kind: 'command', id, label: `Create ${name}`, command, status: 'running' })
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-  const output = await new Promise<{ code: number | null; text: string }>((done) => {
-    let text = ''
-    const child = spawn(npm, ['create', 'vite@latest', target, '--', '--template', template], {
-      cwd: parent,
-      windowsHide: true,
-      env: { ...process.env, CI: '1', NO_COLOR: '1', TERM: 'dumb' }
-    })
-    const add = (chunk: Buffer): void => {
-      text += chunk.toString('utf8')
-      if (text.length > 200_000) text = text.slice(-100_000)
-    }
-    child.stdout?.on('data', add)
-    child.stderr?.on('data', add)
-    child.on('error', (error) => done({ code: 1, text: error.message }))
-    child.on('close', (code) => done({ code, text }))
-  })
-  const shown = clip(output.text.trim() || '(no output)')
-  if (output.code !== 0 || !existsSync(target)) {
-    ctx.emit({ kind: 'command', id, label: `Create ${name}`, command, status: 'error', output: shown })
-    return { content: `${shown}\n[exit code ${output.code}]`, isError: true }
-  }
-  ctx.cwd = target
-  setWorkspaceRoot(target)
-  ctx.emit({ kind: 'project', name: basename(target), path: target })
-  ctx.emit({ kind: 'command', id, label: `Create ${name}`, command, status: 'done', output: shown })
-  return { content: `Created ${basename(target)} in ${target}. This is now the active project folder. Install dependencies before starting the dev server.` }
-}
-
 async function readFile(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
-  const abs = resolveSafe(ctx.cwd, str(i.path, 'path'))
+  const abs = resolveRead(ctx.cwd, str(i.path, 'path'))
   const shown = rel(ctx.cwd, abs)
   ctx.emit({ kind: 'read', id, paths: [shown], status: 'running' })
   if (!existsSync(abs)) throw new Error(`There is no file at ${shown}.`)
@@ -211,7 +177,7 @@ async function readFile(ctx: ToolContext, id: string, i: Input): Promise<ToolRes
 }
 
 function listDir(ctx: ToolContext, id: string, i: Input): ToolResult {
-  const abs = resolveSafe(ctx.cwd, typeof i.path === 'string' && i.path ? i.path : '.')
+  const abs = resolveRead(ctx.cwd, typeof i.path === 'string' && i.path ? i.path : '.')
   const shown = rel(ctx.cwd, abs)
   ctx.emit({ kind: 'read', id, paths: [shown === '.' ? 'project folder' : shown], status: 'running' })
   if (!existsSync(abs) || !statSync(abs).isDirectory()) throw new Error(`${shown} is not a folder.`)
@@ -226,7 +192,7 @@ function listDir(ctx: ToolContext, id: string, i: Input): ToolResult {
 
 function search(ctx: ToolContext, id: string, i: Input): ToolResult {
   const pattern = str(i.pattern, 'pattern')
-  const base = resolveSafe(ctx.cwd, typeof i.path === 'string' && i.path ? i.path : '.')
+  const base = resolveRead(ctx.cwd, typeof i.path === 'string' && i.path ? i.path : '.')
   ctx.emit({ kind: 'read', id, paths: [`“${pattern}”`], status: 'running' })
   let re: RegExp
   try {
@@ -280,8 +246,51 @@ function applyWrite(ctx: ToolContext, id: string, abs: string, before: string | 
   mkdirSync(dirname(abs), { recursive: true })
   writeFileSync(abs, after)
   const diff = diffFiles(shown, before, after)
-  ctx.emit({ kind: 'edit', id, path: shown, added: diff.additions, removed: diff.deletions, status: 'done', diff })
+  if (!baselines.has(abs)) baselines.set(abs, before)
+  const net = diffFiles(shown, baselines.get(abs) ?? null, after)
+  ctx.emit({ kind: 'edit', id, path: shown, added: diff.additions, removed: diff.deletions, netAdded: net.additions, netRemoved: net.deletions, status: 'done', diff })
   return { content: `${before === null ? 'Created' : 'Updated'} ${shown} (+${diff.additions} −${diff.deletions}).` }
+}
+
+const indentOf = (line: string): string => /^[ \t]*/.exec(line)?.[0] ?? ''
+
+/** The model often gets indentation or trailing spaces slightly wrong. Match whole lines ignoring that, if there is exactly one place it fits. */
+function looseReplace(before: string, oldText: string, newText: string): string | { hint: string } {
+  const text = before.replace(/\r\n/g, '\n')
+  const lines = text.split('\n')
+  const oldLines = oldText.replace(/\r\n/g, '\n').split('\n')
+  while (oldLines.length && !oldLines[0].trim()) oldLines.shift()
+  while (oldLines.length && !oldLines[oldLines.length - 1].trim()) oldLines.pop()
+  if (!oldLines.length) return { hint: '' }
+  const norm = oldLines.map((l) => l.trim())
+  const starts: number[] = []
+  for (let s = 0; s + norm.length <= lines.length; s++) {
+    if (norm.every((n, k) => lines[s + k].trim() === n)) starts.push(s)
+  }
+  if (starts.length === 1) {
+    const s0 = starts[0]
+    const real = indentOf(lines[s0])
+    const given = indentOf(oldLines[0])
+    const fixed = newText
+      .replace(/\r\n/g, '\n')
+      .split('\n')
+      .map((l) => (l.trim() && l.startsWith(given) ? real + l.slice(given.length) : l))
+    return [...lines.slice(0, s0), ...fixed, ...lines.slice(s0 + norm.length)].join('\n')
+  }
+  // no single match: point at the nearest line so the next attempt can copy it exactly
+  const key = norm.find((n) => n.length >= 4) ?? norm[0]
+  const near = lines.findIndex((l) => key && l.includes(key))
+  if (near < 0) return { hint: '' }
+  const from = Math.max(0, near - 2)
+  const shownLines = lines.slice(from, near + 5).map((l, n) => `${String(from + n + 1).padStart(5)}  ${l}`)
+  return { hint: `The closest match is around line ${near + 1}:\n${shownLines.join('\n')}` }
+}
+
+const failNote = (ctx: ToolContext, abs: string): string => {
+  const map = (ctx.editFailures ??= new Map())
+  const n = (map.get(abs) ?? 0) + 1
+  map.set(abs, n)
+  return n >= 2 ? `\nThis is edit failure number ${n} on this file. Stop using edit_file for it: read_file it, then write_file the complete corrected file.` : ''
 }
 
 function editFile(ctx: ToolContext, id: string, i: Input): ToolResult {
@@ -298,9 +307,13 @@ function editFile(ctx: ToolContext, id: string, i: Input): ToolResult {
   if (!oldText) throw new Error('old_string is empty. To create a file use write_file.')
   if (oldText === newText) throw new Error('old_string and new_string are the same, so nothing would change.')
   const count = before.split(oldText).length - 1
-  if (count === 0) throw new Error(`That text was not found in ${shown}. Read the file again and copy the exact lines, including spaces.`)
+  if (count === 0) {
+    const loose = looseReplace(before, oldText, newText)
+    if (typeof loose === 'string') return applyWrite(ctx, id, abs, before, toEol(loose, eol))
+    throw new Error(`That text was not found in ${shown}. Copy the exact lines from read_file, including spaces.${loose.hint ? `\n${loose.hint}` : ''}${failNote(ctx, abs)}`)
+  }
   if (count > 1 && i.replace_all !== true) {
-    throw new Error(`That text appears ${count} times in ${shown}. Add more surrounding lines to make it unique, or set replace_all.`)
+    throw new Error(`That text appears ${count} times in ${shown}. Add more surrounding lines to make it unique, or set replace_all.${failNote(ctx, abs)}`)
   }
   const after = i.replace_all === true ? before.split(oldText).join(newText) : before.replace(oldText, () => newText)
   return applyWrite(ctx, id, abs, before, after)
@@ -380,7 +393,9 @@ function todoWrite(ctx: ToolContext, i: Input): ToolResult {
 }
 
 function presentPlan(ctx: ToolContext, id: string, i: Input): ToolResult {
-  const steps = (Array.isArray(i.steps) ? i.steps : []).filter((s): s is string => typeof s === 'string' && s.trim() !== '')
+  const steps = (Array.isArray(i.steps) ? i.steps : [])
+    .filter((s): s is string => typeof s === 'string' && s.trim() !== '')
+    .map((s) => s.replace(/^\s*(?:step\s*)?\d+[.):-]\s*/i, '').trim())
   if (!steps.length) throw new Error('A plan needs at least one step.')
   ctx.emit({
     kind: 'plan',
@@ -393,25 +408,36 @@ function presentPlan(ctx: ToolContext, id: string, i: Input): ToolResult {
   return { content: 'The plan is now shown to the person for approval. Stop here and wait; do not change any files.', stop: true }
 }
 
+/** A short listing of the project (two levels deep) so the AI knows what already exists. */
+export function projectTree(cwd: string, limit = 80): string {
+  const out: string[] = []
+  const walk = (dir: string, depth: number, prefix: string): void => {
+    let entries
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    entries = entries
+      .filter((e) => !SKIP_DIRS.has(e.name) && !e.name.startsWith('.'))
+      .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
+    for (const e of entries) {
+      if (out.length >= limit) return
+      out.push(`${prefix}${e.name}${e.isDirectory() ? '/' : ''}`)
+      if (e.isDirectory() && depth < 2) walk(join(dir, e.name), depth + 1, `${prefix}  `)
+    }
+  }
+  walk(cwd, 1, '')
+  return out.length ? out.join('\n') + (out.length >= limit ? '\n…' : '') : '(empty folder)'
+}
+
 /* ---------- registry ---------- */
 
 export const TOOL_DEFS: ToolDef[] = [
   {
-    name: 'create_project',
-    description: 'Create a new standalone Vite project in the person’s Documents\\MoreCode Projects folder and make it the active project. Use this instead of scaffolding inside the current project when the person asks for a new project without a location.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: 'Short project name.' },
-        template: { type: 'string', enum: [...PROJECT_TEMPLATES], description: 'Vite template.' }
-      },
-      required: ['name', 'template']
-    }
-  },
-  {
     name: 'list_dir',
-    description: 'List the files and folders in a directory of the project. Use "." for the project root.',
-    input_schema: { type: 'object', properties: { path: { type: 'string', description: 'Folder path relative to the project root.' } } }
+    description: 'List the files and folders in a directory. Use "." for the project root. Any folder on the computer can be listed; use a full path for folders outside the project.',
+    input_schema: { type: 'object', properties: { path: { type: 'string', description: 'Folder path, relative to the project root or a full path.' } } }
   },
   {
     name: 'read_file',
@@ -436,9 +462,19 @@ export const TOOL_DEFS: ToolDef[] = [
     }
   },
   {
+    name: 'delegate',
+    description:
+      'Hand a broad, read-only research job to a helper that works alone and reports back in a few lines. Use it ONLY when the answer needs reading many files, for example "find every place the billing code is used and summarise it". Never use it for edits, commands, or anything you can do in one or two tool calls, and never send the same job twice. At most 3 per request.',
+    input_schema: {
+      type: 'object',
+      properties: { task: { type: 'string', description: 'What to find out, with enough detail to work alone.' } },
+      required: ['task']
+    }
+  },
+  {
     name: 'edit_file',
     description:
-      'Change part of an existing file by replacing exact text. old_string must match the file exactly (including indentation) and be unique unless replace_all is true. Prefer this over rewriting a whole file.',
+      'Change part of an existing file by replacing exact text. old_string must match the file exactly (including indentation) and be unique unless replace_all is true. Prefer this for small changes. If it fails twice on a file, read the file and use write_file with the full new content instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -452,13 +488,13 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'write_file',
-    description: 'Create a new file, or replace a file completely with the given content. Missing folders are created.',
+    description: 'Create a new file, or replace a file completely with the given content. Missing folders are created. Use paths relative to the project root, with no leading slash.',
     input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] }
   },
   {
     name: 'run_command',
     description:
-      'Run a shell command in the project folder (tests, type checks, builds, git, package managers). The person is asked to approve it first. Do not run long-lived servers; they will be stopped after the timeout.',
+      'Run a shell command, starting in the project folder (tests, type checks, builds, git, package managers, scaffolding new projects). Commands are not limited to the project: they can use any folder on the computer, which is also how to create or change files outside the project. The person is asked to approve it first. Do not run long-lived servers; they will be stopped after the timeout.',
     input_schema: {
       type: 'object',
       properties: {
@@ -501,15 +537,20 @@ export const TOOL_DEFS: ToolDef[] = [
 
 export async function executeTool(name: string, id: string, input: Input, ctx: ToolContext): Promise<ToolResult> {
   try {
+    if ((input as { __invalid?: boolean }).__invalid) {
+      throw new Error('Your tool call arrived cut off or was not valid JSON, so nothing ran. Send it again. For a big file, write it in smaller pieces.')
+    }
     switch (name) {
-      case 'create_project':
-        return await createProject(ctx, id, input)
       case 'list_dir':
         return listDir(ctx, id, input)
       case 'read_file':
         return await readFile(ctx, id, input)
       case 'search':
         return search(ctx, id, input)
+      case 'delegate': {
+        if (!ctx.delegate) throw new Error('Helpers are not available here.')
+        return { content: await ctx.delegate(id, str(input.task, 'task')) }
+      }
       case 'edit_file':
         return editFile(ctx, id, input)
       case 'write_file':

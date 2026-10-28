@@ -32,6 +32,8 @@ interface AuthApi {
   messagesLeft: number
   /** Count one sent message. Returns false (and opens the limit dialog) when none are left. */
   spendMessage: () => boolean
+  /** Re-read the plan and today's count from the server (the server's count is the one that is enforced). */
+  refreshAccount: () => void
   planDialog: PlanDialogReason | null
   openPlanDialog: (reason?: PlanDialogReason) => void
   closePlanDialog: () => void
@@ -154,6 +156,23 @@ export function AuthProvider({
     [account, update]
   )
 
+  // The count shown after a send is an instant estimate. Once a run has finished the server's own count replaces it,
+  // so the two cannot drift apart. Several calls close together make one request.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const refreshAccount = useCallback((): void => {
+    if (!service.hosted) return
+    if (refreshTimer.current) clearTimeout(refreshTimer.current)
+    refreshTimer.current = setTimeout(() => {
+      void service.restore().then(
+        (r) =>
+          r.current &&
+          setAccount((now) =>
+            now && now.id === r.current!.id ? rollDay({ ...r.current!, apiKey: now.apiKey }) : now
+          )
+      )
+    }, 1500)
+  }, [service])
+
   const messagesLeft =
     !account || account.apiKey
       ? Infinity
@@ -256,6 +275,7 @@ export function AuthProvider({
       openProject,
       messagesLeft,
       spendMessage,
+      refreshAccount,
       choosePlan,
       applyAccount,
       cancelPlan,
@@ -279,6 +299,7 @@ export function AuthProvider({
       openProject,
       messagesLeft,
       spendMessage,
+      refreshAccount,
       choosePlan,
       applyAccount,
       cancelPlan,

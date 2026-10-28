@@ -24,7 +24,15 @@ export function createApp({ config, repo, mail, fetchImpl = fetch }) {
     const n = Number(req.headers['x-tz-offset'])
     return Number.isFinite(n) && Math.abs(n) <= 14 * 60 ? n : 0
   }
-  const ipOf = (req) => req.socket.remoteAddress || 'unknown'
+  const ipOf = (req) => {
+    if (config.trustProxyHops > 0) {
+      // every trusted proxy appends the address it saw, so the person is `hops` entries from the end
+      const chain = String(req.headers['x-forwarded-for'] || '').split(',').map((a) => a.trim()).filter(Boolean)
+      const seen = chain[chain.length - config.trustProxyHops]
+      if (seen) return seen
+    }
+    return req.socket.remoteAddress || 'unknown'
+  }
 
   /* ---------- shape sent to the app ---------- */
 
@@ -504,11 +512,13 @@ section{margin:0 0 22px}p{margin:0}.user p{background:#323231;padding:10px 14px;
   async function readBody(req, limit) {
     const chunks = []
     let size = 0
+    let tooLarge = false
     for await (const c of req) {
       size += c.length
-      if (size > limit) throw new HttpError(413, 'too-large', 'That request is too large.')
-      chunks.push(c)
+      if (size > limit) tooLarge = true
+      else if (!tooLarge) chunks.push(c)
     }
+    if (tooLarge) throw new HttpError(413, 'too-large', 'That request is too large.')
     return Buffer.concat(chunks)
   }
 

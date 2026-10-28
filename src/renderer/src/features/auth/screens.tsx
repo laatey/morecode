@@ -219,7 +219,7 @@ export function VerifyScreen({ go, email }: ScreenProps): React.JSX.Element {
           <TextLink
             disabled={left > 0}
             onClick={() => {
-              void service.resendCode(email).then(() => toast('A new code is on its way'))
+              void service.resendCode(email).then(() => toast.success('A new code is on its way'))
               restart()
             }}
           >
@@ -344,7 +344,7 @@ export function ForgotSentScreen({ go, email }: ScreenProps): React.JSX.Element 
           <TextLink
             disabled={left > 0}
             onClick={() => {
-              void service.requestReset(email).then(() => toast('Sent again'))
+              void service.requestReset(email).then(() => toast.success('Sent again'))
               restart()
             }}
           >

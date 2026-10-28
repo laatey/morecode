@@ -23,7 +23,7 @@ export function DataPage(): React.JSX.Element {
     a.download = 'morecode-data.json'
     a.click()
     URL.revokeObjectURL(a.href)
-    toast('Your data was downloaded')
+    toast.success('Your data was downloaded')
   }
 
   return (
@@ -45,7 +45,7 @@ export function DataPage(): React.JSX.Element {
           confirmLabel="Delete all chats"
           onConfirm={() => {
             ws.deleteAllChats()
-            toast('All chats deleted')
+            toast.success('All chats deleted')
           }}
         />
         <DangerRow
@@ -55,7 +55,7 @@ export function DataPage(): React.JSX.Element {
           confirmLabel="Clear list"
           onConfirm={async () => {
             await update({ recents: account.project ? [account.project] : [] })
-            toast('Recent folders cleared')
+            toast.success('Recent folders cleared')
           }}
         />
         <DangerRow
@@ -65,7 +65,7 @@ export function DataPage(): React.JSX.Element {
           confirmLabel="Reset settings"
           onConfirm={() => {
             reset()
-            toast('Settings reset')
+            toast.success('Settings reset')
           }}
         />
       </Group>
@@ -80,7 +80,7 @@ export function DataPage(): React.JSX.Element {
           onConfirm={async () => {
             closeSettings()
             await deleteAccount()
-            toast('Your account was deleted')
+            toast.success('Your account was deleted')
           }}
         />
       </Group>

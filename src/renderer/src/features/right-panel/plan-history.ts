@@ -28,7 +28,7 @@ const listeners = new Set<() => void>()
 let cache: { raw: string | null; list: SavedPlan[] } = { raw: null, list: [] }
 
 function read(): SavedPlan[] {
-  let raw: string | null = null
+  let raw: string | null
   try {
     raw = localStorage.getItem(KEY)
   } catch {
@@ -102,4 +102,4 @@ export function usePlanHistory(): {
 
 /** The message sent to the AI to carry out a plan. Used by Approve and by Run again. */
 export const planPrompt = (steps: string[]): string =>
-  `Go ahead with this plan:\n${steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+  `Go ahead with this plan:\n${steps.map((s, i) => `${i + 1}. ${s.replace(/^\s*(?:step\s*)?\d+[.):-]\s*/i, '')}`).join('\n')}`

@@ -1,163 +1,123 @@
 import React, { useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/auth-store'
+import { AuthError } from '@/features/auth/auth-service'
 import { errorText } from '@/features/auth/ui'
-import { isKaggleQwen, isMorlineGateway, MODELS } from '@/features/ai-assistant/models'
+import { MODELS, sourceOf } from '@/features/ai-assistant/models'
+import { getPlan } from '@/features/billing/plans'
 import { Btn, Group, Page, Pick, Row, TextInput } from '../kit'
 import { useSettings } from '../settings-store'
 
-const mask = (key: string): string => `sk-…${key.slice(-4)}`
+const mask = (key: string): string => `${key.slice(0, 3)}…${key.slice(-4)}`
 
-function ApiKeyRow(): React.JSX.Element {
-  const { account, update, service } = useAuth()
+type Check = { ok: boolean; message?: string }
+const must = (r: Check): void => {
+  if (!r.ok) throw new AuthError('bad-key', r.message ?? 'That key was not accepted.')
+}
+
+/**
+ * One way of using your own AI provider: connect it with a key (and an address, for a gateway), check it works
+ * before saving, and remove it. Every provider is this same row, so they all behave the same.
+ */
+function ProviderRow({
+  title,
+  description,
+  summary,
+  connected,
+  connectLabel,
+  endpointPlaceholder,
+  keyLabel,
+  keyPlaceholder,
+  initialEndpoint = '',
+  test,
+  save,
+  remove,
+  savedMessage
+}: {
+  title: string
+  description: string
+  /** What to show once connected: a masked key, or the address. */
+  summary: string
+  connected: boolean
+  connectLabel: string
+  /** Set only for providers that live at an address you give (a gateway). */
+  endpointPlaceholder?: string
+  keyLabel: string
+  keyPlaceholder: string
+  initialEndpoint?: string
+  test: (input: { key: string; endpoint: string }) => Promise<void>
+  save: (input: { key: string; endpoint: string }) => Promise<void> | void
+  remove: () => Promise<void> | void
+  savedMessage: string
+}): React.JSX.Element {
   const [adding, setAdding] = useState(false)
+  const [endpoint, setEndpoint] = useState(initialEndpoint)
   const [key, setKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  if (!account) return <></>
 
-  if (account.apiKey) {
-    return (
-      <Row
-        title="Your API key"
-        description="Requests use your key. There is no daily message limit."
-      >
-        <span className="font-mono text-[12px] text-[#c9c9c6]">{mask(account.apiKey)}</span>
-        <Btn
-          variant="danger"
-          onClick={() => {
-            void update({ apiKey: null }).then(() => toast('API key removed'))
-          }}
-        >
-          Remove
-        </Btn>
-      </Row>
-    )
+  const submit = (e: React.FormEvent): void => {
+    e.preventDefault()
+    const input = { key: key.trim(), endpoint: endpoint.trim().replace(/\/$/, '') }
+    setBusy(true)
+    setError(null)
+    test(input)
+      .then(() => save(input))
+      .then(() => {
+        setAdding(false)
+        setKey('')
+        toast.success(savedMessage)
+      })
+      .catch((err) => setError(errorText(err)))
+      .finally(() => setBusy(false))
   }
 
   return (
     <div className="py-3">
       <div className="flex items-center gap-6">
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] text-[#ededeb]">Use your own API key</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">
-            Pay your provider directly and skip the daily limit.
-          </div>
+          <div className="text-[13px] text-[#ededeb]">{title}</div>
+          <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">{description}</div>
         </div>
-        {!adding && <Btn onClick={() => setAdding(true)}>Add key</Btn>}
-      </div>
-      {adding && (
-        <form
-          className="mt-3 flex items-start gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setBusy(true)
-            setError(null)
-            service
-              .testApiKey(key)
-              .then(() => update({ apiKey: key.trim() }))
-              .then(() => toast('API key saved'))
-              .catch((err) => setError(errorText(err)))
-              .finally(() => setBusy(false))
-          }}
-        >
-          <div className="flex-1">
-            <TextInput
-              type="password"
-              autoFocus
-              autoComplete="off"
-              spellCheck={false}
-              aria-label="API key"
-              placeholder="sk-…"
-              className="font-mono"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-            />
-            {error && <p className="mt-1.5 text-[12.5px] text-[#f4a39e]">{error}</p>}
-          </div>
-          <Btn variant="primary" type="submit" busy={busy} disabled={!key.trim()}>
-            Test and save
-          </Btn>
-          <Btn onClick={() => setAdding(false)}>Cancel</Btn>
-        </form>
-      )}
-    </div>
-  )
-}
-
-function KaggleEndpointRow(): React.JSX.Element {
-  const { settings, set } = useSettings()
-  const [adding, setAdding] = useState(false)
-  const [endpoint, setEndpoint] = useState(settings.kaggleEndpoint)
-  const [token, setToken] = useState(settings.kaggleToken)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const configured = Boolean(settings.kaggleEndpoint && settings.kaggleToken)
-
-  return (
-    <div className="py-3">
-      <div className="flex items-center gap-6">
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] text-[#ededeb]">Kaggle notebook endpoint</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">
-            Personal and temporary. The notebook must be running; project requests go directly to
-            it.
-          </div>
-        </div>
-        {configured && !adding ? (
+        {connected && !adding ? (
           <div className="flex items-center gap-2">
-            <span className="max-w-40 truncate font-mono text-[11px] text-[#c9c9c6]">
-              {settings.kaggleEndpoint}
+            <span className="max-w-40 truncate font-mono text-[12px] text-[#c9c9c6]">
+              {summary}
             </span>
-            <Btn variant="danger" onClick={() => set({ kaggleEndpoint: '', kaggleToken: '' })}>
+            <Btn variant="danger" onClick={() => void Promise.resolve(remove())}>
               Remove
             </Btn>
           </div>
         ) : !adding ? (
-          <Btn onClick={() => setAdding(true)}>Connect notebook</Btn>
+          <Btn onClick={() => setAdding(true)}>{connectLabel}</Btn>
         ) : null}
       </div>
       {adding && (
-        <form
-          className="mt-3 space-y-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setBusy(true)
-            setError(null)
-            const clean = endpoint.trim().replace(/\/$/, '')
-            window.api.agent
-              .testEndpoint(clean, token.trim())
-              .then((r) => {
-                if (!r.ok) throw new Error(r.message)
-                set({ kaggleEndpoint: clean, kaggleToken: token.trim() })
-                setAdding(false)
-                toast('Kaggle endpoint connected')
-              })
-              .catch((err: Error) => setError(err.message))
-              .finally(() => setBusy(false))
-          }}
-        >
-          <TextInput
-            autoFocus
-            autoComplete="off"
-            spellCheck={false}
-            aria-label="Kaggle endpoint"
-            placeholder="https://…trycloudflare.com"
-            className="font-mono"
-            value={endpoint}
-            onChange={(e) => setEndpoint(e.target.value)}
-          />
+        <form className="mt-3 space-y-2" onSubmit={submit}>
+          {endpointPlaceholder && (
+            <TextInput
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              aria-label={`${title} address`}
+              placeholder={endpointPlaceholder}
+              className="font-mono"
+              value={endpoint}
+              onChange={(e) => setEndpoint(e.target.value)}
+            />
+          )}
           <div className="flex items-start gap-2">
             <div className="flex-1">
               <TextInput
                 type="password"
+                autoFocus={!endpointPlaceholder}
                 autoComplete="off"
                 spellCheck={false}
-                aria-label="Notebook token"
-                placeholder="Notebook token"
+                aria-label={keyLabel}
+                placeholder={keyPlaceholder}
                 className="font-mono"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
               />
               {error && <p className="mt-1.5 text-[12.5px] text-[#f4a39e]">{error}</p>}
             </div>
@@ -165,7 +125,7 @@ function KaggleEndpointRow(): React.JSX.Element {
               variant="primary"
               type="submit"
               busy={busy}
-              disabled={!endpoint.trim() || !token.trim()}
+              disabled={!key.trim() || (Boolean(endpointPlaceholder) && !endpoint.trim())}
             >
               Test and save
             </Btn>
@@ -177,69 +137,32 @@ function KaggleEndpointRow(): React.JSX.Element {
   )
 }
 
-function MorlineGatewayRow(): React.JSX.Element {
-  const { settings, set } = useSettings()
-  const [adding, setAdding] = useState(false)
-  const [endpoint, setEndpoint] = useState(settings.morlineGatewayUrl)
-  const [key, setKey] = useState(settings.morlineGatewayKey)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const configured = Boolean(settings.morlineGatewayUrl && settings.morlineGatewayKey)
-
+/** Where the Claude models come from: your MoreCode plan, unless you added your own key below. */
+function PlanRow(): React.JSX.Element | null {
+  const { account, messagesLeft } = useAuth()
+  const { setTab } = useSettings()
+  if (!account) return null
+  const plan = getPlan(account.plan)
   return (
-    <div className="py-3">
-      <div className="flex items-center gap-6">
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] text-[#ededeb]">Dedicated AI gateway</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">
-            Uses your separately deployed endpoint. Provider keys stay in that service.
-          </div>
-        </div>
-        {configured && !adding ? (
-          <div className="flex items-center gap-2">
-            <span className="max-w-40 truncate font-mono text-[11px] text-[#c9c9c6]">{settings.morlineGatewayUrl}</span>
-            <Btn variant="danger" onClick={() => set({ morlineGatewayKey: '' })}>Remove</Btn>
-          </div>
-        ) : !adding ? <Btn onClick={() => setAdding(true)}>Connect gateway</Btn> : null}
-      </div>
-      {adding && (
-        <form
-          className="mt-3 space-y-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setBusy(true)
-            setError(null)
-            const clean = endpoint.trim().replace(/\/$/, '')
-            window.api.agent
-              .testEndpoint(clean, key.trim())
-              .then((r) => {
-                if (!r.ok) throw new Error(r.message)
-                set({ morlineGatewayUrl: clean, morlineGatewayKey: key.trim() })
-                setAdding(false)
-                toast('Morline gateway connected')
-              })
-              .catch((err: Error) => setError(err.message))
-              .finally(() => setBusy(false))
-          }}
-        >
-          <TextInput autoFocus autoComplete="off" spellCheck={false} aria-label="Gateway URL" placeholder="https://ai-gateway.morline.space" className="font-mono" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} />
-          <div className="flex items-start gap-2">
-            <div className="flex-1">
-              <TextInput type="password" autoComplete="off" spellCheck={false} aria-label="Morline gateway key" placeholder="Morline gateway key" className="font-mono" value={key} onChange={(e) => setKey(e.target.value)} />
-              {error && <p className="mt-1.5 text-[12.5px] text-[#f4a39e]">{error}</p>}
-            </div>
-            <Btn variant="primary" type="submit" busy={busy} disabled={!endpoint.trim() || !key.trim()}>Test and save</Btn>
-            <Btn onClick={() => setAdding(false)}>Cancel</Btn>
-          </div>
-        </form>
-      )}
-    </div>
+    <Row
+      title={`MoreCode ${plan.name}`}
+      description={
+        account.apiKey
+          ? 'Not used while your own API key is added below.'
+          : `${messagesLeft} of ${plan.dailyMessages} messages left today.`
+      }
+    >
+      <Btn onClick={() => setTab('billing')}>Manage plan</Btn>
+    </Row>
   )
 }
 
 export function ModelsPage(): React.JSX.Element {
   const { settings, set } = useSettings()
+  const { account, update, service } = useAuth()
   const current = MODELS.find((m) => m.id === settings.model)
+  const source = sourceOf(settings.model)
+
   return (
     <Page
       title="Models"
@@ -255,10 +178,69 @@ export function ModelsPage(): React.JSX.Element {
           />
         </Row>
       </Group>
-      <Group title="Access">
-        <ApiKeyRow />
-        {isMorlineGateway(settings.model) && <MorlineGatewayRow />}
-        {isKaggleQwen(settings.model) && <KaggleEndpointRow />}
+
+      <Group
+        title="Your MoreCode plan"
+        note={
+          source === 'claude'
+            ? 'Claude models run through your plan, with a daily message limit.'
+            : 'This model does not use your plan, so it has no daily limit.'
+        }
+      >
+        <PlanRow />
+      </Group>
+
+      <Group
+        title="Your own providers"
+        note="These skip your plan. Requests go straight to the provider with your key, and MoreCode does not count them."
+      >
+        {account && (
+          <ProviderRow
+            title="Anthropic API key"
+            description="Use Claude with your own key. Overrides your plan for every Claude model."
+            connected={Boolean(account.apiKey)}
+            summary={account.apiKey ? mask(account.apiKey) : ''}
+            connectLabel="Add key"
+            keyLabel="Anthropic API key"
+            keyPlaceholder="sk-ant-…"
+            test={({ key }) => service.testApiKey(key)}
+            save={({ key }) => update({ apiKey: key })}
+            remove={() => update({ apiKey: null }).then(() => void toast.success('API key removed'))}
+            savedMessage="API key saved"
+          />
+        )}
+        <ProviderRow
+          title="OpenRouter"
+          description="Free community models through OpenRouter. Requests can be rate limited."
+          connected={Boolean(settings.openRouterKey)}
+          summary={settings.openRouterKey ? mask(settings.openRouterKey) : ''}
+          connectLabel="Add key"
+          keyLabel="OpenRouter API key"
+          keyPlaceholder="sk-or-v1-…"
+          test={({ key }) =>
+            window.api.agent.testProvider({ provider: 'openrouter', key }).then(must)
+          }
+          save={({ key }) => set({ openRouterKey: key })}
+          remove={() => set({ openRouterKey: '' })}
+          savedMessage="OpenRouter key saved"
+        />
+        <ProviderRow
+          title="AI gateway"
+          description="Your own AI gateway service. The provider keys stay on that service."
+          connected={Boolean(settings.morlineGatewayUrl && settings.morlineGatewayKey)}
+          summary={settings.morlineGatewayUrl}
+          connectLabel="Connect"
+          endpointPlaceholder="https://ai-gateway.example.com"
+          keyLabel="Gateway key"
+          keyPlaceholder="Gateway key"
+          initialEndpoint={settings.morlineGatewayUrl}
+          test={({ key, endpoint }) =>
+            window.api.agent.testProvider({ provider: 'gateway', key, endpoint }).then(must)
+          }
+          save={({ key, endpoint }) => set({ morlineGatewayUrl: endpoint, morlineGatewayKey: key })}
+          remove={() => set({ morlineGatewayUrl: '', morlineGatewayKey: '' })}
+          savedMessage="Gateway connected"
+        />
       </Group>
     </Page>
   )

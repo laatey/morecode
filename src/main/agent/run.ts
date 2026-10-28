@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'fs'
+import { homedir } from 'os'
 import { join } from 'path'
 import { ApiFailure, streamMessage, type ApiMessage, type ContentBlock } from './anthropic'
-import { executeTool, TOOL_DEFS, type Decision, type PermissionAction } from './tools'
+import { executeTool, projectTree, TOOL_DEFS, type Decision, type PermissionAction } from './tools'
 
 export type Style = 'new' | 'some' | 'pro'
 
@@ -25,6 +26,8 @@ export type OutEvent =
 export interface RunInput {
   apiKey: string
   baseUrl?: string
+  /** The linked project, if any. Chats without one start in Documents\\MoreCode Projects. */
+  projectPath?: string
   model: string
   cwd: string
   prompt: string
@@ -32,9 +35,11 @@ export interface RunInput {
   attachments: { kind: 'file' | 'folder'; name: string; path?: string }[]
   history: { role: 'user' | 'assistant'; text: string }[]
   style: Style
+  /** What already happened in this chat (edits, commands, task list), written by the app. */
+  progress?: string
+  /** No tools: the model can only answer in text. */
+  noTools?: boolean
   runId: string
-  /** Documents-based parent used only when a person asks to start a separate project. */
-  newProjectRoot?: string
   /** Extra headers for the MoreCode server (never sent to anyone else). */
   headers?: Record<string, string>
 }
@@ -55,7 +60,15 @@ const VOICE: Record<Style, string> = {
   pro: 'The person is an experienced developer. Be brief and technical; skip basics.'
 }
 
-export function buildSystem(cwd: string, style: Style, newProjectRoot?: string): string {
+/** Which shell `run_command` really uses, so the AI writes commands that work on this computer. */
+export function shellNote(platform: NodeJS.Platform = process.platform): string {
+  if (platform === 'win32') {
+    return 'The person is on Windows and commands run in cmd.exe, not bash. Use dir (not ls), type (not cat), set NAME=value (not export), and backslash paths. Do not use bash-only syntax.'
+  }
+  return `The person is on ${platform === 'darwin' ? 'macOS' : 'Linux'} and commands run in /bin/sh. Stick to portable POSIX shell syntax.`
+}
+
+export function buildSystem(cwd: string, style: Style, hasProject = true, progress = ''): string {
   let notes = ''
   for (const name of ['AGENTS.md', 'CLAUDE.md']) {
     const file = join(cwd, name)
@@ -64,7 +77,7 @@ export function buildSystem(cwd: string, style: Style, newProjectRoot?: string):
       break
     }
   }
-  return `You are MoreCode, an AI coding assistant working inside the person's project folder on their computer.
+  return `You are MoreCode, an AI coding assistant${hasProject ? " working inside the person's project folder on their computer." : ' helping in a chat that is not linked to a project folder; commands start in the person\'s MoreCode Projects folder.'}
 
 ${VOICE[style]}
 
@@ -73,11 +86,65 @@ How to work:
 - Make the smallest change that does the job. Prefer edit_file over rewriting whole files. Keep the existing style of the code.
 - For anything with more than a couple of steps, call todo_write first and keep it updated.
 - After changing code, check your work when a check exists (tests, type check, lint) with run_command.
+- ${shellNote()}
 - If the person asks for a plan, or the change is large or risky, call present_plan and stop. Do not change files until they approve.
-- If the person asks to create a new, separate project and has not named a folder, call create_project. It creates the project in ${newProjectRoot ?? 'their Documents folder'}, switches this run into it, and keeps it out of the project currently open in MoreCode. Never scaffold a separate project inside the current project unless the person explicitly gives that location.
-- You can only touch files inside the project folder. If a command is refused, do not look for a way around it; explain and ask.
+- You can read files and list folders anywhere on the computer, including outside the project (use full paths). If the person points you at other code to copy from, read it directly.
+- write_file and edit_file only work inside the project folder. run_command is not limited to the project: to create or change anything elsewhere, use a command (copy, move, mkdir, and so on).
+- To start a new project, scaffold it with run_command (for example npm create vite@latest, npm init, or writing the files yourself) in the folder the person names. If they name none, ${hasProject ? 'create it inside the current project folder' : "create it in the current folder"}. Pick the right stack for what they asked for, such as Electron for a desktop app.
+- If a command is refused, do not look for a way around it; explain and ask.
+- Only a tool call changes anything. Never type tool activity as text (for example "[Edited file]"), and never say you created or changed something unless a tool result confirmed it.
+- Use paths relative to the project root (src/main.js), with no leading slash.
+- Keep todo_write up to date: mark each task completed as soon as it is done, so the list is true if the person says "continue".
+- If the person says "continue" or "keep going", carry on with the unfinished tasks in the state below. Do not start over or recreate files that already exist.
+- delegate is for broad read-only research across many files, never for edits, commands or small lookups, and at most 3 times per request. Do everything else yourself.
+- If edit_file fails twice on a file, stop retrying it: read the file, then write_file the complete corrected content.
+- If the person mentions a project or file on their computer ("on the desktop", "in Documents"), find it with list_dir under the folders listed below before saying you cannot see it.
 - Never invent file contents or command output. If something fails, say so plainly and say what you will try next.
-- Finish with a short summary of what changed and anything the person should check. Write for a person, not a log.${notes}`
+- Finish with a short summary of what changed and anything the person should check. Write for a person, not a log.
+
+This computer: home folder ${homedir()}; Desktop ${join(homedir(), 'Desktop')}; Documents ${join(homedir(), 'Documents')}.
+
+Files in the working folder right now:
+${safeTree(cwd)}${progress ? `\n\nWhat has happened in this chat so far (kept by the app, so it is accurate; trust it over your own memory):\n${progress}` : ''}${notes}`
+}
+
+const safeTree = (cwd: string): string => {
+  try {
+    return projectTree(cwd)
+  } catch {
+    return '(could not list the folder)'
+  }
+}
+
+const sleep = (ms: number, signal: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    const t = setTimeout(resolve, ms)
+    signal.addEventListener('abort', () => (clearTimeout(t), resolve()), { once: true })
+  })
+
+/** Ask the model, and quietly try again when the connection drops or a free service is briefly busy. */
+async function streamWithRetry(
+  args: Parameters<typeof streamMessage>[0],
+  io: RunIo
+): ReturnType<typeof streamMessage> {
+  let spoke = false
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await streamMessage(args, {
+        text: (delta) => {
+          spoke = true
+          io.emit({ type: 'text', delta })
+        }
+      })
+    } catch (err) {
+      const f = err instanceof ApiFailure ? err : null
+      const transient = !!f && (f.kind === 'interrupted' || f.kind === 'rate_limit' || (f.status ?? 0) >= 500)
+      const wait = f?.kind === 'rate_limit' ? (f.retryAfter ?? 5 * (attempt + 1)) : 2 * (attempt + 1)
+      if (io.signal.aborted || !transient || spoke || attempt >= 2 || wait > 30) throw err
+      await sleep(wait * 1000, io.signal)
+      if (io.signal.aborted) throw err
+    }
+  }
 }
 
 /** History from the chat, as API messages: roles alternate and the first one is the person's. */
@@ -91,7 +158,6 @@ export function buildHistory(history: RunInput['history']): ApiMessage[] {
     else out.push({ role: h.role, content: text })
   }
   while (out.length && out[0].role !== 'user') out.shift()
-  if (out.length && out[out.length - 1].role === 'user') out.pop() // the new prompt follows; two user turns in a row are not allowed
   return out
 }
 
@@ -110,33 +176,87 @@ function userContent(input: RunInput): ContentBlock[] {
 
 /** One whole request: keep asking the model and running its tools until it has finished. */
 export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
-  const system = buildSystem(input.cwd, input.style, input.newProjectRoot)
-  const messages: ApiMessage[] = [...buildHistory(input.history), { role: 'user', content: userContent(input) }]
+  const hasProject = Boolean(input.projectPath)
+  const system = buildSystem(input.cwd, input.style, hasProject, input.progress ?? '')
+  const tools = input.noTools ? [] : TOOL_DEFS
+  const past = buildHistory(input.history)
+  const next = userContent(input)
+  // two person turns in a row are not allowed, so a trailing one (a summary, or a message that never got a reply) rides along with the new prompt
+  const carried = past.length && past[past.length - 1].role === 'user' ? (past.pop() as ApiMessage) : null
+  if (carried && typeof carried.content === 'string') next.unshift({ type: 'text', text: `${carried.content}\n\n` })
+  const messages: ApiMessage[] = [...past, { role: 'user', content: next }]
+  let delegations = 0
+  const delegate = async (id: string, task: string): Promise<string> => {
+    if (delegations >= 3) throw new Error('You already used 3 helpers for this request. Do the rest yourself.')
+    delegations++
+    const readOnly = TOOL_DEFS.filter((t) => ['list_dir', 'read_file', 'search'].includes(t.name))
+    const helperSystem = `You are a read-only research helper for a coding assistant. The project folder is ${input.cwd}. You can list folders, read files and search. You cannot change anything or run commands. Find what the task asks for, then reply with a short report (under 250 words) naming the files and lines that matter. Say plainly what you could not find. Do not guess.`
+    const msgs: ApiMessage[] = [{ role: 'user', content: [{ type: 'text', text: task }] }]
+    const show = (steps: number, status: 'running' | 'done' | 'error', report?: string): void =>
+      io.emit({ type: 'tool', tool: { kind: 'agent', id, task: task.slice(0, 160), status, steps, ...(report ? { report } : {}) } })
+    show(0, 'running')
+    let last = ''
+    try {
+      for (let step = 0; step < 6; step++) {
+        if (io.signal.aborted) break
+        const r = await streamWithRetry(
+          { apiKey: input.apiKey, baseUrl: input.baseUrl, model: input.model, system: helperSystem, messages: msgs, tools: readOnly, signal: io.signal, headers: input.headers, fetchImpl: io.fetchImpl },
+          { ...io, emit: () => undefined }
+        )
+        if (r.content.length) msgs.push({ role: 'assistant', content: r.content })
+        last = r.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n').trim() || last
+        if (r.stopReason !== 'tool_use') break
+        const results: ContentBlock[] = []
+        for (const b of r.content) {
+          if (b.type !== 'tool_use') continue
+          // the helper's own reads stay out of the chat, and it cannot start helpers of its own
+          const out = await executeTool(b.name, b.id, b.input, {
+            cwd: input.cwd,
+            signal: io.signal,
+            runId: input.runId,
+            emit: () => undefined,
+            ask: io.ask
+          })
+          results.push({ type: 'tool_result', tool_use_id: b.id, content: out.content, ...(out.isError ? { is_error: true } : {}) })
+        }
+        msgs.push({ role: 'user', content: results })
+        show(step + 1, 'running')
+      }
+    } catch (err) {
+      show(0, 'error')
+      throw err
+    }
+    const report = (last || 'The helper found nothing to report.').slice(0, 2500)
+    show(msgs.filter((m) => m.role === 'assistant').length, 'done', report)
+    return report
+  }
+
   const ctx = {
     cwd: input.cwd,
-    newProjectRoot: input.newProjectRoot,
     signal: io.signal,
     runId: input.runId,
     emit: (tool: Record<string, unknown>) => io.emit({ type: 'tool', tool }),
-    ask: io.ask
+    ask: io.ask,
+    delegate,
+    editFailures: new Map<string, number>()
   }
 
   for (let step = 0; step < MAX_STEPS; step++) {
     if (io.signal.aborted) return
     const started = Date.now()
-    const result = await streamMessage(
+    const result = await streamWithRetry(
       {
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,
         system,
         messages,
-        tools: TOOL_DEFS,
+        tools,
         signal: io.signal,
         headers: input.headers,
         fetchImpl: io.fetchImpl
       },
-      { text: (delta) => io.emit({ type: 'text', delta }) }
+      io
     )
 
     const u = result.usage

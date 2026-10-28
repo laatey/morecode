@@ -121,7 +121,7 @@ export function ProfileMenu(): React.JSX.Element | null {
                   type="button"
                   onClick={() => {
                     if (a.id === account.id) return close()
-                    void switchTo(a.id).then(() => toast(`Switched to ${a.name}`))
+                    void switchTo(a.id).then(() => toast.success(`Switched to ${a.name}`))
                     close()
                   }}
                   className="flex h-[30px] w-full cursor-pointer items-center gap-2 rounded-[5px] px-1.5 text-left transition-colors hover:bg-white/[0.07]"
@@ -140,7 +140,7 @@ export function ProfileMenu(): React.JSX.Element | null {
               icon={<Plus className="h-3.5 w-3.5" />}
               onClick={() => {
                 close()
-                void signOut().then(() => toast('Sign in with another account. This one stays in the list.'))
+                void signOut().then(() => toast.success('Sign in with another account. This one stays in the list.'))
               }}
             >
               Add another account

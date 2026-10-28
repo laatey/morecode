@@ -58,7 +58,11 @@ export interface AgentStart {
   attachments: { kind: 'file' | 'folder'; name: string; path?: string }[]
   history: { role: 'user' | 'assistant'; text: string }[]
   style: 'new' | 'some' | 'pro'
+  /** What already happened in this chat, so "continue" picks up where things stopped. */
+  progress?: string
+  noTools?: boolean
   baseUrl?: string
+  projectPath?: string
   headers?: Record<string, string>
 }
 export interface AgentUsage {
@@ -92,7 +96,7 @@ export type AgentMessage = { runId: string } & (
   | { kind: 'done' }
   | {
       kind: 'error'
-      error: { kind: 'rate_limit' | 'offline' | 'failed'; message: string; retryAfter?: number }
+      error: { kind: 'rate_limit' | 'offline' | 'failed' | 'interrupted'; message: string; retryAfter?: number }
     }
 )
 export interface TermData {
@@ -122,10 +126,11 @@ const api = {
       ipcRenderer.send('agent:permission', runId, id, decision),
     revert: (id: string): Promise<boolean> => ipcRenderer.invoke('agent:revert', id),
     keep: (id: string): void => ipcRenderer.send('agent:keep', id),
-    testKey: (key: string): Promise<{ ok: boolean; message?: string }> =>
-      ipcRenderer.invoke('agent:test-key', key),
-    testEndpoint: (endpoint: string, token: string): Promise<{ ok: boolean; message?: string }> =>
-      ipcRenderer.invoke('agent:test-endpoint', endpoint, token),
+    testProvider: (
+      check:
+        | { provider: 'anthropic' | 'openrouter'; key: string }
+        | { provider: 'gateway'; key: string; endpoint: string }
+    ): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('agent:test-provider', check),
     onEvent: (cb: (m: AgentMessage) => void): (() => void) => listen('agent:event', cb)
   },
   /** Calls to the MoreCode server, made by the desktop shell so the browser's CORS rules do not apply. Null = no answer. */
@@ -190,8 +195,14 @@ const api = {
       ipcRenderer.invoke('git:create-pr', req),
     openUrl: (url: string): Promise<void> => ipcRenderer.invoke('git:open-url', url)
   },
+  secrets: {
+    available: (): Promise<boolean> => ipcRenderer.invoke('secrets:available'),
+    get: (name: string): Promise<string | null> => ipcRenderer.invoke('secrets:get', name),
+    set: (name: string, value: string | null): Promise<boolean> =>
+      ipcRenderer.invoke('secrets:set', name, value)
+  },
   terminal: {
-    startDir: (): Promise<string> => ipcRenderer.invoke('term:start-dir'),
+    startDir: (folder?: string | null): Promise<string> => ipcRenderer.invoke('term:start-dir', folder ?? null),
     cd: (cwd: string, target: string): Promise<CdResult> =>
       ipcRenderer.invoke('term:cd', cwd, target),
     run: (id: string, command: string, cwd: string): void =>

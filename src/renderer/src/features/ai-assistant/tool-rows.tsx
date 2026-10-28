@@ -121,6 +121,21 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
     )
   }
 
+  if (tool.kind === 'agent') {
+    return (
+      <div>
+        <Row expandable={Boolean(tool.report)} open={open} onToggle={() => setOpen((o) => !o)} status={tool.status}>
+          <span className="text-muted-foreground">{tool.status === 'running' ? 'Helper researching' : 'Helper'}</span>
+          <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">{tool.task}</span>
+          {tool.steps > 0 && <span className="text-[11px] text-muted-foreground">{tool.steps} {tool.steps === 1 ? 'step' : 'steps'}</span>}
+        </Row>
+        {open && tool.report && (
+          <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-white/[0.08] bg-[#242423] p-2.5 text-[12px] leading-5 text-[#b4b4b0]">{tool.report}</p>
+        )}
+      </div>
+    )
+  }
+
   if (tool.kind === 'thinking') {
     return <ThinkingBlock text={tool.text} status={tool.status} durationMs={tool.durationMs} />
   }
@@ -193,7 +208,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
           <span className="text-[#d6d6d3]">{tool.label}</span>
         </Row>
         {open && (
-          <pre className="my-1 ml-1 overflow-x-auto rounded-[6px] border border-white/[0.08] px-3 py-2 font-mono text-[11.5px] leading-5 text-[#a9a9a6]">
+          <pre className="slim-scroll my-1 ml-1 max-h-[240px] overflow-auto rounded-[6px] border border-white/[0.08] px-3 py-2 font-mono text-[11.5px] leading-5 text-[#a9a9a6]">
             <span className="text-muted-foreground">$ {tool.command}</span>
             {'\n'}
             {tool.output}

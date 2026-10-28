@@ -29,7 +29,7 @@ export interface PermissionRequest {
   reason?: string
 }
 
-export type ErrorKind = 'rate_limit' | 'offline' | 'failed'
+export type ErrorKind = 'rate_limit' | 'offline' | 'failed' | 'interrupted'
 
 export interface TodoItem {
   text: string
@@ -44,6 +44,9 @@ export type ToolBlock =
       path: string
       added: number
       removed: number
+      /** The real change to this file since before its first edit waiting for review (rewrites do not pile up). */
+      netAdded?: number
+      netRemoved?: number
       status: ToolStatus
       /** pending = waiting for the user to accept/discard; set when the edit finishes. */
       review?: 'pending' | 'accepted' | 'discarded'
@@ -58,6 +61,7 @@ export type ToolBlock =
       output?: string
     }
   | { kind: 'todos'; id: string; items: TodoItem[] }
+  | { kind: 'agent'; id: string; task: string; status: ToolStatus; steps: number; report?: string }
   | { kind: 'read'; id: string; paths: string[]; status: ToolStatus }
   | ({ kind: 'permission'; state: PermissionState } & PermissionRequest)
   | {
@@ -84,8 +88,8 @@ export type Part =
   | { type: 'error'; kind: ErrorKind; message: string; retryAfter?: number; at: number }
 
 export type Msg =
-  | { id: string; role: 'user'; text: string; images?: string[]; attachments?: Attachment[] }
-  | { id: string; role: 'system'; text: string }
+  | { id: string; role: 'user'; text: string; shown?: string; images?: string[]; attachments?: Attachment[] }
+  | { id: string; role: 'system'; text: string; /** A written summary of everything above this point, which replaces it for the AI. */ summary?: string }
   | {
       id: string
       role: 'agent'
@@ -112,6 +116,10 @@ export interface AgentRequest {
   signal: AbortSignal
   /** The conversation before this message, as plain text, so a real agent has context. */
   history: { role: 'user' | 'assistant'; text: string }[]
+  /** What already happened in this chat (files, commands, tasks, last failure), so "continue" has something to continue. */
+  progress?: string
+  /** A plain answer with no tools (used to write a summary). */
+  noTools?: boolean
   /** Ask the person before doing something risky. Resolves once they (or their settings) decide. */
   askPermission: (req: PermissionRequest) => Promise<Decision>
 }

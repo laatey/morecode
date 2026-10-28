@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import {
   ChevronRight,
+  CalendarClock,
   Folder,
   ListFilter,
   MoreHorizontal,
@@ -26,10 +27,20 @@ const NAV =
   'flex h-7 w-full cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-[#d4d4d2] transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
 
 /** A chat in the list. The "…" shows on hover and holds the chat's actions. */
-function ChatRow({ chat, indent }: { chat: Chat; indent?: boolean }): React.JSX.Element {
+function ChatRow({
+  chat,
+  indent,
+  suppressSelection = false,
+  onSelect
+}: {
+  chat: Chat
+  indent?: boolean
+  suppressSelection?: boolean
+  onSelect?: () => void
+}): React.JSX.Element {
   const ws = useWorkspace()
   const menu = useChatMenu()
-  const selected = chat.id === ws.activeId
+  const selected = !suppressSelection && chat.id === ws.activeId
   const renaming = ws.renamingId === chat.id
 
   return (
@@ -46,7 +57,10 @@ function ChatRow({ chat, indent }: { chat: Chat; indent?: boolean }): React.JSX.
       ) : (
         <button
           type="button"
-          onClick={() => ws.select(chat.id)}
+          onClick={() => {
+            ws.select(chat.id)
+            onSelect?.()
+          }}
           onDoubleClick={() => ws.startRename(chat.id)}
           title={chat.title}
           aria-current={selected ? 'true' : undefined}
@@ -163,7 +177,9 @@ function SidebarFileTree({
 }
 
 function FilesSection(): React.JSX.Element {
-  const files = useWorkspaceFiles('sidebar')
+  const ws = useWorkspace()
+  const project = ws.groups.find((group) => group.id === ws.active.projectId)
+  const files = useWorkspaceFiles(project?.folder ?? '')
   const { openTab } = useRightPanel()
   // The explorer deliberately keeps each directory visible and starts every one open.
   const tree = buildTree(files.map((path) => ({ path })), false)
@@ -175,14 +191,28 @@ function FilesSection(): React.JSX.Element {
     <section className="flex min-h-0 flex-1 flex-col px-2 pt-2">
       <div className="flex h-6 shrink-0 items-center px-2 text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Explorer</div>
       <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-0.5 pb-2">
-        {tree.length ? <SidebarFileTree nodes={tree} onFile={openFile} /> : <p className="px-2 py-1.5 text-[12px] text-[#77776f]">No files found.</p>}
+        {!project?.folder ? (
+          <p className="px-2 py-2 text-[12px] leading-5 text-[#77776f]">
+            Add this chat to a project to browse its files.
+          </p>
+        ) : tree.length ? <SidebarFileTree nodes={tree} onFile={openFile} /> : <p className="px-2 py-1.5 text-[12px] text-[#77776f]">No files found.</p>}
       </div>
     </section>
   )
 }
 
 /** Body of the left sidebar (below the title-bar row). */
-export function LeftSidebar({ mode }: { mode: 'chat' | 'code' }): React.JSX.Element {
+export function LeftSidebar({
+  mode,
+  onOpenRoutines,
+  onOpenChat,
+  routinesActive
+}: {
+  mode: 'chat' | 'code'
+  onOpenRoutines: () => void
+  onOpenChat: () => void
+  routinesActive: boolean
+}): React.JSX.Element {
   const ws = useWorkspace()
   const [view, setView] = useState<'active' | 'archived'>('active')
   const [shut, setShut] = useState<Set<string>>(new Set())
@@ -209,12 +239,23 @@ export function LeftSidebar({ mode }: { mode: 'chat' | 'code' }): React.JSX.Elem
         <FilesSection />
       ) : (
         <>
-          <nav className="flex flex-col gap-px px-2 pt-2">
-            <button type="button" onClick={() => ws.newChat()} className={NAV}>
+          <nav className="flex flex-col gap-px px-2 pt-1">
+            <button type="button" onClick={() => { ws.newChat(); onOpenChat() }} className={NAV}>
               <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
                 <SquarePen className={SMALL} />
               </span>
               New chat
+            </button>
+            <button
+              type="button"
+              onClick={onOpenRoutines}
+              aria-current={routinesActive ? 'page' : undefined}
+              className={cn(NAV, routinesActive && 'bg-white/[0.09] text-foreground')}
+            >
+              <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+                <CalendarClock className={SMALL} />
+              </span>
+              Routines
             </button>
             <button type="button" onClick={() => ws.setSearchOpen(true)} className={NAV}>
               <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
@@ -312,7 +353,7 @@ export function LeftSidebar({ mode }: { mode: 'chat' | 'code' }): React.JSX.Elem
                         <li className="pl-8 text-[12px] leading-6 text-[#77776f]">No chats yet</li>
                       )}
                       {items.map((c) => (
-                        <ChatRow key={c.id} chat={c} indent />
+                        <ChatRow key={c.id} chat={c} indent suppressSelection={routinesActive} onSelect={onOpenChat} />
                       ))}
                     </ul>
                   )}
@@ -325,7 +366,7 @@ export function LeftSidebar({ mode }: { mode: 'chat' | 'code' }): React.JSX.Elem
                 <SectionLabel>Pinned</SectionLabel>
                 <ul className="flex flex-col gap-px">
                   {pinned.map((c) => (
-                    <ChatRow key={c.id} chat={c} />
+                    <ChatRow key={c.id} chat={c} suppressSelection={routinesActive} onSelect={onOpenChat} />
                   ))}
                 </ul>
               </>
@@ -363,7 +404,7 @@ export function LeftSidebar({ mode }: { mode: 'chat' | 'code' }): React.JSX.Elem
         </SectionLabel>
         <ul className="flex flex-col gap-px">
           {(view === 'archived' ? visible.sort(byRecent) : loose).map((c) => (
-            <ChatRow key={c.id} chat={c} />
+            <ChatRow key={c.id} chat={c} suppressSelection={routinesActive} onSelect={onOpenChat} />
           ))}
         </ul>
         {view === 'archived' && visible.length === 0 && (

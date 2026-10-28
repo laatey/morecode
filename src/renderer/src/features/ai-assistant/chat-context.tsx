@@ -13,18 +13,28 @@ import { useWorkspace } from '@/features/workspace/workspace-store'
 import { useSettings } from '@/features/settings/settings-store'
 import { useNotify } from '@/features/settings/notifications'
 import { recordPlans } from '@/features/right-panel/plan-history'
-import { recordUsage } from '@/features/billing/usage-log'
+import { forgetSessionEdit, recordSessionEdit, recordUsage } from '@/features/billing/usage-log'
 import { mockAgent } from './agent/mock-agent'
 import { makeRealRunner, type RealConfig } from './agent/real-agent'
-import { isKaggleQwen, isMorlineGateway, resolveModel } from './models'
+import { toast } from 'sonner'
+import { routeFor } from './ai-route'
+import { resolveModel } from './models'
 import { useChat, type Policy } from './use-chat'
 import type { AgentRunner } from './types'
-import type { Msg, TodoItem, ToolBlock } from './types'
+import type { Attachment, Msg, TodoItem, ToolBlock } from './types'
 
 type BaseChat = ReturnType<typeof useChat>
-type ChatApi = Omit<BaseChat, 'retry' | 'edit'> & {
+type ChatApi = Omit<BaseChat, 'retry' | 'edit' | 'send'> & {
+  /** Send a message. Returns false when it was not sent (no messages left, or the plan lacks the model). */
+  send: (
+    prompt: string,
+    images: string[],
+    model: string,
+    autoAccept: boolean,
+    attachments?: Attachment[]
+  ) => boolean
   /** Run the message before this reply again. */
-  retry: (agentId: string) => void
+  retry: (agentId: string, modelOverride?: string) => void
   /** Replace a sent message and run it again from there. */
   edit: (userId: string, text: string) => void
   model: string
@@ -49,7 +59,7 @@ export function ChatProvider({
   chatId: string
   children: React.ReactNode
 }): React.JSX.Element {
-  const { getMessages, saveMessages } = useWorkspace()
+  const { getMessages, saveMessages, active, groups } = useWorkspace()
   const [first] = useState(() => getMessages(chatId))
   const { settings, set } = useSettings()
   const notify = useNotify()
@@ -71,56 +81,62 @@ export function ChatProvider({
   const getPolicy = useCallback(() => policy.current as Policy, [])
 
   // The real AI in the desktop app; a scripted demo only in a plain browser, where there is no file access.
-  const { account, service } = useAuth()
-  const config = useRef<RealConfig>({ apiKey: null, style: 'some', onUsage: () => undefined })
-  useEffect(() => {
-    const useKaggle = isKaggleQwen(settings.model)
-    const useMorlineGateway = isMorlineGateway(settings.model)
-    config.current = {
-      // your own key goes straight to the AI; otherwise the MoreCode server does it under your plan
-      apiKey: useKaggle
-        ? settings.kaggleToken || null
-        : useMorlineGateway
-          ? settings.morlineGatewayKey || null
-        : (account?.apiKey ?? service.hosted?.token() ?? null),
-      baseUrl: useKaggle
-        ? settings.kaggleEndpoint || undefined
-        : useMorlineGateway
-          ? settings.morlineGatewayUrl || undefined
-        : !account?.apiKey && service.hosted
-          ? `${service.hosted.url}/v1/ai`
-          : undefined,
-      hosted: !useKaggle && !useMorlineGateway && !account?.apiKey && Boolean(service.hosted),
-      forceModel: useKaggle
-        ? undefined
-        : !account?.apiKey && service.hosted && account?.plan === 'free'
-          ? 'claude-haiku-5-5'
-          : undefined,
+  const { account, service, refreshAccount } = useAuth()
+  const route = useMemo(
+    () =>
+      routeFor({
+        model: resolveModel(settings.model),
+        settings,
+        account,
+        hosted: service.hosted ?? null
+      }),
+    [settings, account, service.hosted]
+  )
+  const config = useMemo<RealConfig>(() => {
+    const projectPath = groups.find((group) => group.id === active.projectId)?.folder
+    return {
+      apiKey: route.apiKey,
+      baseUrl: route.baseUrl,
+      // only requests that go through the MoreCode server carry its run and time-zone headers
+      hosted: route.kind === 'subscription' && Boolean(route.baseUrl),
+      missing: route.missing,
+      projectPath,
       style: account?.profile?.experience ?? 'some',
       onUsage: (u) => {
-        if (account) {
-          recordUsage(account.id, {
-            model: u.model,
-            input: u.input,
-            output: u.output,
-            cacheRead: u.cacheRead,
-            cacheWrite: u.cacheWrite,
-            context: u.contextTokens,
-            ms: u.ms
-          })
-        }
+        recordUsage(account?.id ?? 'guest', {
+          model: u.model,
+          input: u.input,
+          output: u.output,
+          cacheRead: u.cacheRead,
+          cacheWrite: u.cacheWrite,
+          context: u.contextTokens,
+          ms: u.ms
+        })
+        // a message through the plan was just counted by the server: show its count, not an estimate
+        if (route.kind === 'subscription') refreshAccount()
       }
     }
-  })
+  }, [route, account, active.projectId, groups, refreshAccount])
   const runner = useMemo<AgentRunner>(
     () =>
       typeof window !== 'undefined' && window.api?.agent
-        ? makeRealRunner(() => config.current)
+        ? makeRealRunner(() => config)
         : mockAgent,
-    []
+    [config]
   )
 
-  const chat = useChat(runner, first, chatId, getPolicy)
+  const chat = useChat(
+    runner,
+    first,
+    chatId,
+    getPolicy,
+    (edit) => {
+      recordSessionEdit(account?.id ?? 'guest', edit.id, edit.added, edit.removed)
+    },
+    (id) => {
+      forgetSessionEdit(account?.id ?? 'guest', id)
+    }
+  )
   const { load, owner, messages } = chat
 
   // before paint, so the old chat never flashes
@@ -154,28 +170,49 @@ export function ChatProvider({
     [set, settings.autoAccept]
   )
   const { send, retry: retryRun, edit: editRun } = chat
-  const { spendMessage } = useAuth()
-  const ask = useCallback(
-    (prompt: string) => {
-      if (isKaggleQwen(model) || isMorlineGateway(model) || spendMessage()) send(prompt, [], model, autoAccept)
+  const { spendMessage, openPlanDialog } = useAuth()
+  /** May this message go? Subscription messages must be on a model the plan includes and count against its limit. */
+  const admit = useCallback((): boolean => {
+    if (route.blocked) {
+      toast.error(route.blocked)
+      openPlanDialog('upgrade')
+      return false
+    }
+    return !route.metered || spendMessage()
+  }, [route, spendMessage, openPlanDialog])
+  const sendMessage = useCallback(
+    (
+      prompt: string,
+      images: string[],
+      model: string,
+      autoAccept: boolean,
+      attachments?: Attachment[]
+    ): boolean => {
+      if (!admit()) return false
+      send(prompt, images, model, autoAccept, attachments)
+      return true
     },
-    [send, model, autoAccept, spendMessage]
+    [send, admit]
+  )
+  const ask = useCallback(
+    (prompt: string) => void sendMessage(prompt, [], model, autoAccept),
+    [sendMessage, model, autoAccept]
   )
   const retry = useCallback(
-    (agentId: string) => {
-      if (isKaggleQwen(model) || isMorlineGateway(model) || spendMessage()) retryRun(agentId, model, autoAccept)
+    (agentId: string, modelOverride?: string) => {
+      if (admit()) retryRun(agentId, modelOverride ?? model, autoAccept)
     },
-    [retryRun, model, autoAccept, spendMessage]
+    [retryRun, model, autoAccept, admit]
   )
   const edit = useCallback(
     (userId: string, text: string) => {
-      if (isKaggleQwen(model) || isMorlineGateway(model) || spendMessage()) editRun(userId, text, model, autoAccept)
+      if (admit()) editRun(userId, text, model, autoAccept)
     },
-    [editRun, model, autoAccept, spendMessage]
+    [editRun, model, autoAccept, admit]
   )
   const value = useMemo<ChatApi>(
-    () => ({ ...chat, retry, edit, model, setModel, autoAccept, setAutoAccept, ask }),
-    [chat, retry, edit, model, setModel, autoAccept, setAutoAccept, ask]
+    () => ({ ...chat, send: sendMessage, retry, edit, model, setModel, autoAccept, setAutoAccept, ask }),
+    [chat, sendMessage, retry, edit, model, setModel, autoAccept, setAutoAccept, ask]
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

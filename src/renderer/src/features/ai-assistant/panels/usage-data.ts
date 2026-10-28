@@ -2,7 +2,6 @@ import type { Account } from '@/features/auth/auth-service'
 import { dayKey } from '@/features/billing/usage'
 import { getPlan } from '@/features/billing/plans'
 import { cacheHitRate, getLastContext, summarize, type Totals } from '@/features/billing/usage-log'
-import type { ChatTotals } from '../use-chat'
 
 /** What the Usage and Context panels show, built from the real usage log and the account's plan. */
 
@@ -51,8 +50,8 @@ function untilMidnight(now = new Date()): string {
 
 const pct = (n: number, of: number): number => (of > 0 ? Math.min(100, Math.round((n / of) * 100)) : 0)
 
-export function getUsageSnapshot(account: Account | null, modelName: string, totals: ChatTotals): UsageSnapshot {
-  const log = account ? summarize(account.id) : null
+export function getUsageSnapshot(account: Account | null, modelName: string): UsageSnapshot {
+  const log = summarize(account?.id ?? 'guest')
   const s: Totals = log?.session ?? { requests: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, ms: 0 }
 
   let limits: PlanLimit[] = []
@@ -84,8 +83,8 @@ export function getUsageSnapshot(account: Account | null, modelName: string, tot
       requests: s.requests,
       apiTime: duration(s.ms),
       activeTime: duration(Date.now() - (log?.sessionStart ?? Date.now())),
-      added: totals.added,
-      removed: totals.removed,
+      added: log.edits.added,
+      removed: log.edits.removed,
       modelName,
       modelShare: s.requests ? Math.round((modelRequests / s.requests) * 100) : 0,
       cacheHit: cacheHitRate(s)
@@ -137,7 +136,7 @@ const TOOLS_TOKENS = 1500
 const REPLY_RESERVE = 8192
 
 /** How full the context window is. Total is what the API reported for the latest step. */
-export function getContextRows(_totals?: ChatTotals): {
+export function getContextRows(): {
   rows: ContextRow[]
   buffer: number
   used: number

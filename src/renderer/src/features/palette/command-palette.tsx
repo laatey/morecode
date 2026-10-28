@@ -1,3 +1,4 @@
+import { ModalOverlay } from '@/components/modal-overlay'
 import React, { useMemo, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Command } from 'cmdk'
@@ -17,7 +18,7 @@ import {
   SquarePen,
   type LucideIcon
 } from 'lucide-react'
-import { MODELS } from '@/features/ai-assistant/models'
+import { useModelChoices } from '@/features/ai-assistant/use-model-choices'
 import { useChatContext } from '@/features/ai-assistant/chat-context'
 import { KeyChip } from '@/features/ai-assistant/panels/ui'
 import { buildCommands } from '@/features/ai-assistant/slash-commands'
@@ -63,7 +64,7 @@ export function CommandPalette(): React.JSX.Element {
   return (
     <Dialog.Root open={ws.searchOpen} onOpenChange={ws.setSearchOpen}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <ModalOverlay tone="light" />
         <PaletteBody />
       </Dialog.Portal>
     </Dialog.Root>
@@ -76,6 +77,7 @@ function PaletteBody(): React.JSX.Element {
   const { openSettings } = useSettings()
   const { openTab } = useRightPanel()
   const { model, setModel, autoAccept, setAutoAccept } = useChatContext()
+  const { choices: modelChoices, choose: chooseModel } = useModelChoices(setModel)
   const skills = useSkills()
   const bindings = useBindings()
   const [query, setQuery] = useState('')
@@ -119,8 +121,8 @@ function PaletteBody(): React.JSX.Element {
       out.push({ id: `cmd:${c.id}`, group: 'Commands', label: `/${c.id}`, detail: c.description, icon: c.icon, run: () => emit('assistant:run', c.id) })
     }
 
-    for (const m of MODELS) {
-      if (m.id !== model) out.push({ id: `model:${m.id}`, group: 'Models', label: `Switch to ${m.name}`, detail: m.description, icon: Sparkles, words: 'model', run: () => setModel(m.id) })
+    for (const c of modelChoices) {
+      if (c.model.id !== model) out.push({ id: `model:${c.model.id}`, group: 'Models', label: `Switch to ${c.model.name}`, detail: c.locked ? `${c.model.description} · Upgrade to use` : c.model.description, icon: Sparkles, words: 'model', run: () => void chooseModel(c) })
     }
 
     for (const r of account?.recents ?? []) {
@@ -159,7 +161,7 @@ function PaletteBody(): React.JSX.Element {
       { id: 'sign-out', group: 'Account', label: 'Sign out', icon: LogOut, run: () => void signOut() }
     )
     return out
-  }, [ws, account, skills.active, skills.commands, model, autoAccept, openSettings, openTab, setModel, setAutoAccept, openProject, openPlanDialog, startTour, signOut])
+  }, [ws, account, skills.active, skills.commands, model, autoAccept, openSettings, openTab, modelChoices, chooseModel, setAutoAccept, openProject, openPlanDialog, startTour, signOut])
 
   const needle = query.trim().toLowerCase()
 

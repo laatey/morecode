@@ -127,8 +127,8 @@ export function FileActions({
 }): React.JSX.Element {
   const open = async (): Promise<void> => {
     const res = await window.api?.workspace.openFile(path)
-    if (!res) toast('Opening files needs the desktop app')
-    else if (!res.ok) toast(res.error ?? 'Could not open this file.')
+    if (!res) toast.error('Opening files needs the desktop app')
+    else if (!res.ok) toast.error(res.error ?? 'Could not open this file.')
   }
   return (
     <span className={cn('flex shrink-0 items-center', className)}>
@@ -137,7 +137,7 @@ export function FileActions({
         className="p-1"
         onClick={(e) => {
           e.stopPropagation()
-          void navigator.clipboard.writeText(path).then(() => toast('Path copied'))
+          void navigator.clipboard.writeText(path).then(() => toast.success('Path copied'))
         }}
       >
         <Copy className="h-3 w-3" />

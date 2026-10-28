@@ -36,7 +36,7 @@ function BugReport({ version }: { version: string }): React.JSX.Element {
             : undefined
         })
           .then((ref) => {
-            toast('Report sent', { description: `Your reference is ${ref}.` })
+            toast.success('Report sent', { description: `Your reference is ${ref}.` })
             setText('')
           })
           .catch(() => toast.error('Could not send the report. Try again in a moment.'))

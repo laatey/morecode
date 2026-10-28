@@ -48,7 +48,7 @@ export function UsagePanel({
 }): React.JSX.Element {
   const { account, openPlanDialog, messagesLeft } = useAuth()
   useSyncExternalStore(subscribeUsage, getUsageVersion) // refresh while the AI works
-  const u = getUsageSnapshot(account, modelName(ctx.model), ctx.totals)
+  const u = getUsageSnapshot(account, modelName(ctx.model))
 
   const copy = (): void => {
     const text = [
@@ -56,7 +56,7 @@ export function UsagePanel({
       `Requests this session: ${u.session.requests}`,
       ...u.breakdown.map((b) => `${b.label}: ${b.value}`)
     ].join('\n')
-    void navigator.clipboard.writeText(text).then(() => toast('Usage copied'))
+    void navigator.clipboard.writeText(text).then(() => toast.success('Usage copied'))
   }
 
   return (

@@ -54,3 +54,15 @@ export const PLANS: Plan[] = [
 ]
 
 export const getPlan = (id: PlanId): Plan => PLANS.find((p) => p.id === id) ?? PLANS[0]
+
+/**
+ * The Claude models each plan includes when the AI is reached through MoreCode. The server is what enforces this
+ * (server/src/config.mjs); the app only uses it to show what is locked instead of quietly answering with another model.
+ */
+const PLAN_MODELS: Record<PlanId, string[]> = {
+  free: ['claude-haiku-5-5'],
+  pro: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
+  max: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']
+}
+
+export const planAllows = (plan: PlanId, model: string): boolean => PLAN_MODELS[plan].includes(model)

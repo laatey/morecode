@@ -17,16 +17,27 @@ export function useWorkspaceFiles(projectKey: string): string[] {
   useEffect(() => {
     let stale = false
     const api = window.api?.workspace
+    if (!projectKey) {
+      setFiles([])
+      return
+    }
     if (!api?.files) {
       setFiles(SAMPLE)
       return
     }
-    api
-      .files()
-      .then((list) => !stale && setFiles(list))
-      .catch(() => !stale && setFiles([]))
+    setFiles([]) // never show the previous project's files while the new list loads
+    const load = (): void => {
+      api
+        .open(projectKey)
+        .then(() => api.files())
+        .then((list) => !stale && setFiles(list))
+        .catch(() => !stale && setFiles([]))
+    }
+    load()
+    window.addEventListener('workspace:changed', load)
     return () => {
       stale = true
+      window.removeEventListener('workspace:changed', load)
     }
   }, [projectKey])
   return files

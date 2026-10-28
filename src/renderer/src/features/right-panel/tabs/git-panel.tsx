@@ -1,8 +1,10 @@
+import { FileIcon } from '@/components/file-icon'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, ExternalLink, GitBranch, GitPullRequest, RefreshCw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { IconButton } from '@/components/layout/icon-button'
 import { useChatContext } from '@/features/ai-assistant/chat-context'
+import { useWorkspace } from '@/features/workspace/workspace-store'
 import type { GitFile, GitRepo, GitState } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 import { FileActions, FileTree } from './file-tree'
@@ -187,7 +189,7 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
     })
     setSaving(false)
     if (!res.ok) return setError(res.error)
-    toast(res.branch ? `Version saved on ${res.branch}` : 'Version saved')
+    toast.success(res.branch ? `Version saved on ${res.branch}` : 'Version saved')
     setMessage('')
     await refresh()
   }
@@ -197,6 +199,7 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
     return (
       <div className="group flex items-center gap-2 rounded-[6px] px-1.5 py-1 hover:bg-white/[0.04]">
         <Checkbox checked={picked.has(f.path)} onChange={() => toggle(f.path)} label={`Include ${f.path}`} />
+        <FileIcon name={name} />
         <span
           title={f.path}
           className={cn('min-w-0 flex-1 truncate text-[12.5px] text-[#ececea]', f.status === 'deleted' && 'text-muted-foreground line-through')}
@@ -338,21 +341,30 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
 export function GitPanel(): React.JSX.Element {
   const available = Boolean(window.api?.git)
   const { running } = useChatContext()
+  const ws = useWorkspace()
+  const hasProject = Boolean(ws.groups.find((group) => group.id === ws.active.projectId)?.folder)
   const [state, setState] = useState<GitState | null>(null)
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (!window.api?.git) return
+    if (!window.api?.git || !hasProject) {
+      setState(null)
+      return
+    }
     setLoading(true)
     setState(await window.api.git.state())
     setLoading(false)
-  }, [])
+  }, [hasProject])
 
   useEffect(() => {
     void refresh()
     const onFocus = (): void => void refresh()
     window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
+    window.addEventListener('workspace:changed', onFocus)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('workspace:changed', onFocus)
+    }
   }, [refresh])
 
   // when the AI finishes a run, its edits are on disk: look again
@@ -364,6 +376,13 @@ export function GitPanel(): React.JSX.Element {
     return (
       <TabEmpty icon={GitBranch} title="Saving versions needs the desktop app">
         Open MoreCode as a desktop app to save versions of your project and send them for review.
+      </TabEmpty>
+    )
+  }
+  if (!hasProject) {
+    return (
+      <TabEmpty icon={GitBranch} title="Add this chat to a project first">
+        Version history belongs to a project, not a loose chat.
       </TabEmpty>
     )
   }
@@ -388,7 +407,7 @@ export function GitPanel(): React.JSX.Element {
             onClick={async () => {
               const res = await window.api.git.init()
               if (res.ok) await refresh()
-              else toast(res.error)
+              else toast.error(res.error)
             }}
           >
             Turn on version history

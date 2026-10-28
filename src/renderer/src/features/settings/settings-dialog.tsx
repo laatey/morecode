@@ -1,3 +1,4 @@
+import { ModalOverlay } from '@/components/modal-overlay'
 import React, { useEffect, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
@@ -76,7 +77,7 @@ export function SettingsDialog(): React.JSX.Element {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && closeSettings()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <ModalOverlay tone="blurred" />
         <Dialog.Content
           aria-describedby={undefined}
           className="fixed left-1/2 top-1/2 z-50 flex h-[min(540px,calc(100vh-56px))] w-[min(720px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 select-text overflow-hidden rounded-[10px] border border-white/[0.12] bg-[#272726] shadow-[0_24px_80px_rgba(0,0,0,0.58)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0"

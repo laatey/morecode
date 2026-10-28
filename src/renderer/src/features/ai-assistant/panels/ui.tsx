@@ -25,12 +25,14 @@ export function PanelFrame({
   onClose,
   actions,
   width = 420,
+  maxHeight = '100%',
   children
 }: {
   title: string
   onClose: () => void
   actions?: React.ReactNode
   width?: number
+  maxHeight?: string
   children: React.ReactNode
 }): React.JSX.Element {
   useEffect(() => {
@@ -50,8 +52,8 @@ export function PanelFrame({
         role="dialog"
         aria-label={title}
         onMouseDown={(e) => e.stopPropagation()}
-        style={{ maxWidth: width }}
-        className="slim-scroll max-h-full w-full overflow-y-auto rounded-[12px] border border-white/[0.1] bg-[#242423] shadow-[0_16px_48px_rgba(0,0,0,0.55)] animate-in fade-in-0 zoom-in-95 duration-150"
+        style={{ maxWidth: width, maxHeight }}
+        className="slim-scroll w-full overflow-y-auto rounded-[11px] border border-white/[0.1] bg-[#242423] shadow-[0_16px_48px_rgba(0,0,0,0.55)] animate-in fade-in-0 zoom-in-95 duration-150"
       >
         <div className="flex items-center justify-between px-4 pb-1 pt-3.5">
           <span className="text-[13px] font-medium text-[#ececea]">{title}</span>

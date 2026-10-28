@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronDown, CodeXml, FileText, MessagesCircle } from 'lucide-react'
+import { CalendarClock, ChevronDown, CodeXml, FileText, MessagesCircle } from 'lucide-react'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable'
 import { SegmentedSwitch, SegmentedSwitchOption } from './components/segmented-switch'
 import { ActionMenu } from './components/action-menu'
@@ -20,6 +20,8 @@ import { RightPanel } from './features/right-panel/right-panel'
 import { getLayout } from './features/right-panel/layouts'
 import { RightPanelProvider, useRightPanel } from './features/right-panel/store'
 import { AiAssistant } from './features/ai-assistant/ai-assistant'
+import { RoutinesPage, RoutineScheduler } from './features/routines/routines-page'
+import { RoutinesProvider } from './features/routines/routines-store'
 import { AuthProvider, useAuth } from './features/auth/auth-store'
 import { AuthFlow } from './features/auth/auth-flow'
 import { OnboardingFlow } from './features/onboarding/onboarding-flow'
@@ -160,6 +162,7 @@ function AppShell(): React.JSX.Element {
 
   // Chat keeps the sidebar focused on chats; Code adds the project file tree there.
   const [mode, setMode] = useState<Mode>(() => (localStorage.getItem('morecode:mode') === 'code' ? 'code' : 'chat'))
+  const [showRoutines, setShowRoutines] = useState(false)
   useEffect(() => {
     try {
       localStorage.setItem('morecode:mode', mode)
@@ -172,10 +175,10 @@ function AppShell(): React.JSX.Element {
   const chatMenu = useChatMenu()
   const copyChat = useCopyChat()
   const { active } = ws
-  const title = active.title
-  // a project the chat belongs to wins; otherwise the folder chosen during setup
+  const title = showRoutines ? 'Routines' : active.title
+  // A loose chat deliberately has no project context. Never fall back to the last folder opened.
   const group = ws.groups.find((g) => g.id === active.projectId)
-  const folder = group?.name ?? account?.project?.name ?? ''
+  const folder = showRoutines ? '' : group?.name ?? ''
 
   // opening a chat that lives in a linked project switches the working folder with it
   const linked = group?.folder
@@ -229,6 +232,13 @@ function AppShell(): React.JSX.Element {
   useEffect(() => {
     reveal.current = { collapsed: rightCollapsed, toggle: toggleRight }
   })
+  // Collapse only when the user closes the last tab. An empty panel can still be
+  // opened manually so people can reach its tab controls and empty states.
+  const previousTabCount = useRef(tabs.length)
+  useEffect(() => {
+    if (previousTabCount.current > 0 && tabs.length === 0 && !rightCollapsed) toggleRight()
+    previousTabCount.current = tabs.length
+  }, [tabs.length, rightCollapsed, toggleRight])
   useEffect(() => {
     const onReveal = (): void => {
       if (reveal.current.collapsed) reveal.current.toggle()
@@ -273,6 +283,7 @@ function AppShell(): React.JSX.Element {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground select-none">
+      <RoutineScheduler />
       <ResizablePanelGroup orientation="horizontal" className="h-full w-full">
         {/* Left sidebar */}
         <ResizablePanel
@@ -300,7 +311,15 @@ function AppShell(): React.JSX.Element {
               arrowsClass="@max-[200px]:hidden"
             />
           </div>
-          <LeftSidebar mode={mode} />
+          <LeftSidebar
+            mode={mode}
+            routinesActive={showRoutines}
+            onOpenRoutines={() => setShowRoutines(true)}
+            onOpenChat={() => {
+              setShowRoutines(false)
+              setMode('chat')
+            }}
+          />
         </ResizablePanel>
 
         <ResizableHandle onToggle={toggleLeft} disabled={leftCollapsed} />
@@ -381,7 +400,11 @@ function AppShell(): React.JSX.Element {
                     </span>
                   </>
                 )}
-                <div className="flex items-center gap-0.5 min-w-0">
+                {showRoutines ? (
+                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-[#e2e2e0]">
+                    <CalendarClock className="h-3.5 w-3.5 text-[#82aaff]" /> Routines
+                  </div>
+                ) : <div className="flex items-center gap-0.5 min-w-0">
                   {ws.renamingId === active.id ? (
                     <InlineRename
                       value={title}
@@ -415,7 +438,7 @@ function AppShell(): React.JSX.Element {
                     )}
                     items={chatMenu(active)}
                   />
-                </div>
+                </div>}
               </div>
             </div>
 
@@ -433,7 +456,7 @@ function AppShell(): React.JSX.Element {
             )}
           </div>
           <div className="flex-1 min-h-0 relative flex flex-col">
-            <AiAssistant />
+            {showRoutines ? <RoutinesPage onBack={() => { setShowRoutines(false); setMode('chat') }} /> : <AiAssistant />}
           </div>
         </ResizablePanel>
 
@@ -443,7 +466,7 @@ function AppShell(): React.JSX.Element {
         <ResizablePanel
           id="sidebar-right"
           panelRef={rightRef}
-          defaultSize={initialWidths.right}
+          defaultSize={rightCollapsed ? 0 : initialWidths.right}
           minSize={RIGHT_MIN_PX}
           maxSize="45%"
           groupResizeBehavior="preserve-pixel-size"
@@ -487,6 +510,7 @@ function OpenChat(): React.JSX.Element {
   return (
     <SkillsProvider>
     <RightPanelProvider>
+    <RoutinesProvider>
       <ChatProvider chatId={activeId}>
         <AppShell />
         <WorkspaceDialogs />
@@ -496,6 +520,7 @@ function OpenChat(): React.JSX.Element {
         <Tour />
         <PlanDialog />
       </ChatProvider>
+    </RoutinesProvider>
     </RightPanelProvider>
     </SkillsProvider>
   )
@@ -520,7 +545,7 @@ export default function App(): React.JSX.Element {
       <SettingsProvider>
         <AuthProvider>
           <Gate />
-          <Toaster position="bottom-right" />
+          <Toaster position="top-center" />
         </AuthProvider>
       </SettingsProvider>
     </TooltipProvider>

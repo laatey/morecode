@@ -7,13 +7,12 @@ import {
   FolderOpen,
   Plus,
   RefreshCw,
-  Search,
-  Sparkles
+  Search
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { IconButton } from '@/components/layout/icon-button'
 import { Markdown } from '@/features/ai-assistant/message-parts'
-import { useChatContext } from '@/features/ai-assistant/chat-context'
+import { useWorkspace } from '@/features/workspace/workspace-store'
 import type { DocInfo, DocMatch, WorkspaceInfo } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 import { takeDocRequest } from '../docs-request'
@@ -61,7 +60,6 @@ function DocViewer({
   startEditing: boolean
   onBack: () => void
 }): React.JSX.Element {
-  const { ask, running } = useChatContext()
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(startEditing)
@@ -96,7 +94,7 @@ function DocViewer({
       setSave(latest.current === next ? 'saved' : 'saving')
     } else {
       setSave('error')
-      toast(res.error)
+      toast.error(res.error)
     }
   }, [doc.path])
 
@@ -153,16 +151,6 @@ function DocViewer({
             </button>
           ))}
         </div>
-        <TabButton
-          disabled={running}
-          onClick={() => {
-            void flush()
-            ask(`Read ${doc.path} and explain what it says in plain language.`)
-          }}
-          className="h-6 text-[11.5px]"
-        >
-          <Sparkles className="h-3 w-3" /> Ask AI
-        </TabButton>
         <IconButton title="Open in your editor" onClick={() => void window.api.docs.open(doc.path)}>
           <ExternalLink className="h-3.5 w-3.5" />
         </IconButton>
@@ -267,6 +255,9 @@ function NewDoc({
 /** "Docs": browse, search, write and read the guides and notes (Markdown files) in your project. */
 export function DocsTab(): React.JSX.Element {
   const available = Boolean(window.api?.docs)
+  const ws = useWorkspace()
+  const project = ws.groups.find((group) => group.id === ws.active.projectId)
+  const hasProject = Boolean(project?.folder)
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null)
   const [docs, setDocs] = useState<DocInfo[] | null>(null)
   const [query, setQuery] = useState('')
@@ -275,15 +266,22 @@ export function DocsTab(): React.JSX.Element {
   const [creating, setCreating] = useState(false)
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (!window.api?.docs) return
+    if (!window.api?.docs || !hasProject) {
+      setWorkspace(null)
+      setDocs([])
+      return
+    }
     setDocs(null)
     const [w, list] = await Promise.all([window.api.workspace.get(), window.api.docs.list()])
     setWorkspace(w)
     setDocs([...list].sort(order))
-  }, [])
+  }, [hasProject])
 
   useEffect(() => {
     void refresh()
+    const on = (): void => void refresh()
+    window.addEventListener('workspace:changed', on)
+    return () => window.removeEventListener('workspace:changed', on)
   }, [refresh])
 
   // another part of the app (like /init) asked for a file to be opened
@@ -307,7 +305,7 @@ export function DocsTab(): React.JSX.Element {
   // search inside the docs too, once a couple of letters are typed
   const q = query.trim()
   useEffect(() => {
-    if (!window.api?.docs || q.length < 2) {
+    if (!window.api?.docs || !hasProject || q.length < 2) {
       setMatches(null)
       return
     }
@@ -321,7 +319,7 @@ export function DocsTab(): React.JSX.Element {
       cancelled = true
       clearTimeout(id)
     }
-  }, [q])
+  }, [hasProject, q])
 
   const chooseFolder = async (): Promise<void> => {
     const next = await window.api.workspace.choose()
@@ -349,6 +347,13 @@ export function DocsTab(): React.JSX.Element {
     return (
       <TabEmpty icon={FileText} title="Docs need the desktop app">
         Open MoreCode as a desktop app to read and write the guides and notes in your project folder.
+      </TabEmpty>
+    )
+  }
+  if (!hasProject) {
+    return (
+      <TabEmpty icon={FileText} title="Add this chat to a project first">
+        Loose chats do not read or create project docs. Create a chat in a project or add this chat to one.
       </TabEmpty>
     )
   }
