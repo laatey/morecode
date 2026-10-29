@@ -1,5 +1,8 @@
 import { ipcMain, type WebContents } from 'electron'
 import { getNewProjectRoot } from '../workspace'
+import { authorize } from '../mcp/oauth'
+import { disconnect, disconnectAll, testConnector } from '../mcp/manager'
+import type { McpConfig } from '../mcp/client'
 import { ApiFailure, looksDropped } from './anthropic'
 import { stopAllJobs } from './background'
 import { runAgent, type RunInput, type Style } from './run'
@@ -37,7 +40,24 @@ function valid(p: unknown): p is Payload {
       (typeof x.headers === 'object' &&
         Object.entries(x.headers).every(
           ([k, v]) => /^x-morecode-[a-z-]+$/.test(k) && typeof v === 'string' && v.length < 80
-        )))
+        ))) &&
+    (x.connectors === undefined || (Array.isArray(x.connectors) && x.connectors.length < 30 && x.connectors.every(goodConfig)))
+  )
+}
+
+function goodConfig(c: unknown): c is McpConfig {
+  const x = c as McpConfig
+  return (
+    !!x &&
+    typeof x.id === 'string' &&
+    typeof x.name === 'string' &&
+    (x.kind === 'http' || x.kind === 'stdio') &&
+    (x.url === undefined || typeof x.url === 'string') &&
+    (x.command === undefined || typeof x.command === 'string') &&
+    (x.args === undefined || (Array.isArray(x.args) && x.args.every((a) => typeof a === 'string'))) &&
+    (x.headers === undefined || (typeof x.headers === 'object' && Object.values(x.headers).every((v) => typeof v === 'string'))) &&
+    (x.oauth === undefined || (typeof x.oauth === 'object' && typeof x.oauth.access_token === 'string')) &&
+    (x.env === undefined || (typeof x.env === 'object' && Object.values(x.env).every((v) => typeof v === 'string')))
   )
 }
 
@@ -181,6 +201,20 @@ export function registerAgentIpc(): void {
     checkProvider(check)
   )
 
+  // Connectors: try one (connects and lists its tools), or let one go.
+  ipcMain.handle('mcp:test', (_e, config: unknown) => (goodConfig(config) ? testConnector(config) : { ok: false, error: 'That connector is not set up correctly.' }))
+  ipcMain.handle('mcp:authorize', async (_e, url: unknown) => {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return { ok: false, error: 'Enter the full address, starting with https://' }
+    try {
+      return { ok: true, oauth: await authorize(url) }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+  ipcMain.on('mcp:disconnect', (_e, id: unknown) => {
+    if (typeof id === 'string') disconnect(id)
+  })
+
   ipcMain.handle('agent:revert', (_e, id: string): boolean =>
     typeof id === 'string' ? revertEdit(id) : false
   )
@@ -193,4 +227,5 @@ export function registerAgentIpc(): void {
 export function stopAllAgents(): void {
   runs.forEach((r) => r.abort.abort())
   stopAllJobs()
+  disconnectAll()
 }

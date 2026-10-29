@@ -139,3 +139,6 @@ export const Wand2 = make(H.MagicWand01Icon)
 export const WifiOff = make(H.WifiOff01Icon)
 export const X = make(H.Cancel01Icon)
 export const XCircle = make(H.CancelCircleIcon)
+
+export const SlidersHorizontal = make(H.SlidersHorizontalIcon)
+export const Briefcase = make(H.Briefcase01Icon)

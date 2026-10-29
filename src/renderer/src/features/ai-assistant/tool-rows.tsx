@@ -4,6 +4,8 @@ import { DiffView } from '@/components/diff-view'
 import { Tip } from '@/components/tooltip'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useConnectors } from '@/features/connectors/connectors-store'
+import { ConnectorLogo } from '@/features/connectors/logo'
 import { useRightPanel } from '@/features/right-panel/store'
 import { useChatContext } from './chat-context'
 import { PermissionCard } from './permission-card'
@@ -102,12 +104,59 @@ function MiniAction({
   )
 }
 
+const clipJson = (v: unknown): string => {
+  const t = typeof v === 'string' ? v : JSON.stringify(v, null, 2)
+  return t.length > 4000 ? `${t.slice(0, 4000)}\n…` : t
+}
+
+function Block({ label, text, error }: { label: string; text: string; error?: boolean }): React.JSX.Element {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#a9a9a4]">{label}</div>
+      <pre
+        className={cn(
+          'slim-scroll max-h-[220px] overflow-auto whitespace-pre-wrap break-words border-l-2 border-[#4a4a45] pl-3 font-mono text-[11.5px] leading-[18px] select-text',
+          error ? 'text-[var(--diff-del)]' : 'text-[#d6d6d3]'
+        )}
+      >
+        {text}
+      </pre>
+    </div>
+  )
+}
+
+/** A connector call: logo, tool, service, time. Opens to the exact input and output, with no card around it. */
+function McpRow({ tool }: { tool: Extract<ToolBlock, { kind: 'mcp' }> }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const { get } = useConnectors()
+  const c = get(tool.connectorId)
+  return (
+    <div>
+      <Row expandable open={open} onToggle={() => setOpen((o) => !o)} status={tool.status === 'done' ? undefined : tool.status}>
+        <ConnectorLogo id={c?.catalogId ?? tool.connectorId} domain={c?.domain} name={tool.connector} size={16} className="rounded-[4px]" />
+        <span className="min-w-0 truncate font-mono text-[12px] text-[#e2e2e0]">{tool.tool}</span>
+        <span className="shrink-0 text-muted-foreground">{tool.connector}</span>
+        <span className="flex-1" />
+        {tool.ms !== undefined && <span className="shrink-0 text-[11.5px] tabular-nums text-muted-foreground/70">{(tool.ms / 1000).toFixed(2)}s</span>}
+        {tool.status === 'done' && <Check className="h-3 w-3 shrink-0 text-[var(--diff-add)]" />}
+      </Row>
+      {open && (
+        <div className="ml-[22px] mt-1 mb-1.5 flex flex-col gap-3 pr-1">
+          <Block label="Input" text={clipJson(tool.input)} />
+          {tool.output !== undefined && <Block label="Output" text={clipJson(tool.output)} error={tool.status === 'error'} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const { openTab } = useRightPanel()
   const { reviewOne } = useChatContext()
 
   if (tool.kind === 'permission') return <PermissionCard tool={tool} />
+  if (tool.kind === 'mcp') return <McpRow tool={tool} />
 
   if (tool.kind === 'read') {
     const names = tool.paths.map((p) => p.split('/').pop() ?? p)

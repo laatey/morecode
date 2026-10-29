@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import { ApiFailure, streamMessage, type ApiMessage, type ContentBlock } from './anthropic'
+import { openRuntime, type McpRuntime } from '../mcp/manager'
+import type { McpConfig } from '../mcp/client'
 import { executeTool, projectTree, TOOL_DEFS, type Decision, type PermissionAction } from './tools'
 
 export type Style = 'new' | 'some' | 'pro'
@@ -39,6 +41,8 @@ export interface RunInput {
   progress?: string
   /** No tools: the model can only answer in text. */
   noTools?: boolean
+  /** Connectors the person switched on (with their sign-in details). */
+  connectors?: McpConfig[]
   runId: string
   /** Extra headers for the MoreCode server (never sent to anyone else). */
   headers?: Record<string, string>
@@ -178,8 +182,11 @@ function userContent(input: RunInput): ContentBlock[] {
 /** One whole request: keep asking the model and running its tools until it has finished. */
 export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
   const hasProject = Boolean(input.projectPath)
-  const system = buildSystem(input.cwd, input.style, hasProject, input.progress ?? '')
-  const tools = input.noTools ? [] : TOOL_DEFS
+  const mcp: McpRuntime | null = input.noTools ? null : await openRuntime(input.connectors ?? [], input.cwd, io.signal)
+  const system =
+    buildSystem(input.cwd, input.style, hasProject, input.progress ?? '') +
+    (mcp ? `\n\nConnected connectors: ${mcp.names.join(', ')}. Their tools start with mcp__. Use them when the task needs that service's data or actions, and say which one you used.` : '')
+  const tools = input.noTools ? [] : [...TOOL_DEFS, ...(mcp?.defs ?? [])]
   const past = buildHistory(input.history)
   const next = userContent(input)
   // two person turns in a row are not allowed, so a trailing one (a summary, or a message that never got a reply) rides along with the new prompt
@@ -239,6 +246,7 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
     emit: (tool: Record<string, unknown>) => io.emit({ type: 'tool', tool }),
     ask: io.ask,
     delegate,
+    mcp,
     editFailures: new Map<string, number>()
   }
 

@@ -5,7 +5,18 @@ import { ContextPanel } from './context-panel'
 import { HelpPanel } from './help-panel'
 import { ModelPanel } from './model-panel'
 import { UsagePanel } from './usage-panel'
-import { SkillsPanel } from './skills-panel'
+import { useEffect } from 'react'
+
+/** Skills now live on the Customize page. */
+function OpenCustomize({ onClose }: { onClose: () => void }): null {
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('app:open-customize', { detail: 'skills' }))
+    onClose()
+    // once, when the command is chosen
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return null
+}
 
 export interface PanelContext {
   model: string
@@ -34,9 +45,8 @@ export function CommandPanel({
     case 'model':
       return <ModelPanel ctx={ctx} onClose={onClose} />
     case 'skills':
-      return <SkillsPanel initialTab="mine" onClose={onClose} />
     case 'commands':
-      return <SkillsPanel initialTab="commands" onClose={onClose} />
+      return <OpenCustomize onClose={onClose} />
     case 'help':
       return <HelpPanel onClose={onClose} />
   }

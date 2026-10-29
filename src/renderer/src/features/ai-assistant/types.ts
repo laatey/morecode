@@ -64,6 +64,18 @@ export type ToolBlock =
     }
   | { kind: 'todos'; id: string; items: TodoItem[] }
   | { kind: 'agent'; id: string; task: string; status: ToolStatus; steps: number; report?: string }
+  | {
+      /** A call to a tool from one of the person's connectors. */
+      kind: 'mcp'
+      id: string
+      connectorId: string
+      connector: string
+      tool: string
+      input: Record<string, unknown>
+      output?: string
+      status: ToolStatus
+      ms?: number
+    }
   | { kind: 'read'; id: string; paths: string[]; status: ToolStatus; error?: string }
   | ({ kind: 'permission'; state: PermissionState } & PermissionRequest)
   | {

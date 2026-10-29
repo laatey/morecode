@@ -1,5 +1,5 @@
 import { Toaster as Sonner } from 'sonner'
-import { AlertCircle, Check, Info, Loader, Alert } from 'fluid-icons/react'
+import { AlertCircle, Check, Loader, Alert } from 'fluid-icons/react'
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { CalendarClock, ChevronDown, CodeXml, FileText, MessagesCircle } from '@/components/icons'
+import { CalendarClock, ChevronDown, Briefcase, CodeXml, FileText, MessagesCircle } from '@/components/icons'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable'
 import { SegmentedSwitch, SegmentedSwitchOption } from './components/segmented-switch'
 import { ActionMenu } from './components/action-menu'
@@ -31,6 +31,8 @@ import { ChatProvider } from './features/ai-assistant/chat-context'
 import { WorkspaceProvider, useWorkspace } from './features/workspace/workspace-store'
 import { InlineRename, WorkspaceDialogs } from './features/workspace/dialogs'
 import { useChatMenu, useCopyChat } from './features/workspace/chat-menu'
+import { CustomizePage } from './features/customize/customize-page'
+import { ConnectorsProvider } from './features/connectors/connectors-store'
 import { SkillsProvider } from './features/skills/skills-store'
 import { Toaster } from './components/ui/sonner'
 import { TooltipProvider } from './components/tooltip'
@@ -162,7 +164,34 @@ function AppShell(): React.JSX.Element {
 
   // Chat keeps the sidebar focused on chats; Code adds the project file tree there.
   const [mode, setMode] = useState<Mode>(() => (localStorage.getItem('morecode:mode') === 'code' ? 'code' : 'chat'))
-  const [showRoutines, setShowRoutines] = useState(false)
+  // which page is open (chat, routines or customize) is remembered too
+  const [page, setPage] = useState<'chat' | 'routines' | 'customize'>(() => {
+    const v = localStorage.getItem('morecode:page')
+    return v === 'routines' || v === 'customize' ? v : 'chat'
+  })
+  const showRoutines = page === 'routines'
+  const showCustomize = page === 'customize'
+  const setShowRoutines = (on: boolean): void => setPage(on ? 'routines' : 'chat')
+  const setShowCustomize = (on: boolean): void => setPage(on ? 'customize' : 'chat')
+  useEffect(() => {
+    try {
+      localStorage.setItem('morecode:page', page)
+    } catch {
+      // harmless
+    }
+  }, [page])
+  useEffect(() => {
+    const open = (e: Event): void => {
+      try {
+        localStorage.setItem('morecode:customize-tab', String((e as CustomEvent<string>).detail ?? 'skills'))
+      } catch {
+        // harmless
+      }
+      setPage('customize')
+    }
+    window.addEventListener('app:open-customize', open)
+    return () => window.removeEventListener('app:open-customize', open)
+  }, [])
   useEffect(() => {
     try {
       localStorage.setItem('morecode:mode', mode)
@@ -175,10 +204,10 @@ function AppShell(): React.JSX.Element {
   const chatMenu = useChatMenu()
   const copyChat = useCopyChat()
   const { active } = ws
-  const title = showRoutines ? 'Routines' : active.title
+  const title = showRoutines ? 'Routines' : showCustomize ? 'Customize' : active.title
   // A loose chat deliberately has no project context. Never fall back to the last folder opened.
   const group = ws.groups.find((g) => g.id === active.projectId)
-  const folder = showRoutines ? '' : group?.name ?? ''
+  const folder = showRoutines || showCustomize ? '' : group?.name ?? ''
 
   // opening a chat that lives in a linked project switches the working folder with it
   const linked = group?.folder
@@ -289,7 +318,7 @@ function AppShell(): React.JSX.Element {
         <ResizablePanel
           id="sidebar-left"
           panelRef={leftRef}
-          defaultSize={initialWidths.left}
+          defaultSize={leftCollapsed ? 0 : initialWidths.left}
           minSize={LEFT_MIN_PX}
           maxSize="45%"
           groupResizeBehavior="preserve-pixel-size"
@@ -314,7 +343,9 @@ function AppShell(): React.JSX.Element {
           <LeftSidebar
             mode={mode}
             routinesActive={showRoutines}
+            customizeActive={showCustomize}
             onOpenRoutines={() => setShowRoutines(true)}
+            onOpenCustomize={() => setShowCustomize(true)}
             onOpenChat={() => {
               setShowRoutines(false)
               setMode('chat')
@@ -402,7 +433,11 @@ function AppShell(): React.JSX.Element {
                 )}
                 {showRoutines ? (
                   <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-[#e2e2e0]">
-                    <CalendarClock className="h-3.5 w-3.5 text-[#82aaff]" /> Routines
+                    <CalendarClock className="h-3.5 w-3.5 text-white" /> Routines
+                  </div>
+                ) : showCustomize ? (
+                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-[#e2e2e0]">
+                    <Briefcase className="h-3.5 w-3.5 text-white" /> Customize
                   </div>
                 ) : <div className="flex items-center gap-0.5 min-w-0">
                   {ws.renamingId === active.id ? (
@@ -456,7 +491,7 @@ function AppShell(): React.JSX.Element {
             )}
           </div>
           <div className="flex-1 min-h-0 relative flex flex-col">
-            {showRoutines ? <RoutinesPage onBack={() => { setShowRoutines(false); setMode('chat') }} /> : <AiAssistant />}
+            {showCustomize ? <CustomizePage /> : showRoutines ? <RoutinesPage onBack={() => { setShowRoutines(false); setMode('chat') }} /> : <AiAssistant />}
           </div>
         </ResizablePanel>
 
@@ -509,6 +544,7 @@ function OpenChat(): React.JSX.Element {
   const { activeId } = useWorkspace()
   return (
     <SkillsProvider>
+    <ConnectorsProvider>
     <RightPanelProvider>
     <RoutinesProvider>
       <ChatProvider chatId={activeId}>
@@ -522,6 +558,7 @@ function OpenChat(): React.JSX.Element {
       </ChatProvider>
     </RoutinesProvider>
     </RightPanelProvider>
+    </ConnectorsProvider>
     </SkillsProvider>
   )
 }

@@ -17,6 +17,18 @@ const STORAGE_KEY = 'morecode:sidebar-widths'
 const DEFAULTS: Record<Side, number> = { left: LEFT_DEFAULT_PX, right: RIGHT_DEFAULT_PX }
 const MINS: Record<Side, number> = { left: LEFT_MIN_PX, right: RIGHT_MIN_PX }
 
+const COLLAPSED_KEY = 'morecode:sidebar-collapsed'
+
+/** Which sidebars the person left closed. The secondary one starts closed until they open it. */
+function loadCollapsed(): Record<Side, boolean> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '{}')
+    return { left: raw.left === true, right: raw.right !== false }
+  } catch {
+    return { left: false, right: true }
+  }
+}
+
 function loadWidths(): Record<Side, number> {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
@@ -54,10 +66,27 @@ export function useResponsiveSidebars(): {
   const leftRef = usePanelRef()
   const rightRef = usePanelRef()
   const [initialWidths] = useState(loadWidths)
-  const [leftCollapsed, setLeftCollapsed] = useState(false)
-  // The secondary sidebar has no useful empty state. Start it closed; opening a
-  // right-panel tab will reveal it through the shell's right-panel:reveal event.
-  const [rightCollapsed, setRightCollapsed] = useState(true)
+  const [saved] = useState(loadCollapsed)
+  const [leftCollapsed, setLeftCollapsed] = useState(saved.left)
+  // The secondary sidebar has no useful empty state, so it starts closed the first time; after that it
+  // comes back the way the person left it.
+  const [rightCollapsed, setRightCollapsed] = useState(saved.right)
+  const pref = useRef<Record<Side, boolean>>({ ...saved })
+  // ignore the sizes the panels report while they are first laid out
+  const ready = useRef(false)
+  useEffect(() => {
+    const t = setTimeout(() => (ready.current = true), 700)
+    return () => clearTimeout(t)
+  }, [])
+  const remember = useCallback((side: Side, closed: boolean) => {
+    if (pref.current[side] === closed) return
+    pref.current[side] = closed
+    try {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(pref.current))
+    } catch {
+      // best effort
+    }
+  }, [])
 
   const widths = useRef<Record<Side, number>>({ ...initialWidths })
   const auto = useRef<Record<Side, boolean>>({ left: false, right: false })
@@ -79,15 +108,16 @@ export function useResponsiveSidebars(): {
       const panel = refFor(side).current
       if (!panel) return
       busy.current = true
+      auto.current[side] = collapse && byAuto // before the resize event it causes, so it is not taken for the person's choice
       if (collapse && !panel.isCollapsed()) panel.collapse()
       if (!collapse && panel.isCollapsed()) {
         panel.expand()
         panel.resize(widths.current[side]) // exact remembered width, not the library's guess
       }
       busy.current = false
-      auto.current[side] = collapse && byAuto
+      if (!byAuto) remember(side, collapse)
     },
-    [refFor]
+    [refFor, remember]
   )
 
   const reconcile = useCallback(() => {
@@ -132,6 +162,7 @@ export function useResponsiveSidebars(): {
       const collapsed = px < 1
       if (side === 'left') setLeftCollapsed(collapsed)
       else setRightCollapsed(collapsed)
+      if (ready.current && !busy.current && !auto.current[side]) remember(side, collapsed)
       if (collapsed) return
       auto.current[side] = false // gained width by any route => no longer "auto" collapsed
       // Remember widths only when they are a real, unconstrained size.
@@ -140,7 +171,7 @@ export function useResponsiveSidebars(): {
         persist()
       }
     },
-    [persist]
+    [persist, remember]
   )
 
   return {

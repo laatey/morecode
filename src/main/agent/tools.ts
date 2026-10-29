@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSyn
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { ToolDef } from './anthropic'
 import { diffFiles } from './diff'
+import { resultText } from '../mcp/client'
+import type { McpRuntime } from '../mcp/manager'
 import { dropJob, getJob, listJobs, seconds, startJob, stopJob, takeNew, waitForJob, type Job } from './background'
 
 /**
@@ -23,6 +25,8 @@ export interface ToolContext {
   emit: (tool: Record<string, unknown>) => void
   ask: (req: { id: string; action: PermissionAction; title: string; command: string; reason?: string }) => Promise<Decision>
   runId: string
+  /** Tools from the person's connected connectors, when any are switched on. */
+  mcp?: McpRuntime | null
 }
 
 export interface ToolResult {
@@ -595,11 +599,41 @@ export const TOOL_DEFS: ToolDef[] = [
   }
 ]
 
+/** One call to a connector's tool: asks first when the person asked it to, shows a row, returns text for the model. */
+async function callConnector(ctx: ToolContext, id: string, name: string, input: Input): Promise<ToolResult> {
+  const hit = ctx.mcp?.find(name)
+  if (!hit) throw new Error('That connector is not connected right now.')
+  const label = hit.config.name
+  const row = { kind: 'mcp', id, connectorId: hit.config.id, connector: label, tool: hit.tool, input }
+  const perm = hit.config.perms?.[hit.tool] ?? (hit.readOnly ? 'allow' : 'ask')
+  if (perm === 'block') return { content: `The person has blocked ${hit.tool} in Customize.`, isError: true }
+  let always = false
+  if (perm === 'ask') {
+    const shown = JSON.stringify(input)
+    const d = await ctx.ask({ id: `${id}:ask`, action: 'network', title: `Use ${label}: ${hit.tool}`, command: shown.length > 400 ? `${shown.slice(0, 400)}…` : shown, reason: `Connector: ${label}` })
+    if (d === 'deny') return { content: 'The person did not allow this call.', isError: true }
+    always = d === 'always'
+  }
+  ctx.emit({ ...row, status: 'running', ...(always ? { always: true } : {}) })
+  const started = Date.now()
+  try {
+    const r = await hit.client.call(hit.tool, input, AbortSignal.any([ctx.signal, AbortSignal.timeout(90_000)]))
+    const text = resultText(r)
+    ctx.emit({ ...row, status: r.isError ? 'error' : 'done', output: text.slice(0, 6000), ms: Date.now() - started })
+    return { content: clip(text), isError: r.isError }
+  } catch (err) {
+    const message = (err as Error).message
+    ctx.emit({ ...row, status: 'error', output: message, ms: Date.now() - started })
+    return { content: message, isError: true }
+  }
+}
+
 export async function executeTool(name: string, id: string, input: Input, ctx: ToolContext): Promise<ToolResult> {
   try {
     if ((input as { __invalid?: boolean }).__invalid) {
       throw new Error('Your tool call arrived cut off or was not valid JSON, so nothing ran. Send it again. For a big file, write it in smaller pieces.')
     }
+    if (name.startsWith('mcp__')) return await callConnector(ctx, id, name, input)
     switch (name) {
       case 'list_dir':
         return listDir(ctx, id, input)

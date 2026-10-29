@@ -26,6 +26,7 @@ export function PanelFrame({
   actions,
   width = 420,
   maxHeight = '100%',
+  embedded,
   children
 }: {
   title: string
@@ -33,15 +34,20 @@ export function PanelFrame({
   actions?: React.ReactNode
   width?: number
   maxHeight?: string
+  /** Drop the floating frame and title: the page around it provides them. */
+  embedded?: boolean
   children: React.ReactNode
 }): React.JSX.Element {
   useEffect(() => {
+    if (embedded) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, embedded])
+
+  if (embedded) return <div className="w-full">{children}</div>
 
   return (
     <div
@@ -144,8 +150,8 @@ export function MiniTabs<T extends string>({
           className={cn(
             'cursor-pointer rounded-[6px] px-2.5 py-1 text-[12px] transition-colors',
             o.value === value
-              ? 'bg-white/[0.1] text-[#ececea]'
-              : 'text-[#8d8d8a] hover:bg-white/[0.05] hover:text-[#d6d6d3]'
+              ? 'bg-[#ececea] font-medium text-[#1a1a19]'
+              : 'text-[#9a9a95] hover:bg-[#30302e] hover:text-white'
           )}
         >
           {o.label}

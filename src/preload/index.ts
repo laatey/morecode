@@ -64,6 +64,32 @@ export interface AgentStart {
   baseUrl?: string
   projectPath?: string
   headers?: Record<string, string>
+  connectors?: McpConfig[]
+}
+export interface McpConfig {
+  id: string
+  name: string
+  kind: 'http' | 'stdio'
+  url?: string
+  headers?: Record<string, string>
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  perms?: Record<string, 'allow' | 'ask' | 'block'>
+  oauth?: McpOAuth
+}
+export interface McpOAuth {
+  access_token: string
+  refresh_token?: string
+  expires_at?: number
+  client_id: string
+  token_endpoint: string
+}
+export interface McpTestResult {
+  ok: boolean
+  error?: string
+  serverName?: string
+  tools?: { name: string; description?: string; readOnly?: boolean }[]
 }
 export interface AgentUsage {
   model: string
@@ -132,6 +158,12 @@ const api = {
         | { provider: 'gateway'; key: string; endpoint: string }
     ): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('agent:test-provider', check),
     onEvent: (cb: (m: AgentMessage) => void): (() => void) => listen('agent:event', cb)
+  },
+  mcp: {
+    test: (config: McpConfig): Promise<McpTestResult> => ipcRenderer.invoke('mcp:test', config),
+    authorize: (url: string): Promise<{ ok: boolean; error?: string; oauth?: McpOAuth }> => ipcRenderer.invoke('mcp:authorize', url),
+    onTokens: (cb: (m: { id: string; oauth: McpOAuth }) => void): (() => void) => listen('mcp:tokens', cb),
+    disconnect: (id: string): void => ipcRenderer.send('mcp:disconnect', id)
   },
   /** Calls to the MoreCode server, made by the desktop shell so the browser's CORS rules do not apply. Null = no answer. */
   http: {

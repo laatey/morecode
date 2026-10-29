@@ -288,7 +288,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
         </button>
         <header className="mb-7 flex items-start justify-between gap-4">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-[#82aaff]">
+            <div className="mb-2 flex items-center gap-2 text-white">
               <CalendarClock className="h-4 w-4" />
               <span className="text-[11px] font-medium uppercase tracking-[0.1em]">Automation</span>
             </div>
@@ -450,7 +450,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
                       </span>
                     </div>
                     <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[#b7b7b2]">
-                      <CalendarClock className="h-3.5 w-3.5 text-[#82aaff]" />{' '}
+                      <CalendarClock className="h-3.5 w-3.5 text-white" />{' '}
                       {describe(routine.cadence, routine.time, routine.weekday)} · {projectName(routine.projectId)}
                     </p>
                     <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-[12px] leading-5 text-muted-foreground">

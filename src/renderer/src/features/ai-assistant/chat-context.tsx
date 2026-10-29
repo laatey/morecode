@@ -16,6 +16,7 @@ import { recordPlans } from '@/features/right-panel/plan-history'
 import { forgetSessionEdit, recordSessionEdit, recordUsage } from '@/features/billing/usage-log'
 import { mockAgent } from './agent/mock-agent'
 import { makeRealRunner, type RealConfig } from './agent/real-agent'
+import { useConnectors } from '@/features/connectors/connectors-store'
 import { toast } from 'sonner'
 import { routeFor } from './ai-route'
 import { resolveModel } from './models'
@@ -31,7 +32,8 @@ type ChatApi = Omit<BaseChat, 'retry' | 'edit' | 'send'> & {
     images: string[],
     model: string,
     autoAccept: boolean,
-    attachments?: Attachment[]
+    attachments?: Attachment[],
+    shown?: string
   ) => boolean
   /** Run the message before this reply again. */
   retry: (agentId: string, modelOverride?: string) => void
@@ -92,6 +94,7 @@ export function ChatProvider({
       }),
     [settings, account, service.hosted]
   )
+  const { forRun: connectorsForRun } = useConnectors()
   const config = useMemo<RealConfig>(() => {
     const projectPath = groups.find((group) => group.id === active.projectId)?.folder
     return {
@@ -102,6 +105,7 @@ export function ChatProvider({
       missing: route.missing,
       projectPath,
       style: account?.profile?.experience ?? 'some',
+      connectors: connectorsForRun,
       onUsage: (u) => {
         recordUsage(account?.id ?? 'guest', {
           model: u.model,
@@ -116,7 +120,7 @@ export function ChatProvider({
         if (route.kind === 'subscription') refreshAccount()
       }
     }
-  }, [route, account, active.projectId, groups, refreshAccount])
+  }, [route, account, active.projectId, groups, refreshAccount, connectorsForRun])
   const runner = useMemo<AgentRunner>(
     () =>
       typeof window !== 'undefined' && window.api?.agent
@@ -186,10 +190,11 @@ export function ChatProvider({
       images: string[],
       model: string,
       autoAccept: boolean,
-      attachments?: Attachment[]
+      attachments?: Attachment[],
+      shown?: string
     ): boolean => {
       if (!admit()) return false
-      send(prompt, images, model, autoAccept, attachments)
+      send(prompt, images, model, autoAccept, attachments, shown)
       return true
     },
     [send, admit]

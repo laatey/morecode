@@ -183,6 +183,7 @@ function currentActivity(parts: Part[]): string {
     if (t.kind === 'thinking') return 'Thinking…'
     if (t.kind === 'edit') return `Editing ${t.path.split('/').pop()}`
     if (t.kind === 'agent') return 'A helper is researching'
+    if (t.kind === 'mcp') return `Using ${t.connector}`
     if (t.kind === 'read') return 'Reading files'
     if (t.kind === 'command') return t.label
   }

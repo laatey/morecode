@@ -9,6 +9,7 @@ import {
   Pin,
   Plus,
   Search,
+  Briefcase,
   SquarePen
 } from '@/components/icons'
 import { ActionMenu } from '@/components/action-menu'
@@ -207,14 +208,19 @@ function FilesSection(): React.JSX.Element {
 export function LeftSidebar({
   mode,
   onOpenRoutines,
+  onOpenCustomize,
   onOpenChat,
-  routinesActive
+  routinesActive,
+  customizeActive
 }: {
   mode: 'chat' | 'code'
   onOpenRoutines: () => void
+  onOpenCustomize: () => void
   onOpenChat: () => void
   routinesActive: boolean
+  customizeActive: boolean
 }): React.JSX.Element {
+  const onPage = routinesActive || customizeActive
   const ws = useWorkspace()
   const [view, setView] = useState<'active' | 'archived'>('active')
   const [shut, setShut] = useState<Set<string>>(new Set())
@@ -258,6 +264,17 @@ export function LeftSidebar({
                 <CalendarClock className={SMALL} />
               </span>
               Routines
+            </button>
+            <button
+              type="button"
+              onClick={onOpenCustomize}
+              aria-current={customizeActive ? 'page' : undefined}
+              className={cn(NAV, customizeActive && 'bg-white/[0.09] text-foreground')}
+            >
+              <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
+                <Briefcase className={SMALL} />
+              </span>
+              Customize
             </button>
             <button type="button" onClick={() => ws.setSearchOpen(true)} className={NAV}>
               <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
@@ -355,7 +372,7 @@ export function LeftSidebar({
                         <li className="pl-8 text-[12px] leading-6 text-[#77776f]">No chats yet</li>
                       )}
                       {items.map((c) => (
-                        <ChatRow key={c.id} chat={c} indent suppressSelection={routinesActive} onSelect={onOpenChat} />
+                        <ChatRow key={c.id} chat={c} indent suppressSelection={onPage} onSelect={onOpenChat} />
                       ))}
                     </ul>
                   )}
@@ -368,7 +385,7 @@ export function LeftSidebar({
                 <SectionLabel>Pinned</SectionLabel>
                 <ul className="flex flex-col gap-px">
                   {pinned.map((c) => (
-                    <ChatRow key={c.id} chat={c} suppressSelection={routinesActive} onSelect={onOpenChat} />
+                    <ChatRow key={c.id} chat={c} suppressSelection={onPage} onSelect={onOpenChat} />
                   ))}
                 </ul>
               </>
@@ -406,7 +423,7 @@ export function LeftSidebar({
         </SectionLabel>
         <ul className="flex flex-col gap-px">
           {(view === 'archived' ? visible.sort(byRecent) : loose).map((c) => (
-            <ChatRow key={c.id} chat={c} suppressSelection={routinesActive} onSelect={onOpenChat} />
+            <ChatRow key={c.id} chat={c} suppressSelection={onPage} onSelect={onOpenChat} />
           ))}
         </ul>
         {view === 'archived' && visible.length === 0 && (

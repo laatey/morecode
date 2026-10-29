@@ -18,6 +18,8 @@ export interface RealConfig {
   projectPath?: string
   /** Called with the real token counts after every step the AI takes. */
   onUsage: (detail: UsageDetail) => void
+  /** The connectors switched on, with their sign-in details, read when a request starts. */
+  connectors?: () => NonNullable<Parameters<Window['api']['agent']['start']>[0]['connectors']>
 }
 
 /**
@@ -72,7 +74,8 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         history: req.history,
         progress: req.progress,
         noTools: req.noTools,
-        style: cfg.style
+        style: cfg.style,
+        connectors: cfg.connectors?.()
       })
       if (!started) throw new AgentError('failed', 'Could not start the AI. Please try again.')
 
@@ -83,6 +86,9 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         if (m.kind === 'error') throw new AgentError(m.error.kind, m.error.message, m.error.retryAfter)
         if (m.kind !== 'evt') continue
         const e = m.evt
+        if (e.type === 'tool' && e.tool.kind === 'mcp' && e.tool.always) {
+          window.dispatchEvent(new CustomEvent('connector:always', { detail: { id: e.tool.connectorId, tool: e.tool.tool } }))
+        }
         if (e.type === 'tool') yield { type: 'tool', tool: e.tool as unknown as ToolBlock }
         else if (e.type === 'text') yield { type: 'text', delta: e.delta }
         else if (e.type === 'project') {

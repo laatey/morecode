@@ -9,7 +9,8 @@ export const SECRET_NAMES = {
   sessions: 'morecode:sessions:v1',
   keys: 'morecode:keys:v1',
   openRouter: 'morecode:openrouter-key',
-  gateway: 'morecode:gateway-key'
+  gateway: 'morecode:gateway-key',
+  connectors: 'morecode:connector-secrets:v1'
 } as const
 
 const cache = new Map<string, string>()

@@ -29,23 +29,26 @@ const prefill = (text: string): void => {
 function Tile({ icon }: { icon: string }): React.JSX.Element {
   const Icon = skillIcon(icon)
   return (
-    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] bg-white/[0.06] text-[#b4b4b1]">
+    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] bg-[#33332f] text-[#e2e2e0]">
       <Icon className="h-3.5 w-3.5" />
     </span>
   )
 }
 
-const label = 'mb-1 block text-[12px] text-[#a8a8a6]'
+const label = 'mb-1 block text-[12px] font-medium text-[#e2e2e0]'
 const area =
-  'slim-scroll w-full resize-none rounded-[5px] border border-white/[0.09] bg-[#222220] px-2 py-1.5 text-[12px] leading-[18px] text-[#ededeb] outline-none transition-colors placeholder:text-[#737370] focus:border-white/[0.22]'
+  'slim-scroll w-full resize-none rounded-[5px] border border-[#3a3a37] bg-[#272726] px-2.5 py-2 text-[12.5px] leading-[18px] text-white outline-none transition-colors placeholder:text-[#9a9a95] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]'
 
 /** Skills library, the person's own skills, and their own / commands. */
 export function SkillsPanel({
   initialTab,
-  onClose
+  onClose,
+  embedded
 }: {
   initialTab: string
   onClose: () => void
+  /** Shown inside the Customize page instead of as a floating panel. */
+  embedded?: boolean
 }): React.JSX.Element {
   const [tab, setTab] = useState<Tab>(initialTab === 'commands' ? 'commands' : 'mine')
   const [view, setView] = useState<View>({ name: 'list' })
@@ -67,7 +70,7 @@ export function SkillsPanel({
             : 'Skills'
 
   return (
-    <PanelFrame title={title} onClose={onClose} width={400} maxHeight="50%">
+    <PanelFrame title={title} onClose={onClose} width={400} maxHeight="50%" embedded={embedded}>
       {view.name === 'list' && (
         <ListView tab={tab} setTab={setTab} setView={setView} onClose={onClose} />
       )}
@@ -176,7 +179,7 @@ function ListView({
                   <button
                     type="button"
                     onClick={() => setView({ name: 'command', id: c.id })}
-                    className="flex w-full cursor-pointer items-center gap-3 rounded-[8px] px-2 py-2 text-left transition-colors hover:bg-white/[0.05]"
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-[8px] px-2 py-2 text-left transition-colors hover:bg-[#30302e]"
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block text-[12.5px] text-[#ececea]">/{c.id}</span>
@@ -193,7 +196,7 @@ function ListView({
         </div>
       )}
 
-      <div className="mt-4 flex justify-end border-t border-white/[0.07] pt-3">
+      <div className="mt-4 flex justify-end border-t border-[#323230] pt-3">
         <Btn onClick={onClose}>Done</Btn>
       </div>
     </div>
@@ -212,7 +215,7 @@ function SkillRow({
   onOpen: () => void
 }): React.JSX.Element {
   return (
-    <li className="flex items-center gap-1 rounded-[8px] pr-2 transition-colors hover:bg-white/[0.04]">
+    <li className="flex items-center gap-1 rounded-[8px] pr-2 transition-colors hover:bg-[#30302e]">
       <button
         type="button"
         onClick={onOpen}
@@ -223,7 +226,7 @@ function SkillRow({
           <span className="flex items-center gap-1.5 text-[12.5px] text-[#ececea]">
             {skill.name}
             {custom && (
-              <span className="rounded-full bg-white/[0.07] px-1.5 text-[10px] leading-[15px] text-[#a8a8a6]">
+              <span className="rounded-full bg-[#44443f] px-1.5 text-[10px] font-medium leading-[15px] text-white">
                 yours
               </span>
             )}
@@ -238,7 +241,7 @@ function SkillRow({
 
 function Empty({ text, action }: { text: string; action?: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="flex flex-col items-center gap-2.5 rounded-[8px] border border-dashed border-white/[0.1] px-4 py-7 text-center text-[12.5px] text-[#8d8d8a]">
+    <div className="flex flex-col items-center gap-2.5 rounded-[8px] border border-dashed border-[#5a5a54] px-4 py-7 text-center text-[12.5px] text-[#c9c9c6]">
       {text}
       {action}
     </div>
@@ -294,7 +297,7 @@ function DetailView({
 
       <section className="mt-4">
         <h3 className="mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#77776f]">How it works</h3>
-        <ol className="space-y-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03] px-3 py-2.5 text-[12.5px] leading-5 text-[#c9c9c6]">
+        <ol className="space-y-1 rounded-[8px] border border-[#323230] bg-[#272726] px-3 py-2.5 text-[12.5px] leading-5 text-[#c9c9c6]">
           {steps.map((s, i) => (
             <li key={i}>{s}</li>
           ))}
@@ -304,7 +307,7 @@ function DetailView({
       {skill.example && (
         <section className="mt-4">
           <h3 className="mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#77776f]">Try saying</h3>
-          <div className="flex items-center gap-2 rounded-[8px] border border-white/[0.07] bg-white/[0.03] py-1.5 pl-3 pr-1.5">
+          <div className="flex items-center gap-2 rounded-[8px] border border-[#323230] bg-[#272726] py-1.5 pl-3 pr-1.5">
             <span className="min-w-0 flex-1 text-[12.5px] italic text-[#c9c9c6]">“{skill.example}”</span>
             <Btn
               onClick={() => {
@@ -330,7 +333,7 @@ function DetailView({
         </section>
       )}
 
-      <div className="mt-5 flex items-center justify-between border-t border-white/[0.07] pt-3">
+      <div className="mt-5 flex items-center justify-between border-t border-[#323230] pt-3">
         {custom ? (
           confirm ? (
             <span className="flex items-center gap-2 text-[12px] text-[#a8a8a6]">
@@ -396,7 +399,7 @@ function BackLink({ onBack }: { onBack: () => void }): React.JSX.Element {
 
 function FileChip({ name, onRemove }: { name: string; onRemove?: () => void }): React.JSX.Element {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] bg-white/[0.07] py-0.5 pl-2 pr-1.5 text-[11.5px] text-[#c9c9c6]">
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] bg-[#44443f] py-0.5 pl-2 pr-1.5 text-[11.5px] text-white">
       <FileText className="h-3 w-3 shrink-0 text-[#8d8d8a]" />
       <span className="truncate">{name}</span>
       {onRemove && (
@@ -528,7 +531,7 @@ function SkillEditor({
                   onClick={() => setIcon(k)}
                   className={cn(
                     'grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] transition-colors',
-                    icon === k ? 'bg-white/[0.14] text-[#ececea]' : 'text-[#8d8d8a] hover:bg-white/[0.06]'
+                    icon === k ? 'bg-[#ececea] text-[#1a1a19]' : 'text-[#9a9a95] hover:bg-[#30302e]'
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -587,7 +590,7 @@ function SkillEditor({
           <p className="mt-1 text-[11.5px] text-[#737370]">Show the AI what a good result looks like.</p>
         </div>
 
-        <section className="rounded-[8px] border border-white/[0.07] bg-white/[0.03] p-3">
+        <section className="rounded-[8px] border border-[#323230] bg-[#272726] p-3">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[12.5px] text-[#ececea]">Test it</div>
@@ -622,7 +625,7 @@ function SkillEditor({
         </section>
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t border-white/[0.07] pt-3">
+      <div className="mt-5 flex items-center justify-between border-t border-[#323230] pt-3">
         <Btn onClick={useInChat}>Save and try in chat</Btn>
         <span className="flex gap-2">
           <Btn onClick={onBack}>Cancel</Btn>
@@ -691,7 +694,7 @@ function CommandEditor({ id, onBack }: { id: string | null; onBack: () => void }
           </p>
         </div>
       </div>
-      <div className="mt-5 flex items-center justify-between border-t border-white/[0.07] pt-3">
+      <div className="mt-5 flex items-center justify-between border-t border-[#323230] pt-3">
         {existing ? (
           confirm ? (
             <span className="flex items-center gap-2 text-[12px] text-[#a8a8a6]">

@@ -101,7 +101,7 @@ export function Toggle({
       onClick={() => onChange(!checked)}
       className={cn(
         'relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6] disabled:cursor-not-allowed disabled:opacity-40',
-        checked ? 'bg-[#3b82f6]' : 'bg-[#3a3a38] hover:bg-[#444442]'
+        checked ? 'bg-[#3b82f6]' : 'bg-[#5a5a54] hover:bg-[#67675f]'
       )}
     >
       <span
@@ -129,7 +129,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex h-7 shrink-0 select-none items-center rounded-[6px] border-0 bg-white/[0.1] p-px"
+      className="inline-flex h-7 shrink-0 select-none items-center rounded-[6px] bg-[#272726] p-px"
     >
       {options.map((o) => {
         const active = o.value === value
@@ -143,8 +143,8 @@ export function Segmented<T extends string>({
             className={cn(
               'flex h-6 cursor-pointer items-center justify-center rounded-[5px] px-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]',
               active
-                ? 'bg-[#3b82f6] text-white'
-                : 'text-[#b4b4b0] hover:text-white'
+                ? 'bg-[#3b82f6] font-medium text-white'
+                : 'text-[#c9c9c6] hover:text-white'
             )}
           >
             {o.label}
@@ -209,7 +209,13 @@ export function Btn({
       variant={variant === 'primary' ? 'default' : variant === 'danger' ? 'destructive' : 'secondary'}
       {...props}
       disabled={props.disabled || busy}
-      className={cn('h-7 rounded-[6px] px-2 text-[12px]', className)}
+      className={cn(
+        'h-8 rounded-[7px] border-transparent px-3 text-[12.5px] font-medium text-white shadow-none',
+        variant === 'primary' && 'bg-[#3b82f6] hover:bg-[#2f6fe0]',
+        variant === 'danger' && 'bg-[#d6453d] hover:bg-[#bf3a33]',
+        variant === 'default' && 'bg-[#33332f] hover:bg-[#3d3d39]',
+        className
+      )}
     >
       {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
       {children}
@@ -225,7 +231,7 @@ export const TextInput = React.forwardRef<
     ref={ref}
     {...props}
     className={cn(
-      'h-7 w-full rounded-[5px] border-0 bg-white/[0.1] px-2 text-[12px] text-[#f1f1ef] outline-none transition-colors placeholder:text-[#aaa9a5] focus:ring-1 focus:ring-[#3b82f6]',
+      'h-8 w-full rounded-[7px] border border-[#3a3a37] bg-[#272726] px-2.5 text-[12.5px] text-white outline-none transition-colors placeholder:text-[#9a9a95] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]',
       className
     )}
   />
