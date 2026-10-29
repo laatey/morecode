@@ -67,6 +67,7 @@ export interface AgentStart {
   noTools?: boolean
   baseUrl?: string
   projectPath?: string
+  chatId?: string
   headers?: Record<string, string>
   connectors?: McpConfig[]
 }
@@ -103,6 +104,16 @@ export interface AgentUsage {
   cacheWrite: number
   contextTokens: number
   ms: number
+}
+export interface BgJob {
+  id: string
+  command: string
+  cwd: string
+  startedAt: number
+  exited: boolean
+  exitCode: number | null
+  stopped: boolean
+  output: string
 }
 export type AgentMessage = { runId: string } & (
   | {
@@ -156,6 +167,10 @@ const api = {
       ipcRenderer.send('agent:permission', runId, id, decision),
     revert: (id: string): Promise<boolean> => ipcRenderer.invoke('agent:revert', id),
     keep: (id: string): void => ipcRenderer.send('agent:keep', id),
+    jobs: (): Promise<BgJob[]> => ipcRenderer.invoke('agent:jobs'),
+    stopJob: (id: string): Promise<boolean> => ipcRenderer.invoke('agent:stop-job', id),
+    dropJob: (id: string): void => ipcRenderer.send('agent:drop-job', id),
+    onJobs: (cb: (jobs: BgJob[]) => void): (() => void) => listen('agent:jobs', cb),
     testProvider: (
       check:
         | { provider: 'anthropic' | 'openrouter'; key: string }
@@ -206,6 +221,11 @@ const api = {
       path: string
     ): Promise<{ ok: true; dataUrl: string } | { ok: false; error: string }> =>
       ipcRenderer.invoke('workspace:read-image', path),
+    /** Read a binary project file (PDF, DOCX, XLSX, audio, video) as base64 for in-app preview. */
+    readBinary: (
+      path: string
+    ): Promise<{ ok: true; base64: string; mime: string } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('workspace:read-binary', path),
     /** Show the project folder in the system file explorer. */
     reveal: (path?: string): Promise<void> => ipcRenderer.invoke('workspace:reveal', path),
     /** Open one project file in the person's default editor. */
@@ -248,6 +268,8 @@ const api = {
       ipcRenderer.invoke('term:cd', cwd, target),
     run: (id: string, command: string, cwd: string): void =>
       ipcRenderer.send('term:run', { id, command, cwd }),
+    input: (id: string, text: string): void =>
+      ipcRenderer.send('term:input', { id, text }),
     kill: (id: string): void => ipcRenderer.send('term:kill', id),
     onData: (cb: (e: TermData) => void): (() => void) => listen('term:data', cb),
     onExit: (cb: (e: TermExit) => void): (() => void) => listen('term:exit', cb)

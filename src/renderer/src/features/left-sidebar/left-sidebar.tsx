@@ -25,6 +25,16 @@ import { requestFilePreview } from '@/features/right-panel/file-preview-request'
 import { useRightPanel } from '@/features/right-panel/store'
 
 const SMALL = 'h-[14px] w-[14px] stroke-[1.7]'
+const SHUT_PROJECTS_KEY = 'morecode:shut-projects'
+
+function loadShutProjects(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SHUT_PROJECTS_KEY) ?? '[]')
+    return new Set(Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
 const NAV =
   'flex h-7 w-full cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-[#d4d4d2] transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
 
@@ -211,7 +221,8 @@ export function LeftSidebar({
   onOpenCustomize,
   onOpenChat,
   routinesActive,
-  customizeActive
+  customizeActive,
+  settingsActive
 }: {
   mode: 'chat' | 'code'
   onOpenRoutines: () => void
@@ -219,11 +230,12 @@ export function LeftSidebar({
   onOpenChat: () => void
   routinesActive: boolean
   customizeActive: boolean
+  settingsActive?: boolean
 }): React.JSX.Element {
-  const onPage = routinesActive || customizeActive
+  const onPage = routinesActive || customizeActive || Boolean(settingsActive)
   const ws = useWorkspace()
   const [view, setView] = useState<'active' | 'archived'>('active')
-  const [shut, setShut] = useState<Set<string>>(new Set())
+  const [shut, setShut] = useState<Set<string>>(loadShutProjects)
 
   const visible = ws.chats.filter((c) => (view === 'archived' ? c.archived : !c.archived))
   const byRecent = (a: Chat, b: Chat): number => b.updatedAt - a.updatedAt
@@ -238,6 +250,11 @@ export function LeftSidebar({
     setShut((s) => {
       const n = new Set(s)
       if (!n.delete(id)) n.add(id)
+      try {
+        localStorage.setItem(SHUT_PROJECTS_KEY, JSON.stringify([...n]))
+      } catch {
+        /* ignore */
+      }
       return n
     })
 
@@ -335,7 +352,10 @@ export function LeftSidebar({
                       <IconButton
                         title="New chat in project"
                         className="p-1"
-                        onClick={() => ws.newChat(g.id)}
+                        onClick={() => {
+                          ws.newChat(g.id)
+                          onOpenChat()
+                        }}
                       >
                         <Plus className={SMALL} />
                       </IconButton>

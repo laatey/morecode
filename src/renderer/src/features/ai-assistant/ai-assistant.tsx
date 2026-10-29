@@ -12,10 +12,12 @@ import { useSettings } from '@/features/settings/settings-store'
 import { useWorkspace } from '@/features/workspace/workspace-store'
 import { AttachmentChip, folderFrom, pathFor, readDrop } from './attachments'
 import { useChatContext } from './chat-context'
+import { BackgroundTasksBar, type HelperTask } from './background-tasks-bar'
 import { ChangesBar } from './changes-bar'
 import { fileIconHtml } from '@/components/file-icon'
 import { MessageRail } from './message-rail'
 import { QueueBar } from './queue-bar'
+import type { BgJob } from '../../../../preload'
 import { ErrorCard } from './error-card'
 import { toDataUrl } from './image-utils'
 import { MentionMenu } from './mention-menu'
@@ -323,6 +325,25 @@ export function AiAssistant(): React.JSX.Element {
   const [panel, setPanel] = useState<PanelId | null>(null)
   const [pickIndex, setPickIndex] = useState(0)
   const [dismissed, setDismissed] = useState(false)
+  const [bgJobs, setBgJobs] = useState<BgJob[]>([])
+
+  useEffect(() => {
+    window.api?.agent?.jobs?.().then((list) => setBgJobs(list ?? []))
+    return window.api?.agent?.onJobs?.((list) => setBgJobs(list ?? []))
+  }, [])
+
+  const activeHelpers = useMemo<HelperTask[]>(() => {
+    const out: HelperTask[] = []
+    for (const m of messages) {
+      if (m.role !== 'agent' || !m.parts) continue
+      for (const p of m.parts) {
+        if (p.type === 'tool' && p.tool.kind === 'agent' && p.tool.status === 'running') {
+          out.push({ id: p.tool.id, task: p.tool.task, steps: p.tool.steps })
+        }
+      }
+    }
+    return out
+  }, [messages])
 
   const scroller = useRef<HTMLDivElement>(null)
   const field = useRef<HTMLDivElement>(null)
@@ -869,9 +890,27 @@ export function AiAssistant(): React.JSX.Element {
             <QueueBar
               items={queue.map((x) => ({ id: x.id, raw: x.raw }))}
               running={running}
+              stackIndex={
+                (totals.files > 0 ? 1 : 0) +
+                (bgJobs.length > 0 || activeHelpers.length > 0 ? 1 : 0)
+              }
               onSendNow={sendQueuedNow}
               onEdit={editQueued}
               onDelete={(id) => setQueue((l) => l.filter((x) => x.id !== id))}
+            />
+          )}
+          {(bgJobs.length > 0 || activeHelpers.length > 0) && (
+            <BackgroundTasksBar
+              jobs={bgJobs}
+              helpers={activeHelpers}
+              stackIndex={totals.files > 0 ? 1 : 0}
+              onStopJob={(id) => {
+                window.api?.agent?.stopJob?.(id)
+                toast.success('Background task stopped')
+              }}
+              onDismissJob={(id) => {
+                window.api?.agent?.dropJob?.(id)
+              }}
             />
           )}
           {totals.files > 0 && (
@@ -879,6 +918,7 @@ export function AiAssistant(): React.JSX.Element {
               files={totals.files}
               added={totals.added}
               removed={totals.removed}
+              stackIndex={0}
               onAccept={() => {
                 acceptAll()
                 toast.success('Changes kept')
@@ -893,7 +933,7 @@ export function AiAssistant(): React.JSX.Element {
           <div
             data-tour="composer"
             className={cn(
-              'relative rounded-3xl border bg-background p-3 transition-colors focus-within:border-primary/50'
+              'relative z-[4] rounded-3xl border bg-background p-3 transition-colors focus-within:border-primary/50'
             )}
           >
             {images.length || attachments.length ? (

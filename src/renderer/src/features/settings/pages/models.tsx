@@ -74,8 +74,8 @@ function ProviderRow({
 
   return (
     <div className="py-3">
-      <div className="flex items-center gap-6">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="min-w-[180px] flex-1">
           <div className="text-[13px] text-[#ededeb]">{title}</div>
           <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">{description}</div>
         </div>

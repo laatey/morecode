@@ -6,7 +6,8 @@ import type { ToolDef } from '../agent/anthropic'
 /** Live connections, kept between runs so a server starts once and is reused. */
 const live = new Map<string, { sig: string; client: McpClient }>()
 
-const sigOf = (c: McpConfig): string => JSON.stringify([c.kind, c.url, c.headers, c.command, c.args, c.env])
+const sigOf = (c: McpConfig, cwd?: string): string =>
+  JSON.stringify([c.kind, c.url, c.headers, c.command, c.args, c.env, c.kind === 'stdio' ? cwd ?? '' : ''])
 
 const withTimeout = (ms: number, signal?: AbortSignal): AbortSignal =>
   signal ? AbortSignal.any([signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms)
@@ -25,7 +26,7 @@ async function withAuth(config: McpConfig): Promise<McpConfig> {
 
 export async function connectOne(raw: McpConfig, cwd?: string): Promise<McpClient> {
   const config = await withAuth(raw)
-  const sig = sigOf(config)
+  const sig = sigOf(config, cwd)
   const known = live.get(config.id)
   if (known && known.sig === sig) return known.client
   known?.client.close()

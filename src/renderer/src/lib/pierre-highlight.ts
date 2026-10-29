@@ -6,6 +6,11 @@ const MAX_CACHE_ENTRIES = 120
 export const escapeCodeHtml = (code: string): string =>
   code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+export function getCachedHighlight(code: string, language: string | null): string | undefined {
+  const lang = language || 'text'
+  return cache.get(`${lang}\u0000${code}`)
+}
+
 /**
  * Use Pierre/Shiki for token colours only. The app continues to own the code surface, spacing,
  * and controls instead of inheriting Pierre's file-view UI.

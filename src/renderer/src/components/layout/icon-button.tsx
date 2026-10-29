@@ -9,17 +9,15 @@ interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
   tipSide?: 'top' | 'right' | 'bottom' | 'left'
 }
 
-export function IconButton({
-  className,
-  title,
-  shortcut,
-  tipSide,
-  ...props
-}: IconButtonProps): React.JSX.Element {
+export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { className, title, shortcut, tipSide, ...props },
+  ref
+): React.JSX.Element {
   const button = (
     <button
+      ref={ref}
       type="button"
-      aria-label={title}
+      aria-label={props['aria-label'] ?? title}
       className={cn(
         'app-no-drag shrink-0 p-1.5 rounded-[5px] flex items-center justify-center cursor-pointer',
         'text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.1]',
@@ -36,4 +34,4 @@ export function IconButton({
   ) : (
     button
   )
-}
+})

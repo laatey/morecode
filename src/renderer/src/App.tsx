@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { CalendarClock, ChevronDown, Briefcase, CodeXml, FileText, MessagesCircle } from '@/components/icons'
+import { CalendarClock, ChevronDown, Briefcase, CodeXml, FileText, MessagesCircle, Settings } from '@/components/icons'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable'
 import { SegmentedSwitch, SegmentedSwitchOption } from './components/segmented-switch'
 import { ActionMenu } from './components/action-menu'
@@ -12,8 +12,8 @@ import {
   useResponsiveSidebars
 } from './hooks/use-responsive-sidebars'
 import { useShortcut } from './features/settings/shortcuts'
-import { SettingsProvider, useSettings } from './features/settings/settings-store'
-import { SettingsDialog } from './features/settings/settings-dialog'
+import { SettingsProvider, useSettings, type SettingsTab } from './features/settings/settings-store'
+import { SettingsPage } from './features/settings/settings-page'
 import { TaskNotifier } from './features/settings/notifications'
 import { LeftSidebar } from './features/left-sidebar/left-sidebar'
 import { RightPanel } from './features/right-panel/right-panel'
@@ -40,6 +40,19 @@ import { cn } from './lib/utils'
 import { WINDOW_CONTROLS_LEFT_PX, WINDOW_CONTROLS_RIGHT_PX } from './lib/platform'
 
 type Mode = 'chat' | 'code'
+
+type NavStop =
+  | { kind: 'chat'; chatId: string }
+  | { kind: 'routines' }
+  | { kind: 'customize' }
+  | { kind: 'settings'; tab: SettingsTab }
+
+const sameStop = (a: NavStop, b: NavStop): boolean => {
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'chat' && b.kind === 'chat') return a.chatId === b.chatId
+  if (a.kind === 'settings' && b.kind === 'settings') return a.tab === b.tab
+  return true
+}
 
 const MODE_OPTIONS: SegmentedSwitchOption<Mode>[] = [
   { value: 'chat', icon: <MessagesCircle className="w-[15px] h-[15px]" />, title: 'Chat: just the conversation' },
@@ -169,10 +182,22 @@ function AppShell(): React.JSX.Element {
     const v = localStorage.getItem('morecode:page')
     return v === 'routines' || v === 'customize' ? v : 'chat'
   })
-  const showRoutines = page === 'routines'
-  const showCustomize = page === 'customize'
-  const setShowRoutines = (on: boolean): void => setPage(on ? 'routines' : 'chat')
-  const setShowCustomize = (on: boolean): void => setPage(on ? 'customize' : 'chat')
+  const { open: showSettings, tab: settingsTab, openSettings, closeSettings } = useSettings()
+  const showRoutines = !showSettings && page === 'routines'
+  const showCustomize = !showSettings && page === 'customize'
+  const setShowRoutines = (on: boolean): void => {
+    closeSettings()
+    setPage(on ? 'routines' : 'chat')
+  }
+  const setShowCustomize = (on: boolean): void => {
+    closeSettings()
+    setPage(on ? 'customize' : 'chat')
+  }
+  const handleModeChange = (nextMode: Mode): void => {
+    closeSettings()
+    setPage('chat')
+    setMode(nextMode)
+  }
   useEffect(() => {
     try {
       localStorage.setItem('morecode:page', page)
@@ -187,11 +212,12 @@ function AppShell(): React.JSX.Element {
       } catch {
         // harmless
       }
+      closeSettings()
       setPage('customize')
     }
     window.addEventListener('app:open-customize', open)
     return () => window.removeEventListener('app:open-customize', open)
-  }, [])
+  }, [closeSettings])
   useEffect(() => {
     try {
       localStorage.setItem('morecode:mode', mode)
@@ -204,10 +230,10 @@ function AppShell(): React.JSX.Element {
   const chatMenu = useChatMenu()
   const copyChat = useCopyChat()
   const { active } = ws
-  const title = showRoutines ? 'Routines' : showCustomize ? 'Customize' : active.title
+  const title = showSettings ? 'Settings' : showRoutines ? 'Routines' : showCustomize ? 'Customize' : active.title
   // A loose chat deliberately has no project context. Never fall back to the last folder opened.
   const group = ws.groups.find((g) => g.id === active.projectId)
-  const folder = showRoutines || showCustomize ? '' : group?.name ?? ''
+  const folder = showSettings || showRoutines || showCustomize ? '' : group?.name ?? ''
 
   // opening a chat that lives in a linked project switches the working folder with it
   const linked = group?.folder
@@ -276,7 +302,6 @@ function AppShell(): React.JSX.Element {
     return () => window.removeEventListener('right-panel:reveal', onReveal)
   }, [])
 
-  const { openSettings } = useSettings()
   useShortcut('toggle-sidebar', toggleLeft)
   useShortcut('toggle-panel', toggleRight)
   useShortcut('palette', () => ws.setSearchOpen(true))
@@ -302,11 +327,69 @@ function AppShell(): React.JSX.Element {
     return () => window.removeEventListener('app:layout', onLayout)
   }, [])
 
+  const currentStop: NavStop = showSettings
+    ? { kind: 'settings', tab: settingsTab }
+    : page === 'routines'
+      ? { kind: 'routines' }
+      : page === 'customize'
+        ? { kind: 'customize' }
+        : { kind: 'chat', chatId: active.id }
+
+  const [history, setHistory] = useState<{ list: NavStop[]; index: number }>(() =>
+    currentStop.kind === 'chat'
+      ? { list: [currentStop], index: 0 }
+      : { list: [{ kind: 'chat', chatId: active.id }, currentStop], index: 1 }
+  )
+
+  const isValidStop = (s: NavStop): boolean =>
+    s.kind !== 'chat' || ws.chats.some((c) => c.id === s.chatId && !c.archived)
+
+  const activeAtIndex = history.list[history.index]
+  if (!activeAtIndex || !sameStop(activeAtIndex, currentStop)) {
+    const validPrefix = history.list.slice(0, history.index + 1).filter(isValidStop)
+    const deduped = validPrefix.filter((s, idx) => idx === 0 || !sameStop(s, validPrefix[idx - 1]))
+    const last = deduped[deduped.length - 1]
+    const nextList = (last && sameStop(last, currentStop) ? deduped : [...deduped, currentStop]).slice(-50)
+    setHistory({ list: nextList, index: nextList.length - 1 })
+  }
+
+  const findTargetIndex = (dir: -1 | 1): number => {
+    let i = history.index + dir
+    while (i >= 0 && i < history.list.length) {
+      const candidate = history.list[i]
+      if (isValidStop(candidate) && !sameStop(candidate, currentStop)) return i
+      i += dir
+    }
+    return -1
+  }
+
+  const backIndex = findTargetIndex(-1)
+  const forwardIndex = findTargetIndex(1)
+
+  const goHistory = (targetIndex: number): void => {
+    if (targetIndex < 0 || targetIndex >= history.list.length) return
+    const target = history.list[targetIndex]
+    setHistory((h) => ({ ...h, index: targetIndex }))
+    if (target.kind === 'settings') {
+      openSettings(target.tab)
+    } else if (target.kind === 'routines') {
+      closeSettings()
+      setPage('routines')
+    } else if (target.kind === 'customize') {
+      closeSettings()
+      setPage('customize')
+    } else {
+      closeSettings()
+      setPage('chat')
+      ws.select(target.chatId)
+    }
+  }
+
   const nav = {
-    canBack: ws.canBack,
-    canForward: ws.canForward,
-    onBack: ws.back,
-    onForward: ws.forward
+    canBack: backIndex !== -1,
+    canForward: forwardIndex !== -1,
+    onBack: () => goHistory(backIndex),
+    onForward: () => goHistory(forwardIndex)
   }
   const share = (): void => copyChat(active)
 
@@ -333,7 +416,7 @@ function AppShell(): React.JSX.Element {
           >
             <NavControls
               mode={mode}
-              onModeChange={setMode}
+              onModeChange={handleModeChange}
               onToggleSidebar={toggleLeft}
               sidebarTitle="Collapse sidebar"
               {...nav}
@@ -344,9 +427,11 @@ function AppShell(): React.JSX.Element {
             mode={mode}
             routinesActive={showRoutines}
             customizeActive={showCustomize}
+            settingsActive={showSettings}
             onOpenRoutines={() => setShowRoutines(true)}
             onOpenCustomize={() => setShowCustomize(true)}
             onOpenChat={() => {
+              closeSettings()
               setShowRoutines(false)
               setMode('chat')
             }}
@@ -373,7 +458,7 @@ function AppShell(): React.JSX.Element {
                 <div className="flex items-center gap-1 shrink-0">
                   <NavControls
                     mode={mode}
-                    onModeChange={setMode}
+                    onModeChange={handleModeChange}
                     onToggleSidebar={toggleLeft}
                     sidebarTitle="Expand sidebar"
                     {...nav}
@@ -431,7 +516,11 @@ function AppShell(): React.JSX.Element {
                     </span>
                   </>
                 )}
-                {showRoutines ? (
+                {showSettings ? (
+                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-[#e2e2e0]">
+                    <Settings className="h-3.5 w-3.5 text-white" /> Settings
+                  </div>
+                ) : showRoutines ? (
                   <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-[#e2e2e0]">
                     <CalendarClock className="h-3.5 w-3.5 text-white" /> Routines
                   </div>
@@ -491,7 +580,15 @@ function AppShell(): React.JSX.Element {
             )}
           </div>
           <div className="flex-1 min-h-0 relative flex flex-col">
-            {showCustomize ? <CustomizePage /> : showRoutines ? <RoutinesPage onBack={() => { setShowRoutines(false); setMode('chat') }} /> : <AiAssistant />}
+            {showSettings ? (
+              <SettingsPage onBack={() => { closeSettings(); setShowRoutines(false); setMode('chat') }} />
+            ) : showCustomize ? (
+              <CustomizePage />
+            ) : showRoutines ? (
+              <RoutinesPage onBack={() => { setShowRoutines(false); setMode('chat') }} />
+            ) : (
+              <AiAssistant />
+            )}
           </div>
         </ResizablePanel>
 
@@ -503,7 +600,7 @@ function AppShell(): React.JSX.Element {
           panelRef={rightRef}
           defaultSize={rightCollapsed ? 0 : initialWidths.right}
           minSize={RIGHT_MIN_PX}
-          maxSize="45%"
+          maxSize="55%"
           groupResizeBehavior="preserve-pixel-size"
           collapsible
           collapsedSize={0}
@@ -550,7 +647,6 @@ function OpenChat(): React.JSX.Element {
       <ChatProvider chatId={activeId}>
         <AppShell />
         <WorkspaceDialogs />
-        <SettingsDialog />
         <TaskNotifier />
         <TourAutoStart />
         <Tour />

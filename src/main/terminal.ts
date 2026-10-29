@@ -92,6 +92,13 @@ export function registerTerminalIpc(): void {
     })
   })
 
+  ipcMain.on('term:input', (_event, req: { id: string; text: string }) => {
+    const child = running.get(req.id)
+    if (child?.stdin?.writable) {
+      child.stdin.write(req.text)
+    }
+  })
+
   ipcMain.on('term:kill', (_event, id: string) => {
     const child = running.get(id)
     if (child) killTree(child)

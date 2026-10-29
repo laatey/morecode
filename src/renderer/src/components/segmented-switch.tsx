@@ -1,4 +1,5 @@
 import React from 'react'
+import { Tip } from '@/components/tooltip'
 
 export interface SegmentedSwitchOption<T extends string = string> {
   value: T
@@ -43,12 +44,13 @@ export function SegmentedSwitch<T extends string = string>({
 
       {options.map((option) => {
         const isActive = option.value === value
-        return (
+        const tipLabel = option.title || (typeof option.label === 'string' ? option.label : undefined)
+        const btn = (
           <button
             key={option.value}
             type="button"
+            aria-label={tipLabel}
             onClick={() => onChange(option.value)}
-            title={option.title || (typeof option.label === 'string' ? option.label : undefined)}
             style={{ width: `${itemWidth}px` }}
             className="group relative z-10 h-full flex items-center justify-center bg-transparent cursor-pointer select-none focus:outline-none"
           >
@@ -73,6 +75,13 @@ export function SegmentedSwitch<T extends string = string>({
               </span>
             ) : null}
           </button>
+        )
+        return tipLabel ? (
+          <Tip key={option.value} label={tipLabel}>
+            {btn}
+          </Tip>
+        ) : (
+          btn
         )
       })}
     </div>

@@ -11,6 +11,7 @@ import {
   clearTerminal,
   ensureStarted,
   runCommand,
+  sendTerminalInput,
   stopCommand,
   terminalAvailable,
   useTerminalSession
@@ -99,6 +100,10 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
     const text = input
     setInput('')
     setCursor(null)
+    if (session.running) {
+      sendTerminalInput(tabId, text)
+      return
+    }
     void runCommand(tabId, text)
   }
 
@@ -193,15 +198,14 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
           )}
 
           <div className="mt-1.5 flex items-center gap-2">
-            <Prompt cwd={session.cwd} className="max-w-[60%] shrink-0" />
+            {!session.running && <Prompt cwd={session.cwd} className="max-w-[60%] shrink-0" />}
             <input
               ref={field}
               value={input}
-              disabled={Boolean(session.running)}
               spellCheck={false}
               autoComplete="off"
               aria-label="Terminal input"
-              placeholder={session.running ? 'Running… press Ctrl+C to stop' : ''}
+              placeholder={session.running ? 'Type input for running command, or press Ctrl+C to stop…' : ''}
               onChange={(e) => {
                 setInput(e.target.value)
                 setCursor(null)
@@ -210,7 +214,7 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
                 const ctrl = e.ctrlKey && !e.metaKey
                 if (e.key === 'Enter') {
                   submit()
-                } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                } else if (!session.running && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                   e.preventDefault()
                   walk(e.key === 'ArrowUp' ? -1 : 1)
                 } else if (ctrl && e.key.toLowerCase() === 'l') {
@@ -222,7 +226,7 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
                   else setInput('')
                 }
               }}
-              className="min-w-0 flex-1 bg-transparent text-[#ececea] caret-[#ececea] outline-none placeholder:text-muted-foreground disabled:opacity-60"
+              className="min-w-0 flex-1 bg-transparent text-[#ececea] caret-[#ececea] outline-none placeholder:text-muted-foreground"
             />
           </div>
         </div>

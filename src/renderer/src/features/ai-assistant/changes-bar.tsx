@@ -1,6 +1,7 @@
 import React from 'react'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { stackTabClass } from './background-tasks-bar'
 
 /**
  * Edits waiting for review. It is a tab attached to the top of the message box (slightly lighter,
@@ -10,17 +11,24 @@ export function ChangesBar({
   files,
   added,
   removed,
+  stackIndex = 0,
   onAccept,
   onDiscard
 }: {
   files: number
   added: number
   removed: number
+  stackIndex?: number
   onAccept: () => void
   onDiscard: () => void
 }): React.JSX.Element {
   return (
-    <div className="relative mx-5 -mb-3 flex h-10 items-center justify-between rounded-t-2xl border border-b-0 border-white/[0.1] bg-[#323231] px-3.5 pb-3 text-[11.5px]">
+    <div
+      className={cn(
+        'relative -mb-3 flex h-10 items-center justify-between rounded-t-2xl border border-b-0 px-3.5 pb-3 text-[11.5px]',
+        stackTabClass(stackIndex)
+      )}
+    >
       <div className="flex items-center gap-2">
         <span className="font-medium text-[#d6d6d3]">
           {files} {files === 1 ? 'file' : 'files'} changed

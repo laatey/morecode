@@ -12,7 +12,7 @@ export const RIGHT_MIN_PX = 180
 /** The chat never gets narrower than this: the message box, its toolbar and replies stop fitting below it. */
 export const CENTER_MIN_PX = 440
 export const LEFT_DEFAULT_PX = 260
-export const RIGHT_DEFAULT_PX = 240
+export const RIGHT_DEFAULT_PX = 360
 
 type Side = 'left' | 'right'
 
@@ -93,8 +93,16 @@ export function useResponsiveSidebars(): {
 
   const widths = useRef<Record<Side, number>>({ ...initialWidths })
   const auto = useRef<Record<Side, boolean>>({ left: false, right: false })
-  // true while we are programmatically collapsing/expanding, so onResize doesn't record it
-  const busy = useRef(false)
+  // timestamp until which onResize should ignore programmatic panel layout changes
+  const busyUntil = useRef(0)
+  const prevWin = useRef({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    screenX: typeof window !== 'undefined' ? window.screenX : 0
+  })
+
+  const markBusy = useCallback(() => {
+    busyUntil.current = performance.now() + 90
+  }, [])
 
   const refFor = useCallback((s: Side) => (s === 'left' ? leftRef : rightRef), [leftRef, rightRef])
 
@@ -110,21 +118,25 @@ export function useResponsiveSidebars(): {
     (side: Side, collapse: boolean, byAuto: boolean) => {
       const panel = refFor(side).current
       if (!panel) return
-      busy.current = true
+      markBusy()
       auto.current[side] = collapse && byAuto // before the resize event it causes, so it is not taken for the person's choice
       if (collapse && !panel.isCollapsed()) panel.collapse()
       if (!collapse && panel.isCollapsed()) {
         panel.expand()
         panel.resize(widths.current[side]) // exact remembered width, not the library's guess
       }
-      busy.current = false
       if (!byAuto) remember(side, collapse)
     },
-    [refFor, remember]
+    [refFor, remember, markBusy]
   )
 
   const reconcile = useCallback(() => {
     const width = window.innerWidth
+    const screenX = window.screenX
+    const deltaW = width - prevWin.current.width
+    const deltaX = Math.abs(screenX - prevWin.current.screenX)
+    prevWin.current = { width, screenX }
+
     const left = leftRef.current
     const right = rightRef.current
 
@@ -143,21 +155,29 @@ export function useResponsiveSidebars(): {
         if (!right.isCollapsed()) setCollapsed('right', true, true)
       } else {
         if (auto.current.right && right.isCollapsed()) setCollapsed('right', false, false)
-        // too wide for this window: narrow it for now without forgetting the width the person chose
-        if (!right.isCollapsed() && right.getSize().inPixels > room + 1) {
-          busy.current = true
+        const currentRightPx = right.getSize().inPixels
+        const resizedFromRightEdge = deltaW !== 0 && deltaX <= 4
+
+        if (!right.isCollapsed() && resizedFromRightEdge) {
+          // Resizing the window from its right edge directly grows/shrinks the open right panel
+          const maxRight = Math.max(RIGHT_MIN_PX, Math.min(room, Math.round(width * 0.55)))
+          const nextRight = Math.max(RIGHT_MIN_PX, Math.min(maxRight, Math.round(currentRightPx + deltaW)))
+          widths.current.right = nextRight
+          persist()
+          markBusy()
+          right.resize(nextRight)
+        } else if (!right.isCollapsed() && currentRightPx > room + 1) {
+          // too wide for this window: narrow it for now without forgetting the width the person chose
+          markBusy()
           right.resize(room)
-          busy.current = false
-        }
-        // and give the chosen width back once there is room
-        else if (!right.isCollapsed() && right.getSize().inPixels < widths.current.right - 1 && room > right.getSize().inPixels) {
-          busy.current = true
+        } else if (!right.isCollapsed() && currentRightPx < widths.current.right - 1 && room > currentRightPx) {
+          // and give the chosen width back once there is room
+          markBusy()
           right.resize(Math.min(widths.current.right, room))
-          busy.current = false
         }
       }
     }
-  }, [leftRef, rightRef, setCollapsed])
+  }, [leftRef, rightRef, setCollapsed, markBusy, persist])
 
   useEffect(() => {
     reconcile()
@@ -185,14 +205,15 @@ export function useResponsiveSidebars(): {
 
   const onResize = useCallback(
     (side: Side, px: number) => {
+      const isBusy = performance.now() < busyUntil.current
       const collapsed = px < 1
       if (side === 'left') setLeftCollapsed(collapsed)
       else setRightCollapsed(collapsed)
-      if (ready.current && !busy.current && !auto.current[side]) remember(side, collapsed)
+      if (ready.current && !isBusy && !auto.current[side]) remember(side, collapsed)
       if (collapsed) return
       auto.current[side] = false // gained width by any route => no longer "auto" collapsed
-      // Remember widths only when they are a real, unconstrained size.
-      if (!busy.current && px >= MINS[side]) {
+      // Remember widths only when user-dragged (not during programmatic window-fit adjustments)
+      if (ready.current && !isBusy && px >= MINS[side]) {
         widths.current[side] = Math.round(px)
         persist()
       }

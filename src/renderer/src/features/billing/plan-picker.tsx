@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, KeyRound, Loader2, Lock } from '@/components/icons'
+import { Check, KeyRound, Loader2, Lock, Sparkles } from '@/components/icons'
 import { useAuth } from '@/features/auth/auth-store'
 import { errorText, FormError, Submit, TextLink } from '@/features/auth/ui'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,12 @@ import type { BillingConfig } from '@/features/auth/auth-service'
 import { HostedCheckout } from './hosted-checkout'
 import { PLANS, getPlan, type Plan, type PlanId } from './plans'
 import { money, priceOf, useBillingConfig, yearlySaving } from './prices'
+
+const PLAN_HIGHLIGHTS: Record<PlanId, string> = {
+  free: 'Fast everyday model',
+  pro: 'All frontier models',
+  max: 'All models + priority'
+}
 
 function PlanCard({
   plan,
@@ -30,45 +36,67 @@ function PlanCard({
   const price = priceOf(cfg, plan.id, yearly)
   const blocked = unavailable && plan.id !== 'free'
   const featured = plan.id === 'pro'
+  const highlights = PLAN_HIGHLIGHTS[plan.id]
   return (
     <div
       className={cn(
-        'flex flex-col rounded-[12px] border p-4',
-        featured ? 'border-[#3b82f6]/60 bg-[#3b82f6]/[0.06]' : 'border-white/[0.1] bg-white/[0.02]'
+        'flex flex-col overflow-hidden rounded-[16px] border bg-white/[0.02]',
+        featured ? 'border-white/[0.18]' : 'border-white/[0.1]'
       )}
     >
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-[16px] font-semibold">{plan.name}</h3>
-        {featured && (
-          <span className="rounded-full bg-[#3b82f6]/20 px-2 text-[11px] leading-5 text-[#7db1ff]">
-            Most popular
-          </span>
-        )}
+      <div className="rounded-[15px] border-b border-white/[0.1] bg-white/[0.03] p-5 shadow-[0_6px_16px_rgba(0,0,0,0.28)]">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-display text-[20px] font-semibold tracking-tight text-[#ececea]">{plan.name}</h3>
+          {featured && (
+            <span className="rounded-full border border-white/[0.14] bg-white/[0.06] px-2.5 py-0.5 text-[11px] font-medium text-[#d4d4d0]">
+              Popular
+            </span>
+          )}
+        </div>
+        <p className="mt-1.5 min-h-[36px] text-[13px] leading-[1.45] text-[#c9c9c6]">{plan.tagline}</p>
+
+        <div className="mt-4">
+          <div className="font-display text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[#ececea]">
+            {money(price, cfg.currency)}
+          </div>
+          <div className="mt-1.5 text-[12.5px] text-[#8d8d8a]">{price === 0 ? 'forever' : '/ month'}</div>
+        </div>
+
+        <div className="mt-4 flex h-8 items-center justify-between rounded-[7px] border border-white/[0.12] bg-white/[0.04] px-3 text-[12.5px] font-medium text-[#e6e6e3]">
+          <span>{plan.dailyMessages.toLocaleString()} messages / day</span>
+        </div>
+
+        <button
+          type="button"
+          disabled={current || blocked}
+          onClick={onChoose}
+          className="mt-3 h-9 w-full cursor-pointer rounded-[7px] border border-white/[0.14] bg-white/[0.05] px-3 text-[13px] font-medium text-[#ececea] transition-colors hover:border-white/[0.24] hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {current
+            ? 'Your current plan'
+            : blocked
+              ? 'Not available yet'
+              : plan.id === 'free'
+                ? 'Continue with Free'
+                : `Choose ${plan.name}`}
+        </button>
       </div>
-      <p className="mt-0.5 text-[12.5px] text-[#8d8d8a]">{plan.tagline}</p>
-      <p className="mt-3 flex items-baseline gap-1">
-        <span className="font-display text-[28px] font-semibold tabular-nums">{money(price, cfg.currency)}</span>
-        <span className="text-[12.5px] text-[#8d8d8a]">{price === 0 ? 'forever' : '/ month'}</span>
-      </p>
-      <ul className="mt-3 flex-1 space-y-1.5">
+
+      <div className="px-5 py-3.5 text-[12.5px] font-medium text-[#d8d8d4]">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#8d8d8a]" />
+          <span>{highlights}</span>
+        </div>
+      </div>
+
+      <ul className="flex-1 space-y-2.5 border-t border-white/[0.07] px-5 py-4">
         {plan.perks.map((perk) => (
-          <li key={perk} className="flex items-start gap-2 text-[12.5px] leading-5 text-[#c9c9c6]">
-            <Check className="mt-[3px] h-3 w-3 shrink-0 stroke-[3] text-[#5fd17a]" />
-            {perk}
+          <li key={perk} className="flex items-start gap-2.5 text-[13px] font-medium leading-5 text-[#ececea]">
+            <Check className="mt-[3px] h-3.5 w-3.5 shrink-0 stroke-[2.2] text-[#b5b5b0]" />
+            <span>{perk}</span>
           </li>
         ))}
       </ul>
-      <button
-        type="button"
-        disabled={current || blocked}
-        onClick={onChoose}
-        className={buttonVariants({
-          variant: featured && !current ? 'default' : 'secondary',
-          className: 'mt-4 w-full'
-        })}
-      >
-        {current ? 'Your current plan' : blocked ? 'Not available yet' : plan.id === 'free' ? 'Continue with Free' : `Choose ${plan.name}`}
-      </button>
     </div>
   )
 }

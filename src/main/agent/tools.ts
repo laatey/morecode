@@ -4,7 +4,7 @@ import type { ToolDef } from './anthropic'
 import { diffFiles } from './diff'
 import { resultText } from '../mcp/client'
 import type { McpRuntime } from '../mcp/manager'
-import { dropJob, getJob, listJobs, seconds, startJob, stopJob, takeNew, waitForJob, type Job } from './background'
+import { dropJob, getJob, listJobs, markDetached, seconds, startJob, stopJob, takeNew, waitForJob, type Job } from './background'
 
 /**
  * The things the AI is allowed to do. Reading is free anywhere on the computer; the file-edit
@@ -355,6 +355,7 @@ async function runCommand(ctx: ToolContext, id: string, i: Input): Promise<ToolR
 
   // Leave it running and hand the AI what it has printed so far.
   const detach = (why: string): ToolResult => {
+    markDetached(job)
     const { text } = takeNew(job)
     const out = clip(text.trim() || '(no output yet)')
     const note = `[${why} It is job ${job.id}. Use command_output with id "${job.id}" to read new output or to wait for more (wait_seconds, until), and stop_command to end it.]`
@@ -363,6 +364,7 @@ async function runCommand(ctx: ToolContext, id: string, i: Input): Promise<ToolR
   }
 
   if (background) {
+    markDetached(job)
     // Give it a moment, so a command that fails straight away is reported as a failure.
     await waitForJob(job, 3, undefined, ctx.signal)
     return job.exited ? finishExited() : detach('Started in the background and still running; it keeps going while you work.')
@@ -418,6 +420,7 @@ async function stopCommand(ctx: ToolContext, id: string, i: Input): Promise<Tool
   await stopJob(job)
   const { text } = takeNew(job)
   const out = clip(text.trim() || '(no new output)')
+  dropJob(job.id)
   ctx.emit({ kind: 'command', id, label, command: job.command, status: 'done', output: out })
   return { content: `${out}\n[${job.id}: ${jobStatus(job)}]` }
 }

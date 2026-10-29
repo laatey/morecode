@@ -54,13 +54,30 @@ function update(tabId: string, fn: (s: TermSession) => TermSession): void {
 const add = (tabId: string, kind: TermEntry['kind'], text: string, cwd?: string): void =>
   update(tabId, (s) => ({ ...s, entries: [...s.entries, { id: nextEntry++, kind, text, cwd }] }))
 
+/** Normalize carriage-return (\r) progress updates so spinners update in place instead of flooding lines. */
+function normalizeChunk(prev: string, chunk: string): string {
+  const combined = prev + chunk.replace(/\r\n/g, '\n')
+  if (!combined.includes('\r')) return combined
+  return combined
+    .split('\n')
+    .map((line) => {
+      if (!line.includes('\r')) return line
+      const parts = line.split('\r')
+      return parts[parts.length - 1]
+    })
+    .join('\n')
+}
+
 /** Output arrives in pieces: glue pieces of the same stream onto the last entry. */
 function appendOutput(tabId: string, kind: 'out' | 'err', chunk: string): void {
   update(tabId, (s) => {
     const entries = [...s.entries]
     const last = entries[entries.length - 1]
-    if (last && last.kind === kind) entries[entries.length - 1] = { ...last, text: last.text + chunk }
-    else entries.push({ id: nextEntry++, kind, text: chunk })
+    if (last && last.kind === kind) {
+      entries[entries.length - 1] = { ...last, text: normalizeChunk(last.text, chunk) }
+    } else {
+      entries.push({ id: nextEntry++, kind, text: normalizeChunk('', chunk) })
+    }
     // keep memory bounded: drop the oldest output first
     let total = entries.reduce((n, e) => n + e.text.length, 0)
     while (total > MAX_CHARS && entries.length > 1) total -= entries.shift()?.text.length ?? 0
@@ -131,6 +148,13 @@ export async function runCommand(tabId: string, raw: string): Promise<void> {
   const id = `${tabId}::${crypto.randomUUID().slice(0, 6)}`
   update(tabId, (cur) => ({ ...cur, running: id }))
   t.run(id, command, s.cwd)
+}
+
+export function sendTerminalInput(tabId: string, raw: string): void {
+  const id = session(tabId).running
+  if (!id) return
+  appendOutput(tabId, 'out', `${raw}\n`)
+  term()?.input(id, `${raw}\n`)
 }
 
 export function stopCommand(tabId: string): void {

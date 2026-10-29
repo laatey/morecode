@@ -107,6 +107,21 @@ const IMAGE_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml'
 }
+const BINARY_MIME: Record<string, string> = {
+  ...IMAGE_TYPES,
+  '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.xls': 'application/vnd.ms-excel',
+  '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime'
+}
 
 export interface DocInfo {
   /** Path relative to the workspace, always with forward slashes. */
@@ -333,6 +348,21 @@ export function registerWorkspaceIpc(): void {
       return { ok: false, error: 'Could not open this image. It may have been moved or deleted.' }
     }
   })
+
+  ipcMain.handle(
+    'workspace:read-binary',
+    (_event, rel: string): { ok: true; base64: string; mime: string } | { ok: false; error: string } => {
+      const full = typeof rel === 'string' ? safeFilePath(rel) : null
+      if (!full) return { ok: false, error: 'That file is outside your project.' }
+      const mime = BINARY_MIME[extname(full).toLowerCase()] ?? 'application/octet-stream'
+      try {
+        if (statSync(full).size > MAX_BYTES * 8) return { ok: false, error: 'This file is too large to preview.' }
+        return { ok: true, base64: readFileSync(full).toString('base64'), mime }
+      } catch {
+        return { ok: false, error: 'Could not open this file. It may have been moved or deleted.' }
+      }
+    }
+  )
 
   ipcMain.handle('workspace:reveal', async (_event, path?: string) => {
     const target =

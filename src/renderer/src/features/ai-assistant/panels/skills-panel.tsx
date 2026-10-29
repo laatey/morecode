@@ -12,6 +12,7 @@ import {
   type Skill
 } from '@/features/skills/skills-data'
 import { cn } from '@/lib/utils'
+import { FeatureBanner } from '@/components/feature-banner'
 import { MiniTabs, PanelFrame } from './ui'
 
 type Tab = 'mine' | 'commands'
@@ -72,7 +73,7 @@ export function SkillsPanel({
   return (
     <PanelFrame title={title} onClose={onClose} width={400} maxHeight="50%" embedded={embedded}>
       {view.name === 'list' && (
-        <ListView tab={tab} setTab={setTab} setView={setView} onClose={onClose} />
+        <ListView tab={tab} setTab={setTab} setView={setView} onClose={onClose} embedded={embedded} />
       )}
       {view.name === 'detail' && <DetailView id={view.id} setView={setView} onBack={back} onClose={onClose} />}
       {view.name === 'edit' && (
@@ -87,12 +88,14 @@ function ListView({
   tab,
   setTab,
   setView,
-  onClose
+  onClose,
+  embedded
 }: {
   tab: Tab
   setTab: (t: Tab) => void
   setView: (v: View) => void
   onClose: () => void
+  embedded?: boolean
 }): React.JSX.Element {
   const sk = useSkills()
   const [query, setQuery] = useState('')
@@ -104,6 +107,23 @@ function ListView({
 
   return (
     <div>
+      {embedded && !q && (
+        <FeatureBanner
+          tone="indigo"
+          art="skills"
+          eyebrow={tab === 'commands' ? 'Slash Workflows' : 'Project Intelligence'}
+          tag={tab === 'commands' ? '/command' : 'Skills'}
+          title={tab === 'commands' ? 'Reusable Slash Commands' : 'Custom Agent Skills'}
+          description={
+            tab === 'commands'
+              ? 'Turn multi-step prompts like /review, /ship, or /audit into one-keystroke shortcuts in the chat composer.'
+              : 'Teach MoreCode your architecture conventions, preferred libraries, and review standards once so every chat follows them.'
+          }
+          actionLabel={tab === 'commands' ? 'Create command' : 'Create skill'}
+          onAction={() => setView(tab === 'commands' ? { name: 'command', id: null } : { name: 'edit', id: null })}
+          className="mb-4"
+        />
+      )}
       <div className="mb-3 flex items-center justify-between">
         <MiniTabs
           value={tab}
@@ -196,9 +216,11 @@ function ListView({
         </div>
       )}
 
-      <div className="mt-4 flex justify-end pt-3">
-        <Btn onClick={onClose}>Done</Btn>
-      </div>
+      {!embedded && (
+        <div className="mt-4 flex justify-end pt-3">
+          <Btn onClick={onClose}>Done</Btn>
+        </div>
+      )}
     </div>
   )
 }

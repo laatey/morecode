@@ -9,12 +9,15 @@ import { spawn, execFile, type ChildProcess } from 'child_process'
 export interface Job {
   id: string
   command: string
+  cwd: string
   pid: number | undefined
   startedAt: number
   exited: boolean
   exitCode: number | null
   /** Set when the job was ended on purpose (stop_command, abort, app quit). */
   stopped: boolean
+  /** True once the job is detached to run in the background (so short foreground commands do not flash in the UI). */
+  detached: boolean
   /** Text kept in memory (the end of the output when it is very long). */
   buf: string
   /** Characters dropped from the front of buf, so read positions stay valid. */
@@ -25,12 +28,71 @@ export interface Job {
   waiters: Set<() => void>
 }
 
+export interface JobSnapshot {
+  id: string
+  command: string
+  cwd: string
+  startedAt: number
+  exited: boolean
+  exitCode: number | null
+  stopped: boolean
+  output: string
+}
+
 const MAX_BUF = 200_000
 const KEEP_BUF = 100_000
 const MAX_JOBS = 20
 
 const jobs = new Map<string, Job>()
+const listeners = new Set<(list: JobSnapshot[]) => void>()
 let counter = 0
+let broadcastTimer: ReturnType<typeof setTimeout> | null = null
+
+export function listJobSnapshots(): JobSnapshot[] {
+  return [...jobs.values()]
+    .filter((j) => j.detached)
+    .map((j) => ({
+      id: j.id,
+      command: j.command,
+      cwd: j.cwd,
+      startedAt: j.startedAt,
+      exited: j.exited,
+      exitCode: j.exitCode,
+      stopped: j.stopped,
+      output: j.buf.slice(-4000)
+    }))
+}
+
+function broadcast(immediate = false): void {
+  if (!listeners.size) return
+  if (immediate) {
+    if (broadcastTimer) {
+      clearTimeout(broadcastTimer)
+      broadcastTimer = null
+    }
+    const snap = listJobSnapshots()
+    for (const fn of listeners) fn(snap)
+    return
+  }
+  if (broadcastTimer) return
+  broadcastTimer = setTimeout(() => {
+    broadcastTimer = null
+    const snap = listJobSnapshots()
+    for (const fn of listeners) fn(snap)
+  }, 200)
+  broadcastTimer.unref?.()
+}
+
+export function onJobsChange(fn: (list: JobSnapshot[]) => void): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+
+export function markDetached(job: Job): void {
+  if (job.detached) return
+  job.detached = true
+  broadcast(true)
+}
 
 export function killTree(child: ChildProcess): void {
   if (!child.pid) return
@@ -67,11 +129,13 @@ export function startJob(command: string, cwd: string): Job {
   const job: Job = {
     id: `bg${++counter}`,
     command,
+    cwd,
     pid: child.pid,
     startedAt: Date.now(),
     exited: false,
     exitCode: null,
     stopped: false,
+    detached: false,
     buf: '',
     dropped: 0,
     read: 0,
@@ -86,6 +150,7 @@ export function startJob(command: string, cwd: string): Job {
       job.dropped += cut
     }
     notify(job)
+    if (job.detached) broadcast(false)
   }
   child.stdout?.on('data', add)
   child.stderr?.on('data', add)
@@ -94,11 +159,13 @@ export function startJob(command: string, cwd: string): Job {
     job.exited = true
     job.exitCode = 1
     notify(job)
+    if (job.detached) broadcast(true)
   })
   child.on('close', (code) => {
     job.exited = true
     job.exitCode = code
     notify(job)
+    if (job.detached) broadcast(true)
   })
   jobs.set(job.id, job)
   prune()
@@ -107,7 +174,11 @@ export function startJob(command: string, cwd: string): Job {
 
 export const getJob = (id: string): Job | undefined => jobs.get(id)
 export const listJobs = (): Job[] => [...jobs.values()]
-export const dropJob = (id: string): void => void jobs.delete(id)
+export const dropJob = (id: string): void => {
+  const had = jobs.get(id)?.detached
+  jobs.delete(id)
+  if (had) broadcast(true)
+}
 
 /** Everything printed so far (the end of it, if it was very long), without moving the read position. */
 export const allOutput = (job: Job): string => job.buf
@@ -162,6 +233,7 @@ export function waitForJob(job: Job, seconds: number, until: string | undefined,
 export async function stopJob(job: Job): Promise<void> {
   if (job.exited) return
   job.stopped = true
+  if (job.detached) broadcast(true)
   killTree(job.child)
   await waitForJob(job, 3, undefined, new AbortController().signal)
   if (!job.exited && process.platform !== 'win32' && job.child.pid) {
@@ -172,6 +244,7 @@ export async function stopJob(job: Job): Promise<void> {
     }
     await waitForJob(job, 2, undefined, new AbortController().signal)
   }
+  if (job.detached) broadcast(true)
 }
 
 /** The app is quitting: do not leave servers running behind it. */

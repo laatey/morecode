@@ -46,7 +46,7 @@ function PlanDialogBody({ reason }: { reason: Reason }): React.JSX.Element | nul
   return (
     <Dialog.Content
       aria-describedby={undefined}
-      className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-32px)] w-[min(760px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 outline-none slim-scroll select-text overflow-y-auto rounded-[11px] border border-white/[0.1] bg-[#242423] p-6 shadow-[0_24px_64px_rgba(0,0,0,0.6)] animate-in fade-in-0 zoom-in-95 duration-150"
+      className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-32px)] w-[min(860px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 outline-none slim-scroll select-text overflow-y-auto rounded-[11px] border border-white/[0.1] bg-[#242423] p-6 shadow-[0_24px_64px_rgba(0,0,0,0.6)] animate-in fade-in-0 zoom-in-95 duration-150"
     >
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>

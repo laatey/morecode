@@ -1,11 +1,11 @@
-import { ipcMain, type WebContents } from 'electron'
+import { BrowserWindow, ipcMain, type WebContents } from 'electron'
 import { existsSync, statSync } from 'fs'
 import { getChatRoot } from '../workspace'
 import { authorize } from '../mcp/oauth'
 import { disconnect, disconnectAll, testConnector } from '../mcp/manager'
 import type { McpConfig } from '../mcp/client'
 import { ApiFailure, looksDropped } from './anthropic'
-import { stopAllJobs } from './background'
+import { dropJob, getJob, listJobSnapshots, onJobsChange, stopAllJobs, stopJob } from './background'
 import { runAgent, type RunInput, type Style } from './run'
 import { keepEdit, revertEdit, type Decision } from './tools'
 
@@ -231,6 +231,25 @@ export function registerAgentIpc(): void {
   )
   ipcMain.on('agent:keep', (_e, id: string) => {
     if (typeof id === 'string') keepEdit(id)
+  })
+
+  ipcMain.handle('agent:jobs', () => listJobSnapshots())
+  ipcMain.handle('agent:stop-job', async (_e, id: unknown): Promise<boolean> => {
+    if (typeof id !== 'string') return false
+    const job = getJob(id)
+    if (!job) return false
+    await stopJob(job)
+    dropJob(id)
+    return true
+  })
+  ipcMain.on('agent:drop-job', (_e, id: unknown) => {
+    if (typeof id === 'string') dropJob(id)
+  })
+
+  onJobsChange((list) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('agent:jobs', list)
+    }
   })
 }
 

@@ -5,6 +5,7 @@ import { SkillsPanel } from '@/features/ai-assistant/panels/skills-panel'
 import { CATALOG, entryById, type CatalogEntry } from '@/features/connectors/catalog'
 import { useConnectors, type Connector, type Draft, type Perm } from '@/features/connectors/connectors-store'
 import { ConnectorLogo } from '@/features/connectors/logo'
+import { FeatureBanner } from '@/components/feature-banner'
 import { cn } from '@/lib/utils'
 
 type Tab = 'skills' | 'connectors'
@@ -138,18 +139,40 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
               />
             ))}
           </div>
+        ) : cx.connectors.length ? (
+          <p className="py-10 text-center text-[13px] text-[#8f8f8a]">No matches.</p>
         ) : (
-          <p className="py-10 text-center text-[13px] text-[#8f8f8a]">
-            {cx.connectors.length ? 'No matches.' : 'Nothing connected yet. '}
-            {!cx.connectors.length && (
-              <button type="button" className="cursor-pointer font-medium text-white underline underline-offset-2" onClick={() => set('discover')}>
-                Browse connectors
-              </button>
-            )}
-          </p>
+          <FeatureBanner
+            tone="emerald"
+            art="warehouse"
+            eyebrow="From MoreCode"
+            tag="MCP"
+            title="Connect your stack"
+            description="Give the AI direct access to UI Warehouse, GitHub, Supabase, Linear, Playwright, or any local and remote MCP server."
+            actionLabel="Browse connectors"
+            onAction={() => set('discover')}
+            secondaryLabel="Add custom"
+            onSecondary={() => setView({ name: 'connect' })}
+          />
         )
       ) : (
         <div className="flex flex-col gap-1.5">
+          {!needle && (
+            <FeatureBanner
+              tone="emerald"
+              art="warehouse"
+              eyebrow="From MoreCode"
+              tag="Featured"
+              title="UI Warehouse"
+              description="Query 58+ unbranded desktop, web, and mobile shells, navigation bars, and component primitives directly from the agent."
+              actionLabel={cx.connectors.some((c) => c.catalogId === 'ui-warehouse') ? 'Manage' : 'Add'}
+              onAction={() => {
+                const existing = cx.connectors.find((c) => c.catalogId === 'ui-warehouse')
+                setView(existing ? { name: 'detail', id: existing.id } : { name: 'connect', catalogId: 'ui-warehouse' })
+              }}
+              className="mb-2.5"
+            />
+          )}
           {found.map((e) => {
             const added = cx.connectors.some((c) => c.catalogId === e.id)
             return (

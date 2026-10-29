@@ -15,8 +15,8 @@ export function Page({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="mx-auto max-w-[560px] space-y-7">
-      <header className="pb-1 pr-8">
+    <div className="w-full space-y-7">
+      <header className="pb-1">
         <h2 className="text-[17px] font-medium text-[#f7f7f4]">{title}</h2>
         {description && <p className="mt-1 max-w-[500px] text-[12px] leading-relaxed text-[#9a9a96]">{description}</p>}
       </header>
@@ -38,7 +38,7 @@ export function Group({
   return (
     <section>
       {title && <h3 className="pb-2 text-[13px] font-medium text-[#ececea]">{title}</h3>}
-      <div className="divide-y divide-white/[0.07] overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.025]">
+      <div className="divide-y divide-white/[0.07] overflow-hidden rounded-[10px] border border-white/[0.1]">
         {React.Children.toArray(children).map((child, i) =>
           React.isValidElement(child) && child.type === Row ? child : (
             <div key={i} className="px-4 py-3">
@@ -67,8 +67,8 @@ export function Row({
   className?: string
 }): React.JSX.Element {
   return (
-    <div className={cn('flex min-h-[54px] items-center justify-between gap-5 px-4 py-3', className)}>
-      <div className="flex min-w-0 flex-1 items-start gap-3">
+    <div className={cn('flex min-h-[54px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3', className)}>
+      <div className="flex min-w-[180px] flex-1 items-start gap-3">
         {icon && <div className="mt-0.5 shrink-0">{icon}</div>}
         <div className="min-w-0 flex-1">
           <div className="text-[12.5px] font-medium leading-snug text-[#f1f1ef]">{title}</div>
@@ -129,7 +129,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex h-7 shrink-0 select-none items-center rounded-[6px] bg-[#272726] p-px"
+      className="inline-flex h-7.5 shrink-0 select-none items-center rounded-[7px] border border-white/[0.08] bg-[#1f1f1e] p-0.5"
     >
       {options.map((o) => {
         const active = o.value === value
@@ -141,10 +141,10 @@ export function Segmented<T extends string>({
             aria-checked={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              'flex h-6 cursor-pointer items-center justify-center rounded-[5px] px-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]',
+              'flex h-6 cursor-pointer items-center justify-center rounded-[5px] px-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
               active
-                ? 'bg-[#3b82f6] font-medium text-white'
-                : 'text-[#c9c9c6] hover:text-white'
+                ? 'bg-[#343432] font-medium text-[#f1f1ef] shadow-xs'
+                : 'text-[#9a9a95] hover:text-white'
             )}
           >
             {o.label}
@@ -275,8 +275,8 @@ export function DangerRow({
 
   return (
     <div className="py-2.5">
-      <div className="flex items-center justify-between gap-6">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="min-w-[180px] flex-1">
           <div className="text-[13px] leading-snug text-[#f1f1ef]">{title}</div>
           <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">{description}</div>
         </div>

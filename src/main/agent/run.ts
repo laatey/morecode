@@ -108,8 +108,9 @@ How to work:
 - If the person mentions a project or file on their computer ("on the desktop", "in Documents"), find it with list_dir under the folders listed below before saying you cannot see it.
 - Never invent file contents or command output. If something fails, say so plainly and say what you will try next.
 - Finish with a short summary of what changed and anything the person should check. Write for a person, not a log.
+- Never use emojis in your replies.
 
-This computer runs ${process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux'}. ${process.platform === 'win32' ? 'run_command uses Windows cmd.exe: use dir, type, findstr, copy, move, del and mkdir. There is no head, tail, grep, cat, ls, touch or sed, and no "&&"-free Unix tricks. Use backslashes in paths.' : 'run_command uses a POSIX shell.'} Never invent a drive letter or folder: only use paths from this prompt or ones you found with list_dir.\n\nThis computer: home folder ${homedir()}; Desktop ${join(homedir(), 'Desktop')}; Documents ${join(homedir(), 'Documents')}.
+This computer runs ${process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux'}. ${process.platform === 'win32' ? 'run_command uses Windows cmd.exe: use dir, type, findstr, copy, move, del and mkdir. There is no head, tail, grep, cat, ls, touch or sed, and no "&&"-free Unix tricks. Use backslashes in paths.' : 'run_command uses a POSIX shell.'} Never invent a drive letter or folder: only use paths from this prompt or ones you found with list_dir.\n\nThis computer: working folder ${cwd}; home folder ${homedir()}; Desktop ${join(homedir(), 'Desktop')}; Documents ${join(homedir(), 'Documents')}.
 
 Files in the working folder right now:
 ${safeTree(cwd)}${progress ? `\n\nWhat has happened in this chat so far (kept by the app, so it is accurate; trust it over your own memory):\n${progress}` : ''}${notes}`
@@ -187,7 +188,7 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
   const mcp: McpRuntime | null = input.noTools ? null : await openRuntime(input.connectors ?? [], input.cwd, io.signal)
   const system =
     buildSystem(input.cwd, input.style, hasProject, input.progress ?? '') +
-    (mcp ? `\n\nConnected connectors: ${mcp.names.join(', ')}. Their tools start with mcp__. Use them when the task needs that service's data or actions, and say which one you used.` : '')
+    (mcp ? `\n\nConnected connectors: ${mcp.names.join(', ')}. Their tools start with mcp__. Use them when the task needs that service's data or actions, and say which one you used. When a connector tool saves a file (such as a screenshot), pass a path inside the working folder (${input.cwd}) unless the person asked for another place.` : '')
   const tools = input.noTools ? [] : [...TOOL_DEFS, ...(mcp?.defs ?? [])]
   const past = buildHistory(input.history)
   const next = userContent(input)
@@ -200,7 +201,7 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
     if (delegations >= 3) throw new Error('You already used 3 helpers for this request. Do the rest yourself.')
     delegations++
     const readOnly = TOOL_DEFS.filter((t) => ['list_dir', 'read_file', 'search'].includes(t.name))
-    const helperSystem = `You are a read-only research helper for a coding assistant. The project folder is ${input.cwd}. You can list folders, read files and search. You cannot change anything or run commands. Find what the task asks for, then reply with a short report (under 250 words) naming the files and lines that matter. Say plainly what you could not find. Do not guess.`
+    const helperSystem = `You are a read-only research helper for a coding assistant. The project folder is ${input.cwd}. You can list folders, read files and search. You cannot change anything or run commands. Find what the task asks for, then reply with a short report (under 250 words) naming the files and lines that matter. Say plainly what you could not find. Do not guess. Never use emojis.`
     const msgs: ApiMessage[] = [{ role: 'user', content: [{ type: 'text', text: task }] }]
     const show = (steps: number, status: 'running' | 'done' | 'error', report?: string): void =>
       io.emit({ type: 'tool', tool: { kind: 'agent', id, task: task.slice(0, 160), status, steps, ...(report ? { report } : {}) } })

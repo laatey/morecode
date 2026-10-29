@@ -1,5 +1,6 @@
 import type { OAuthState } from './oauth'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
+import { homedir } from 'os'
 
 /** A connector as the main process needs it. Secrets are already filled in by the app. */
 export interface McpConfig {
@@ -213,7 +214,7 @@ class StdioTransport implements Transport {
   constructor(command: string, args: string[], env: Record<string, string>, cwd?: string) {
     this.proc = spawn(command, args, {
       env: { ...process.env, ...env },
-      cwd,
+      cwd: cwd || homedir(),
       shell: process.platform === 'win32', // npx and uvx are .cmd files on Windows
       windowsHide: true
     })

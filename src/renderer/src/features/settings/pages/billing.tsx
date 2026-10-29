@@ -10,6 +10,7 @@ import { getPlan } from '@/features/billing/plans'
 import { money, priceOf, useBillingConfig } from '@/features/billing/prices'
 import { getUsageHistory } from '@/features/billing/usage'
 import { Btn, DangerRow, Group, Page, Row, TextInput } from '../kit'
+import { FeatureBanner } from '@/components/feature-banner'
 import { useSettings } from '../settings-store'
 
 const date = (t: number): string => new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
@@ -131,6 +132,21 @@ export function BillingPage(): React.JSX.Element {
   }
   return (
     <Page title="Usage and billing">
+      {plan.id === 'free' && (
+        <FeatureBanner
+          tone="violet"
+          art="pro"
+          eyebrow="MoreCode Pro"
+          tag="5× Allowance"
+          title="Built for daily shipping"
+          description="Unlock 5× more daily messages, every flagship Claude model, and priority routing across all your projects."
+          actionLabel="Compare plans"
+          onAction={() => {
+            closeSettings()
+            setTimeout(() => openPlanDialog('upgrade'), 120)
+          }}
+        />
+      )}
       <Group title="Plan">
         <Row
           title={`${plan.name}${account.apiKey ? ' with your own API key' : ''}`}
@@ -215,7 +231,7 @@ export function BillingPage(): React.JSX.Element {
               </div>
             </>
           ) : (
-            <div className="rounded-lg border border-dashed border-white/[0.1] bg-[#1e1e1d] px-4 py-5 text-center text-[12px] text-[#858581]">
+            <div className="rounded-lg border border-dashed border-white/[0.1] px-4 py-5 text-center text-[12px] text-[#858581]">
               Your actual message history will appear here after you start a chat.
             </div>
           )}

@@ -1,9 +1,12 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 import { cn } from '@/lib/utils'
 import { languageForName } from '@/lib/highlight'
-import { escapeCodeHtml, highlightWithPierre } from '@/lib/pierre-highlight'
+import { escapeCodeHtml, getCachedHighlight, highlightWithPierre } from '@/lib/pierre-highlight'
 
 /** What a message says when the person sent only attachments. It is never shown. */
 // eslint-disable-next-line react-refresh/only-export-components
@@ -89,16 +92,23 @@ export function UserBubble({
 function CodeBlock({ code, lang }: { code: string; lang?: string }): React.JSX.Element {
   const [copied, setCopied] = useState(false)
   const language = languageForName(lang)
-  const [html, setHtml] = useState(() => escapeCodeHtml(code))
+  const [html, setHtml] = useState(() => getCachedHighlight(code, language) ?? escapeCodeHtml(code))
 
   useEffect(() => {
+    const cached = getCachedHighlight(code, language)
+    if (cached !== undefined) {
+      setHtml(cached)
+      return
+    }
     let cancelled = false
-    setHtml(escapeCodeHtml(code))
-    void highlightWithPierre(code, language).then((next) => {
-      if (!cancelled) setHtml(next)
-    })
+    const timer = window.setTimeout(() => {
+      void highlightWithPierre(code, language).then((next) => {
+        if (!cancelled) setHtml(next)
+      })
+    }, 16)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
   }, [code, language])
 
@@ -126,10 +136,45 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }): React.JSX.E
   )
 }
 
-export function Markdown({ text }: { text: string }): React.JSX.Element {
+/** Split markdown into top-level blocks while keeping fenced code and math blocks intact, and close any trailing unclosed code fence so streaming code never flickers. */
+function splitMarkdownBlocks(raw: string): string[] {
+  const lines = raw.split('\n')
+  const blocks: string[] = []
+  let buf: string[] = []
+  let inFence = false
+  let inMath = false
+
+  for (let line of lines) {
+    if (/^\s*(`{3,}|~{3,})/.test(line)) {
+      inFence = !inFence
+    } else if (!inFence) {
+      line = line
+        .replace(/\\\((.+?)\\\)/g, '$$$1$$')
+        .replace(/\\\[(.+?)\\\]/g, '$$$$$1$$$$')
+      const trimmed = line.trim()
+      if (trimmed === '$$' || trimmed === '\\[' || trimmed === '\\]') {
+        if (trimmed === '\\[' || trimmed === '\\]') line = '$$'
+        inMath = !inMath
+      }
+    }
+    if (!inFence && !inMath && line.trim() === '' && buf.length > 0) {
+      blocks.push(buf.join('\n'))
+      buf = []
+    } else {
+      buf.push(line)
+    }
+  }
+  if (buf.length > 0) {
+    blocks.push(inFence ? `${buf.join('\n')}\n\`\`\`` : buf.join('\n'))
+  }
+  return blocks
+}
+
+const MarkdownBlock = React.memo(function MarkdownBlock({ content }: { content: string }): React.JSX.Element {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeKatex]}
       components={{
         p: ({ children }) => <p className="mb-3 last:mb-0 leading-6">{children}</p>,
         h1: ({ children }) => (
@@ -197,7 +242,18 @@ export function Markdown({ text }: { text: string }): React.JSX.Element {
         td: ({ children }) => <td className="border-b px-2 py-1.5">{children}</td>
       }}
     >
-      {text}
+      {content}
     </ReactMarkdown>
+  )
+})
+
+export function Markdown({ text }: { text: string }): React.JSX.Element {
+  const blocks = useMemo(() => splitMarkdownBlocks(text), [text])
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, index) => (
+        <MarkdownBlock key={index} content={block} />
+      ))}
+    </div>
   )
 }

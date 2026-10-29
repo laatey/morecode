@@ -1,18 +1,70 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ExternalLink, FileText } from '@/components/icons'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ExternalLink, FileText, Search, X } from '@/components/icons'
 import { FileIcon } from '@/components/file-icon'
+import { Markdown } from '@/features/ai-assistant/message-parts'
 import { languageFor } from '@/lib/highlight'
-import { escapeCodeHtml, highlightWithPierre } from '@/lib/pierre-highlight'
+import { escapeCodeHtml, getCachedHighlight, highlightWithPierre } from '@/lib/pierre-highlight'
+import { cn } from '@/lib/utils'
 import { takeFilePreviewRequest } from '../file-preview-request'
 import { useRightPanel } from '../store'
 import type { TabContentProps } from '../types'
+import {
+  BinaryMediaViewer,
+  DocxViewer,
+  HtmlPreview,
+  JsonTreeViewer,
+  NotebookViewer,
+  parseDelimited,
+  SpreadsheetViewer,
+  SvgPreview,
+  XlsxViewer
+} from './file-viewers'
 import { TabEmpty } from './tab-kit'
 
 const LINE = 19
 const baseName = (path: string): string => path.split('/').pop() ?? path
+const extOf = (path: string): string => {
+  const b = baseName(path).toLowerCase()
+  const idx = b.lastIndexOf('.')
+  return idx >= 0 ? b.slice(idx) : ''
+}
 
-const TEXT_FILE = /\.(?:[cm]?[jt]sx?|css|scss|sass|less|html?|xml|mdx?|txt|ya?ml|toml|ini|env|py|rb|php|go|rs|java|kt|kts|swift|c|cc|cpp|cxx|h|hpp|sh|bash|zsh|fish|ps1|sql|graphql|gql|vue|svelte|astro|prisma|lock)$/i
-const isTextFile = (path: string): boolean => TEXT_FILE.test(path)
+const TEXT_FILE =
+  /\.(?:[cm]?[jt]sx?|css|scss|sass|less|html?|xml|svg|mdx?|markdown|txt|csv|tsv|jsonc?|jsonl|ipynb|ya?ml|toml|ini|env|py|rb|php|go|rs|java|kt|kts|swift|c|cc|cpp|cxx|h|hpp|sh|bash|zsh|fish|ps1|sql|graphql|gql|vue|svelte|astro|prisma|lock|gitignore|dockerignore|editorconfig)$/i
+const RASTER_IMAGE_FILE = /\.(?:png|jpe?g|gif|webp)$/i
+const BINARY_DOC_FILE = /\.(?:docx|xlsx|xls|ods|pdf|mp3|wav|ogg|m4a|mp4|webm|mov)$/i
+
+const isTextFile = (path: string): boolean => {
+  const b = baseName(path).toLowerCase()
+  if (b === 'dockerfile' || b.startsWith('dockerfile.') || b.startsWith('.env') || b === 'makefile') return true
+  return TEXT_FILE.test(path)
+}
+
+type PreviewKind = 'markdown' | 'csv' | 'tsv' | 'json' | 'jsonl' | 'ipynb' | 'svg' | 'html' | null
+
+function richKindOf(path: string): PreviewKind {
+  const ext = extOf(path)
+  if (ext === '.md' || ext === '.mdx' || ext === '.markdown') return 'markdown'
+  if (ext === '.csv') return 'csv'
+  if (ext === '.tsv') return 'tsv'
+  if (ext === '.json') return 'json'
+  if (ext === '.jsonl') return 'jsonl'
+  if (ext === '.ipynb') return 'ipynb'
+  if (ext === '.svg') return 'svg'
+  if (ext === '.html' || ext === '.htm') return 'html'
+  return null
+}
+
+const PREVIEW_LABELS: Record<NonNullable<PreviewKind>, [string, string]> = {
+  markdown: ['Preview', 'Code'],
+  csv: ['Table', 'Code'],
+  tsv: ['Table', 'Code'],
+  json: ['Tree', 'Code'],
+  jsonl: ['Tree', 'Code'],
+  ipynb: ['Notebook', 'JSON'],
+  svg: ['Preview', 'Code'],
+  html: ['Preview', 'Code']
+}
 
 export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
   const { setAutoTitle } = useRightPanel()
@@ -21,7 +73,9 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [image, setImage] = useState<string | null>(null)
+  const [binary, setBinary] = useState<{ base64: string; mime: string } | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview')
   const dirty = saved !== null && draft !== saved
   const dirtyRef = useRef(false)
   dirtyRef.current = dirty
@@ -48,24 +102,38 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
     setSaved(null)
     setDraft('')
     setImage(null)
+    setBinary(null)
     setError(null)
     setNote(null)
+    setViewMode(richKindOf(path) ? 'preview' : 'code')
+
     const textFile = isTextFile(path)
-    const imageFile = /\.(png|jpe?g|gif|webp|svg)$/i.test(path)
-    const read = textFile ? window.api.workspace.readFile(path) : imageFile ? window.api.workspace.readImage(path) : null
-    if (!read) {
-      setError('Preview is available for images and editable text files. Open other formats in your editor.')
-      return
+    const imageFile = RASTER_IMAGE_FILE.test(path)
+    const binaryFile = BINARY_DOC_FILE.test(path)
+
+    if (textFile) {
+      void window.api.workspace.readFile(path).then((result) => {
+        if (stale) return
+        if (result.ok) {
+          setSaved(result.text)
+          setDraft(result.text)
+        } else setError(result.error)
+      })
+    } else if (imageFile) {
+      void window.api.workspace.readImage(path).then((result) => {
+        if (stale) return
+        if (result.ok) setImage(result.dataUrl)
+        else setError(result.error)
+      })
+    } else if (binaryFile && window.api.workspace.readBinary) {
+      void window.api.workspace.readBinary(path).then((result) => {
+        if (stale) return
+        if (result.ok) setBinary({ base64: result.base64, mime: result.mime })
+        else setError(result.error)
+      })
+    } else {
+      setError('Preview is not available for this binary format. Open it in your default app below.')
     }
-    void read.then((result) => {
-      if (stale) return
-      if (result.ok && 'text' in result) {
-        setSaved(result.text)
-        setDraft(result.text)
-      } else if (result.ok && 'dataUrl' in result) {
-        setImage(result.dataUrl)
-      } else setError(result.error)
-    })
     return () => {
       stale = true
     }
@@ -85,21 +153,95 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
     return <TabEmpty icon={FileText} title="Choose a file">Select a file from Code mode to open it here.</TabEmpty>
   }
 
+  const richKind = richKindOf(path)
+  const ext = extOf(path)
+
+  const renderRichPreview = (): React.JSX.Element => {
+    if (richKind === 'markdown') {
+      return (
+        <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-6 py-5 text-[13px] text-[#dcdcd8]">
+          <div className="mx-auto max-w-[680px]">
+            <Markdown text={draft} />
+          </div>
+        </div>
+      )
+    }
+    if (richKind === 'csv' || richKind === 'tsv') {
+      const rows = parseDelimited(draft, richKind === 'tsv' ? '\t' : ',')
+      return <SpreadsheetViewer sheets={[{ name: baseName(path), rows }]} />
+    }
+    if (richKind === 'json' || richKind === 'jsonl') {
+      return <JsonTreeViewer text={draft} jsonl={richKind === 'jsonl'} />
+    }
+    if (richKind === 'ipynb') {
+      return <NotebookViewer text={draft} />
+    }
+    if (richKind === 'svg') {
+      return <SvgPreview svg={draft} />
+    }
+    if (richKind === 'html') {
+      return <HtmlPreview html={draft} />
+    }
+    return <CodeEditor path={path} value={draft} onChange={setDraft} onSave={() => void save()} />
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {richKind && saved !== null && !error && (
+        <div className="flex h-8 shrink-0 items-center justify-between border-b border-white/[0.07] px-3">
+          <div className="inline-flex rounded-[6px] bg-white/[0.05] p-0.5 text-[11.5px]">
+            {(['preview', 'code'] as const).map((m, idx) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setViewMode(m)}
+                className={cn(
+                  'cursor-pointer rounded-[5px] px-2.5 py-0.5 transition-colors',
+                  viewMode === m ? 'bg-white/[0.12] font-medium text-[#ececea]' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {PREVIEW_LABELS[richKind][idx]}
+              </button>
+            ))}
+          </div>
+          {dirty && (
+            <button
+              type="button"
+              onClick={() => void save()}
+              className="cursor-pointer rounded-[5px] bg-[#2563eb] px-2 py-0.5 text-[11px] font-medium text-white hover:bg-[#2f6fe0]"
+            >
+              Save
+            </button>
+          )}
+        </div>
+      )}
+
       {error ? (
         <p className="p-4 text-[12px] text-[#e8b365]">{error}</p>
       ) : isTextFile(path) && saved === null ? (
         <p className="p-4 text-[12px] text-muted-foreground">Opening…</p>
       ) : isTextFile(path) ? (
-        <CodeEditor path={path} value={draft} onChange={setDraft} onSave={() => void save()} />
+        richKind && viewMode === 'preview' ? (
+          renderRichPreview()
+        ) : (
+          <CodeEditor path={path} value={draft} onChange={setDraft} onSave={() => void save()} />
+        )
       ) : image ? (
         <div className="slim-scroll flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
           <img src={image} alt={path} className="max-h-full max-w-full object-contain" />
         </div>
+      ) : binary ? (
+        ext === '.docx' ? (
+          <DocxViewer base64={binary.base64} />
+        ) : ext === '.xlsx' || ext === '.xls' || ext === '.ods' ? (
+          <XlsxViewer base64={binary.base64} />
+        ) : (
+          <BinaryMediaViewer base64={binary.base64} mime={binary.mime} path={path} />
+        )
       ) : (
         <p className="p-4 text-[12px] text-muted-foreground">Opening…</p>
       )}
+
       <div className="flex h-[26px] shrink-0 items-center gap-2 border-t border-white/[0.07] px-3 text-[11px] text-muted-foreground">
         <FileIcon name={baseName(path)} className="h-3.5 w-3.5" />
         <span className="min-w-0 flex-1 truncate" title={path}>
@@ -121,10 +263,11 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
   )
 }
 
+const PAIRS: Record<string, string> = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'", '`': '`' }
+
 /**
- * A small real editor with no extra packages: a transparent text box sits exactly on top of the
- * highlighted code, so you type in the text box and see the colours underneath. Tab indents,
- * Enter keeps the indent, Ctrl/Cmd+S saves, and the browser's own undo keeps working.
+ * Code editor with Shiki syntax highlighting, in-file search (Ctrl/Cmd+F), auto-closing brackets,
+ * Tab/Shift+Tab block indentation, and native undo/redo.
  */
 function CodeEditor({
   path,
@@ -138,21 +281,62 @@ function CodeEditor({
   onSave: () => void
 }): React.JSX.Element {
   const area = useRef<HTMLTextAreaElement>(null)
+  const findInput = useRef<HTMLInputElement>(null)
   const [caret, setCaret] = useState({ line: 1, col: 1 })
-  const [html, setHtml] = useState(() => escapeCodeHtml(value))
+  const lang = languageFor(path)
+  const [html, setHtml] = useState(() => getCachedHighlight(value, lang) ?? escapeCodeHtml(value))
+  const [findOpen, setFindOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState('')
+  const [matchIdx, setMatchIdx] = useState(0)
+
   const lineCount = value.split('\n').length
   const gutter = String(lineCount).length
 
   useEffect(() => {
+    const cached = getCachedHighlight(value, lang)
+    if (cached !== undefined) {
+      setHtml(cached)
+      return
+    }
     let cancelled = false
-    setHtml(escapeCodeHtml(value))
-    void highlightWithPierre(value, languageFor(path)).then((next) => {
-      if (!cancelled) setHtml(next)
-    })
+    const timer = window.setTimeout(() => {
+      void highlightWithPierre(value, lang).then((next) => {
+        if (!cancelled) setHtml(next)
+      })
+    }, 16)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
-  }, [path, value])
+  }, [lang, value])
+
+  const matches = useMemo(() => {
+    const q = findQuery.toLowerCase()
+    if (!q) return []
+    const lower = value.toLowerCase()
+    const out: number[] = []
+    let pos = 0
+    while (pos <= lower.length - q.length) {
+      const idx = lower.indexOf(q, pos)
+      if (idx === -1) break
+      out.push(idx)
+      pos = idx + Math.max(1, q.length)
+    }
+    return out
+  }, [value, findQuery])
+
+  const jumpToMatch = (idx: number): void => {
+    if (!matches.length || !area.current) return
+    const safeIdx = ((idx % matches.length) + matches.length) % matches.length
+    setMatchIdx(safeIdx)
+    const start = matches[safeIdx]
+    const end = start + findQuery.length
+    area.current.focus()
+    area.current.setSelectionRange(start, end)
+    const before = value.slice(0, start)
+    const line = before.split('\n').length
+    setCaret({ line, col: before.length - before.lastIndexOf('\n') })
+  }
 
   const where = (): void => {
     const el = area.current
@@ -163,7 +347,6 @@ function CodeEditor({
   }
 
   const insert = (text: string): void => {
-    // execCommand keeps undo/redo working, which setting .value would break
     area.current?.focus()
     document.execCommand('insertText', false, text)
   }
@@ -173,6 +356,10 @@ function CodeEditor({
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
       e.preventDefault()
       onSave()
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+      e.preventDefault()
+      setFindOpen(true)
+      window.setTimeout(() => findInput.current?.focus(), 10)
     } else if (e.key === 'Tab') {
       e.preventDefault()
       const { selectionStart: a, selectionEnd: b, value: v } = el
@@ -190,43 +377,92 @@ function CodeEditor({
       const open = /[{[(]$/.test(v.slice(start, a).trimEnd())
       e.preventDefault()
       insert(`\n${indent}${open ? '  ' : ''}`)
+    } else if (!e.ctrlKey && !e.metaKey && !e.altKey && PAIRS[e.key]) {
+      const { selectionStart: a, selectionEnd: b, value: v } = el
+      if (a !== b) {
+        e.preventDefault()
+        const wrapped = `${e.key}${v.slice(a, b)}${PAIRS[e.key]}`
+        insert(wrapped)
+        el.setSelectionRange(a + 1, b + 1)
+      }
     }
   }
 
   return (
-    <div className="slim-scroll min-h-0 flex-1 overflow-auto font-mono text-[12px]" style={{ lineHeight: `${LINE}px` }}>
-      <div className="flex min-h-full w-max min-w-full">
-        <div
-          aria-hidden
-          className="sticky left-0 z-10 shrink-0 select-none bg-background py-3 pl-3 pr-3 text-right text-[#5d5d5a]"
-          style={{ minWidth: `${gutter + 3}ch` }}
-        >
-          {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i} className={i + 1 === caret.line ? 'text-[#a8a8a6]' : undefined}>
-              {i + 1}
-            </div>
-          ))}
-        </div>
-        <div className="relative min-w-0 flex-1 py-3 pr-6">
-          <pre className="pointer-events-none m-0 whitespace-pre text-[#d6d6d3]" aria-hidden>
-            <code className="pierre-code" dangerouslySetInnerHTML={{ __html: html }} />
-          </pre>
-          <textarea
-            ref={area}
-            value={value}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            wrap="off"
-            aria-label={`Edit ${path}`}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={onKeyDown}
-            onKeyUp={where}
-            onClick={where}
-            onSelect={where}
-            className="absolute inset-0 h-full w-full resize-none overflow-hidden whitespace-pre bg-transparent py-3 pr-6 font-[inherit] text-transparent caret-[#ececea] outline-none selection:bg-[#3b82f6]/30"
-            style={{ lineHeight: `${LINE}px`, tabSize: 2 }}
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {findOpen && (
+        <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-white/[0.08] bg-[#252524] px-3 text-[11.5px]">
+          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <input
+            ref={findInput}
+            type="text"
+            value={findQuery}
+            onChange={(e) => {
+              setFindQuery(e.target.value)
+              setMatchIdx(0)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                jumpToMatch(e.shiftKey ? matchIdx - 1 : matchIdx + 1)
+              } else if (e.key === 'Escape') {
+                setFindOpen(false)
+                area.current?.focus()
+              }
+            }}
+            placeholder="Find in file…"
+            className="h-6 min-w-0 flex-1 rounded-[5px] border border-white/[0.1] bg-white/[0.04] px-2 text-[11.5px] text-[#ececea] outline-none placeholder:text-[#77776f] focus:border-white/[0.24]"
           />
+          <span className="min-w-[48px] text-center tabular-nums text-muted-foreground">
+            {matches.length ? `${(matchIdx % matches.length) + 1}/${matches.length}` : '0/0'}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setFindOpen(false)
+              area.current?.focus()
+            }}
+            className="grid h-5 w-5 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-white/[0.08] hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
+      <div className="slim-scroll min-h-0 flex-1 overflow-auto font-mono text-[12px]" style={{ lineHeight: `${LINE}px` }}>
+        <div className="flex min-h-full w-max min-w-full">
+          <div
+            aria-hidden
+            className="sticky left-0 z-10 shrink-0 select-none bg-background py-3 pl-3 pr-3 text-right text-[#5d5d5a]"
+            style={{ minWidth: `${gutter + 3}ch` }}
+          >
+            {Array.from({ length: lineCount }, (_, i) => (
+              <div key={i} className={i + 1 === caret.line ? 'text-[#a8a8a6]' : undefined}>
+                {i + 1}
+              </div>
+            ))}
+          </div>
+          <div className="relative min-w-0 flex-1 py-3 pr-6">
+            <pre className="pointer-events-none m-0 whitespace-pre text-[#d6d6d3]" aria-hidden>
+              <code className="pierre-code" dangerouslySetInnerHTML={{ __html: html }} />
+            </pre>
+            <textarea
+              ref={area}
+              value={value}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              wrap="off"
+              aria-label={`Edit ${path}`}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={onKeyDown}
+              onKeyUp={where}
+              onClick={where}
+              onSelect={where}
+              className="absolute inset-0 h-full w-full resize-none overflow-hidden whitespace-pre bg-transparent py-3 pr-6 font-[inherit] text-transparent caret-[#ececea] outline-none selection:bg-[#3b82f6]/30"
+              style={{ lineHeight: `${LINE}px`, tabSize: 2 }}
+            />
+          </div>
         </div>
       </div>
     </div>
