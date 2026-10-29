@@ -14,6 +14,8 @@ export interface Routine {
   lastRunAt?: number
   /** The project every run happens in. Null means a loose chat with no project folder. */
   projectId?: string | null
+  /** true: when it is due it opens its own chat and runs by itself. false (default): the person is told and starts it. */
+  auto?: boolean
   /** The chat the most recent run happened in, so it can be opened from the routine. */
   lastChatId?: string
 }
@@ -21,6 +23,7 @@ export interface Routine {
 interface RoutineApi {
   routines: Routine[]
   add: (routine: Omit<Routine, 'id' | 'enabled' | 'nextRunAt'>) => void
+  update: (id: string, patch: Partial<Pick<Routine, 'title' | 'prompt' | 'cadence' | 'time' | 'weekday' | 'projectId' | 'auto'>>) => void
   toggle: (id: string) => void
   remove: (id: string) => void
   markRun: (id: string, at?: number, chatId?: string) => void
@@ -74,6 +77,11 @@ export function RoutinesProvider({ children }: { children: React.ReactNode }): R
       item.nextRunAt = nextRoutineTime(item)
       setRoutines((items) => [item, ...items])
     },
+    update: (id, patch) => setRoutines((items) => items.map((item) => {
+      if (item.id !== id) return item
+      const next = { ...item, ...patch }
+      return { ...next, nextRunAt: item.enabled ? nextRoutineTime(next) : item.nextRunAt }
+    })),
     toggle: (id) => setRoutines((items) => items.map((item) => item.id !== id ? item : {
       ...item,
       enabled: !item.enabled,

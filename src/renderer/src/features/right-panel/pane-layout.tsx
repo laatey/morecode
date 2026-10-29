@@ -2,6 +2,7 @@ import React from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { cn } from '@/lib/utils'
 import { getTabDefinition, TAB_DEFINITIONS } from './registry'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { getLayout } from './layouts'
 import { useRightPanel } from './store'
 
@@ -55,7 +56,13 @@ function Pane({ index }: { index: number }): React.JSX.Element {
           'after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-[#3b82f6]'
       )}
     >
-      {tab && def ? <def.component tabId={tab.id} kind={tab.kind} /> : <EmptyPane />}
+      {tab && def ? (
+        <ErrorBoundary resetKey={tab.id} label={def.title ?? 'This tab'}>
+          <def.component tabId={tab.id} kind={tab.kind} />
+        </ErrorBoundary>
+      ) : (
+        <EmptyPane />
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { ipcMain, type WebContents } from 'electron'
-import { getNewProjectRoot } from '../workspace'
+import { existsSync, statSync } from 'fs'
+import { getChatRoot } from '../workspace'
 import { authorize } from '../mcp/oauth'
 import { disconnect, disconnectAll, testConnector } from '../mcp/manager'
 import type { McpConfig } from '../mcp/client'
@@ -30,6 +31,8 @@ function valid(p: unknown): p is Payload {
     typeof x.model === 'string' &&
     MODELS.test(x.model) &&
     typeof x.prompt === 'string' &&
+    (x.chatId === undefined || (typeof x.chatId === 'string' && x.chatId.length < 80)) &&
+    (x.projectPath === undefined || typeof x.projectPath === 'string') &&
     Array.isArray(x.images) &&
     Array.isArray(x.attachments) &&
     Array.isArray(x.history) &&
@@ -145,12 +148,20 @@ export function registerAgentIpc(): void {
       if (!sender.isDestroyed()) sender.send('agent:event', { runId: payload.runId, ...msg })
     }
 
+    // A chat is in exactly one environment:
+    //  - in a project whose folder exists  -> that folder
+    //  - anything else (no project, or the folder is gone/not on this computer) -> its own private,
+    //    empty folder. Never the last project that happened to be open, and never the folder that
+    //    holds every project.
+    const projectOk =
+      !!payload.projectPath && existsSync(payload.projectPath) && statSync(payload.projectPath).isDirectory()
+    const project = projectOk ? payload.projectPath : undefined
+
     void runAgent(
       {
         ...payload,
-        // Loose chats run from the neutral Documents\MoreCode Projects parent, never from the
-        // last project folder that happened to be open in the app.
-        cwd: payload.projectPath ?? getNewProjectRoot()
+        projectPath: project,
+        cwd: project ?? getChatRoot(payload.chatId ?? payload.runId)
       },
       {
         signal: live.abort.signal,

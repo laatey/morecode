@@ -32,6 +32,8 @@ export type GitState =
       remoteUrl: string | null
       lastMessage: string | null
       hasGh: boolean
+      /** Files left out of `files` (build folders, or more than the list can show). */
+      hidden: number
     }
 
 export type GitResult<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string }
@@ -43,12 +45,12 @@ interface Run {
   missing?: boolean
 }
 
-function run(cmd: string, args: string[], cwd: string, timeout = 30_000): Promise<Run> {
+function run(cmd: string, args: string[], cwd: string, timeout = 30_000, maxBuffer = 8 * 1024 * 1024): Promise<Run> {
   return new Promise((done) => {
     execFile(
       cmd,
       args,
-      { cwd, timeout, maxBuffer: 8 * 1024 * 1024, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } },
+      { cwd, timeout, maxBuffer, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } },
       (error, stdout, stderr) => {
         if (!error) return done({ code: 0, out: String(stdout), err: String(stderr) })
         const e = error as Error & { code?: number | string }
@@ -64,6 +66,19 @@ function run(cmd: string, args: string[], cwd: string, timeout = 30_000): Promis
 }
 
 const git = (args: string[], cwd = getWorkspaceRoot()): Promise<Run> => run('git', args, cwd)
+
+/**
+ * Folders full of generated files. A project that has not ignored them (a fresh Electron app with an
+ * untracked node_modules, say) would list tens of thousands of files, and reading each one froze the
+ * whole app. They are never offered for saving from here, and git is told not to walk into them.
+ */
+const HEAVY = ['node_modules', 'dist', 'out', 'build', '.next', '.cache', '.venv', 'venv', '__pycache__', 'target', 'vendor', '.turbo', 'coverage']
+const HEAVY_SPEC = HEAVY.map((d) => `:(exclude,glob)**/${d}/**`)
+const isHeavy = (path: string): boolean => path.split('/').some((part) => HEAVY.includes(part))
+
+/** The most files the Changes list will hold, and how many new files get a line count (each is a disk read). */
+const MAX_LISTED = 400
+const MAX_COUNTED = 60
 
 /** Turn git's raw complaints into one calm sentence. */
 function friendly(raw: string): string {
@@ -104,7 +119,7 @@ function countLines(root: string, rel: string): number {
   try {
     const full = join(root, rel)
     const st = statSync(full)
-    if (!st.isFile() || st.size > 1024 * 1024) return 0
+    if (!st.isFile() || st.size > 256 * 1024) return 0
     const text = readFileSync(full, 'utf8')
     return text === '' ? 0 : text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
   } catch {
@@ -136,7 +151,7 @@ async function readState(): Promise<GitState> {
 
   const [branchRes, statusRes, numRes, remoteRes, lastRes, gh] = await Promise.all([
     git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd),
-    git(['status', '--porcelain=v1', '-z', '--untracked-files=all'], cwd),
+    run('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', '.', ...HEAVY_SPEC], cwd, 20_000, 64 * 1024 * 1024),
     git(['diff', '--numstat', 'HEAD', '--'], cwd),
     git(['remote', 'get-url', 'origin'], cwd),
     git(['log', '-1', '--format=%s'], cwd),
@@ -151,6 +166,8 @@ async function readState(): Promise<GitState> {
   }
 
   const files: GitFile[] = []
+  let hidden = 0
+  let counted = 0
   const parts = statusRes.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
     const entry = parts[i]
@@ -163,13 +180,17 @@ async function readState(): Promise<GitState> {
     else if (code.includes('A')) status = 'added'
     else if (code.includes('D')) status = 'deleted'
     if (code.includes('R') || code.includes('C')) i++ // renames carry the old name next
+    if (isHeavy(path) || files.length >= MAX_LISTED) {
+      hidden++
+      continue
+    }
     const s = stats.get(path)
-    files.push({
-      path,
-      status,
-      added: s?.added ?? (status === 'untracked' ? countLines(cwd, path) : 0),
-      removed: s?.removed ?? 0
-    })
+    let added = s?.added ?? 0
+    if (!s && status === 'untracked' && counted < MAX_COUNTED) {
+      counted++
+      added = countLines(cwd, path)
+    }
+    files.push({ path, status, added, removed: s?.removed ?? 0 })
   }
 
   const branch = branchRes.code === 0 ? branchRes.out.trim() : 'main'
@@ -196,7 +217,8 @@ async function readState(): Promise<GitState> {
     hasRemote,
     remoteUrl: hasRemote ? remoteRes.out.trim() : null,
     lastMessage: lastRes.code === 0 ? lastRes.out.trim() || null : null,
-    hasGh: gh.code === 0
+    hasGh: gh.code === 0,
+    hidden
   }
 }
 

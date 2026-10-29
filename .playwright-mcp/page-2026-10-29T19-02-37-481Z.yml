@@ -1,0 +1,446 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content":
+    - /url: "#geist-skip-nav"
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - banner [ref=e4]:
+        - generic [ref=e5]:
+          - link "Vercel" [ref=e8] [cursor=pointer]:
+            - /url: /home
+          - navigation "Main navigation" [ref=e13]:
+            - generic [ref=e14]:
+              - button "Products" [ref=e15] [cursor=pointer]
+              - button "Resources" [ref=e17] [cursor=pointer]
+              - link "Enterprise" [ref=e19] [cursor=pointer]:
+                - /url: /enterprise
+              - link "Pricing" [ref=e21] [cursor=pointer]:
+                - /url: /pricing
+          - generic [ref=e25]:
+            - link "Get a Demo" [ref=e26] [cursor=pointer]:
+              - /url: /contact/sales
+            - link "Log In" [ref=e28] [cursor=pointer]:
+              - /url: /login
+            - link "Sign Up" [ref=e30] [cursor=pointer]:
+              - /url: /signup
+      - main [ref=e33]:
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - generic [ref=e39]:
+              - generic:
+                - generic:
+                  - generic [aria-hidden]:
+                    - generic: Drop to deploy
+                    - generic: Loading
+              - generic [ref=e40]:
+                - heading "Agentic Infrastructure" [level=1] [ref=e41]
+                - generic [ref=e42]:
+                  - link "Deploy now" [ref=e43] [cursor=pointer]:
+                    - /url: /signup
+                  - link "Talk to sales" [ref=e45] [cursor=pointer]:
+                    - /url: /contact/sales
+              - navigation "Platform capabilities" [ref=e48]:
+                - generic [ref=e50]:
+                  - text: For coding agents
+                  - generic [aria-hidden] [ref=e51]: to deploy in their native language, with Vercel's API, CLI, MCP, and Skills.
+                - generic [ref=e53]:
+                  - text: To ship apps and agents
+                  - generic [aria-hidden] [ref=e54]: in Sandboxed VMs, with durable backends, powered by 400+ models.
+                - generic [ref=e56]:
+                  - text: Automated by agents
+                  - generic [aria-hidden] [ref=e57]: who autonomously investigate errors, plan fixes, and open PRs.
+            - generic [ref=e61]:
+              - generic:
+                - img "Meta"
+              - generic:
+                - img "DoorDash"
+              - generic:
+                - img "OpenAI"
+              - generic:
+                - img "SpaceXAI"
+              - generic:
+                - img "The Weather Company"
+              - generic:
+                - img "Polymarket"
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - heading "Build agents on infrastructure that thinks like them" [level=2] [ref=e66]
+              - generic [ref=e67]:
+                - generic [ref=e69]:
+                  - img "Build agents on infrastructure that thinks like them"
+                - generic [ref=e70]:
+                  - paragraph [ref=e71]: Notion powers millions of agent conversations daily on Vercel.
+                  - list [ref=e72]:
+                    - listitem [ref=e73]: Features
+                    - listitem [ref=e74]: Durable Orchestration
+                    - listitem [ref=e75]: Sandboxed Environments
+                    - listitem [ref=e76]: AI Model Gateway
+                    - listitem [ref=e77]: Fluid Compute
+            - generic [ref=e79]:
+              - heading "Ship apps that scale from zero to millions instantly" [level=2] [ref=e81]
+              - generic [ref=e82]:
+                - generic [ref=e84]:
+                  - img "Ship apps that scale from zero to millions instantly"
+                - generic [ref=e85]:
+                  - paragraph [ref=e86]: Zapier serves over 100 million monthly website visits on Vercel.
+                  - list [ref=e87]:
+                    - listitem [ref=e88]: Features
+                    - listitem [ref=e89]: Global Delivery
+                    - listitem [ref=e90]: Deployment Environments
+                    - listitem [ref=e91]: Serverless Functions
+                    - listitem [ref=e92]: Web Application Firewall
+            - generic [ref=e94]:
+              - heading "Host platforms that serve every customer" [level=2] [ref=e96]
+              - generic [ref=e97]:
+                - generic [ref=e99]:
+                  - img "Host platforms that serve every customer"
+                - generic [ref=e100]:
+                  - paragraph [ref=e101]: Mintlify powers documentation for over 20,000 companies on Vercel.
+                  - list [ref=e102]:
+                    - listitem [ref=e103]: Features
+                    - listitem [ref=e104]: Tenant Isolation
+                    - listitem [ref=e105]: Domain Management
+                    - listitem [ref=e106]: Custom SSL Certificates
+                    - listitem [ref=e107]: Preview URLs
+          - generic [ref=e109]:
+            - heading "Recently shipped" [level=2] [ref=e111]
+            - generic [ref=e113]:
+              - link [ref=e114] [cursor=pointer]:
+                - /url: /backends
+                - generic [aria-hidden] [ref=e116]:
+                  - generic [aria-hidden] [ref=e118]:
+                    - generic [aria-hidden]:
+                      - generic: Backend
+                      - generic: Queue
+                      - generic: Daemon
+                  - generic [ref=e121]:
+                    - paragraph [ref=e122]: Backends
+                    - paragraph [ref=e123]: Run Python backends, queues, and daemons on Vercel, alongside your frontend.
+              - link [ref=e124] [cursor=pointer]:
+                - /url: /agents
+                - generic [ref=e126]:
+                  - generic [ref=e127]: "@data-agent How did revenue trend last quarter by region?"
+                  - generic [ref=e137]:
+                    - generic [ref=e138]: Pulled Q3 revenue from the warehouse. EMEA grew 18%, ahead of plan.
+                    - generic [ref=e139]: "North America dipped 4% in August. I posted the chart in channel #revenue."
+                - generic [ref=e144]:
+                  - paragraph [ref=e145]: Agents
+                  - paragraph [ref=e146]: Build agents and run them on Vercel's agent stack.
+              - link [ref=e147] [cursor=pointer]:
+                - /url: /sandbox
+                - generic [ref=e152]:
+                  - paragraph [ref=e153]: Sandbox
+                  - paragraph [ref=e154]: The safest way to run code you didn't write.
+          - generic [ref=e156]:
+            - heading "Built by you, or your agents" [level=2] [ref=e158]
+            - generic [ref=e160]:
+              - link "Deploy now" [ref=e161] [cursor=pointer]:
+                - /url: /new
+              - button "Onboard your agent" [ref=e163] [cursor=pointer]
+      - contentinfo [ref=e190]:
+        - navigation "Vercel Directory" [ref=e191]:
+          - generic [ref=e192]:
+            - generic [ref=e193]:
+              - heading "Agent Stack" [level=2] [ref=e194]
+              - list [ref=e195]:
+                - listitem [ref=e196]:
+                  - link "AI SDK" [ref=e197] [cursor=pointer]:
+                    - /url: /ai-sdk
+                - listitem [ref=e198]:
+                  - link "AI Gateway" [ref=e199] [cursor=pointer]:
+                    - /url: /ai-gateway
+                - listitem [ref=e200]:
+                  - link "Sandbox" [ref=e201] [cursor=pointer]:
+                    - /url: /sandbox
+                - listitem [ref=e202]:
+                  - link "Workflows" [ref=e203] [cursor=pointer]:
+                    - /url: /workflows
+                - listitem [ref=e204]:
+                  - link "Connect New" [ref=e205] [cursor=pointer]:
+                    - /url: /connect
+                    - text: Connect
+                    - generic [ref=e206]: New
+                - listitem [ref=e207]:
+                  - link "Passport New" [ref=e208] [cursor=pointer]:
+                    - /url: /passport
+                    - text: Passport
+                    - generic [ref=e209]: New
+                - listitem [ref=e210]:
+                  - link "eve New" [ref=e211] [cursor=pointer]:
+                    - /url: /eve
+                    - text: eve
+                    - generic [ref=e212]: New
+            - generic [ref=e213]:
+              - heading "Core Platform" [level=2] [ref=e214]
+              - list [ref=e215]:
+                - listitem [ref=e216]:
+                  - link "CI/CD" [ref=e217] [cursor=pointer]:
+                    - /url: /products/previews
+                - listitem [ref=e218]:
+                  - link "Content Delivery" [ref=e219] [cursor=pointer]:
+                    - /url: /cdn
+                - listitem [ref=e220]:
+                  - link "Fluid Compute" [ref=e221] [cursor=pointer]:
+                    - /url: /fluid
+                - listitem [ref=e222]:
+                  - link "Observability" [ref=e223] [cursor=pointer]:
+                    - /url: /products/observability
+            - generic [ref=e224]:
+              - heading "Security" [level=2] [ref=e225]
+              - list [ref=e226]:
+                - listitem [ref=e227]:
+                  - link "Platform Security" [ref=e228] [cursor=pointer]:
+                    - /url: /security
+                - listitem [ref=e229]:
+                  - link "WAF" [ref=e230] [cursor=pointer]:
+                    - /url: /security/web-application-firewall
+                - listitem [ref=e231]:
+                  - link "Bot Management" [ref=e232] [cursor=pointer]:
+                    - /url: /security/bot-management
+                - listitem [ref=e233]:
+                  - link "BotID" [ref=e234] [cursor=pointer]:
+                    - /url: /botid
+            - generic [ref=e235]:
+              - heading "Tools" [level=2] [ref=e236]
+              - list [ref=e237]:
+                - listitem [ref=e238]:
+                  - link "Vercel Drop" [ref=e239] [cursor=pointer]:
+                    - /url: /drop
+                - listitem [ref=e240]:
+                  - link "Vercel Agent" [ref=e241] [cursor=pointer]:
+                    - /url: /agent
+                - listitem [ref=e242]:
+                  - link "Vercel Plugin" [ref=e243] [cursor=pointer]:
+                    - /url: /plugin
+                - listitem [ref=e244]:
+                  - link "Agent Skills" [ref=e245] [cursor=pointer]:
+                    - /url: https://skills.sh
+                - listitem [ref=e246]:
+                  - link "Domains" [ref=e247] [cursor=pointer]:
+                    - /url: /domains
+                - listitem [ref=e248]:
+                  - link "v0" [ref=e249] [cursor=pointer]:
+                    - /url: https://v0.app
+            - generic [ref=e250]:
+              - heading "Frameworks" [level=2] [ref=e251]
+              - list [ref=e252]:
+                - listitem [ref=e253]:
+                  - link "eve New" [ref=e254] [cursor=pointer]:
+                    - /url: https://eve.dev/
+                    - text: eve
+                    - generic [ref=e255]: New
+                - listitem [ref=e256]:
+                  - link "Next.js" [ref=e257] [cursor=pointer]:
+                    - /url: /frameworks/nextjs
+                - listitem [ref=e258]:
+                  - link "Nuxt" [ref=e259] [cursor=pointer]:
+                    - /url: /docs/frameworks/full-stack/nuxt
+                - listitem [ref=e260]:
+                  - link "SvelteKit" [ref=e261] [cursor=pointer]:
+                    - /url: /docs/frameworks/full-stack/sveltekit
+                - listitem [ref=e262]:
+                  - link "Nitro" [ref=e263] [cursor=pointer]:
+                    - /url: /docs/frameworks/backend/nitro
+                - listitem [ref=e264]:
+                  - link "Turborepo" [ref=e265] [cursor=pointer]:
+                    - /url: /solutions/turborepo
+                - listitem [ref=e266]:
+                  - link "Tanstack Start" [ref=e267] [cursor=pointer]:
+                    - /url: /docs/frameworks/full-stack/tanstack-start
+                - listitem [ref=e268]:
+                  - link "FastAPI" [ref=e269] [cursor=pointer]:
+                    - /url: /docs/frameworks/backend/fastapi
+                - listitem [ref=e270]:
+                  - link "All frameworks" [ref=e271] [cursor=pointer]:
+                    - /url: /docs/frameworks
+            - generic [ref=e272]:
+              - heading "SDKs" [level=2] [ref=e273]
+              - list [ref=e274]:
+                - listitem [ref=e275]:
+                  - link "Vercel SDK" [ref=e276] [cursor=pointer]:
+                    - /url: /docs/rest-api/sdk
+                - listitem [ref=e277]:
+                  - link "Workflow SDK" [ref=e278] [cursor=pointer]:
+                    - /url: /workflows
+                - listitem [ref=e279]:
+                  - link "Flags SDK" [ref=e280] [cursor=pointer]:
+                    - /url: /docs/flags/flags-sdk-reference
+                - listitem [ref=e281]:
+                  - link "Chat SDK" [ref=e282] [cursor=pointer]:
+                    - /url: /chat
+                - listitem [ref=e283]:
+                  - link "Queues SDK" [ref=e284] [cursor=pointer]:
+                    - /url: /docs/queues/sdk
+                - listitem [ref=e285]:
+                  - link "Streamdown" [ref=e286] [cursor=pointer]:
+                    - /url: https://streamdown.ai
+            - generic [ref=e287]:
+              - heading "Build" [level=2] [ref=e288]
+              - list [ref=e289]:
+                - listitem [ref=e290]:
+                  - link "AI Apps" [ref=e291] [cursor=pointer]:
+                    - /url: /solutions/ai-apps
+                - listitem [ref=e292]:
+                  - link "Web Apps" [ref=e293] [cursor=pointer]:
+                    - /url: /for/web-apps
+                - listitem [ref=e294]:
+                  - link "Marketing Sites" [ref=e295] [cursor=pointer]:
+                    - /url: /solutions/marketing-sites
+                - listitem [ref=e296]:
+                  - link "Platforms" [ref=e297] [cursor=pointer]:
+                    - /url: /for/platforms
+                - listitem [ref=e298]:
+                  - link "Commerce" [ref=e299] [cursor=pointer]:
+                    - /url: /solutions/composable-commerce
+                - listitem [ref=e300]:
+                  - link "Platform Engineers" [ref=e301] [cursor=pointer]:
+                    - /url: /solutions/platform-engineering
+                - listitem [ref=e302]:
+                  - link "Design Engineers" [ref=e303] [cursor=pointer]:
+                    - /url: /solutions/design-engineering
+            - generic [ref=e304]:
+              - heading "Learn" [level=2] [ref=e305]
+              - list [ref=e306]:
+                - listitem [ref=e307]:
+                  - link "Docs" [ref=e308] [cursor=pointer]:
+                    - /url: /docs
+                - listitem [ref=e309]:
+                  - link "Blog" [ref=e310] [cursor=pointer]:
+                    - /url: /blog
+                - listitem [ref=e311]:
+                  - link "Changelog" [ref=e312] [cursor=pointer]:
+                    - /url: /changelog
+                - listitem [ref=e313]:
+                  - link "Knowledge Base" [ref=e314] [cursor=pointer]:
+                    - /url: /kb
+                - listitem [ref=e315]:
+                  - link "Academy" [ref=e316] [cursor=pointer]:
+                    - /url: /academy
+                - listitem [ref=e317]:
+                  - link "Articles" [ref=e318] [cursor=pointer]:
+                    - /url: /i
+                - listitem [ref=e319]:
+                  - link "Community" [ref=e320] [cursor=pointer]:
+                    - /url: https://community.vercel.com
+                - listitem [ref=e321]:
+                  - link "Is Agentic" [ref=e322] [cursor=pointer]:
+                    - /url: https://is-agentic.com
+            - generic [ref=e323]:
+              - heading "Explore" [level=2] [ref=e324]
+              - list [ref=e325]:
+                - listitem [ref=e326]:
+                  - link "Customers" [ref=e327] [cursor=pointer]:
+                    - /url: /customers
+                - listitem [ref=e328]:
+                  - link "Marketplace" [ref=e329] [cursor=pointer]:
+                    - /url: /marketplace
+                - listitem [ref=e330]:
+                  - link "Templates" [ref=e331] [cursor=pointer]:
+                    - /url: /templates
+                - listitem [ref=e332]:
+                  - link "Partner Finder" [ref=e333] [cursor=pointer]:
+                    - /url: /partners/solution-partners
+                - listitem [ref=e334]:
+                  - link "Vercel + AWS" [ref=e335] [cursor=pointer]:
+                    - /url: /partners/aws
+            - generic [ref=e336]:
+              - heading "Company" [level=2] [ref=e337]
+              - list [ref=e338]:
+                - listitem [ref=e339]:
+                  - link "About" [ref=e340] [cursor=pointer]:
+                    - /url: /about
+                - listitem [ref=e341]:
+                  - link "Careers" [ref=e342] [cursor=pointer]:
+                    - /url: /careers
+                - listitem [ref=e343]:
+                  - link "Press" [ref=e344] [cursor=pointer]:
+                    - /url: /press
+                - listitem [ref=e345]:
+                  - link "Events" [ref=e346] [cursor=pointer]:
+                    - /url: /events
+                - listitem [ref=e347]:
+                  - link "Startups" [ref=e348] [cursor=pointer]:
+                    - /url: /startups
+                - listitem [ref=e349]:
+                  - link "Shipped on Vercel" [ref=e350] [cursor=pointer]:
+                    - /url: /shipped
+                - listitem [ref=e351]:
+                  - link "Open Source Program" [ref=e352] [cursor=pointer]:
+                    - /url: /open-source-program
+                - listitem [ref=e353]:
+                  - link "Enterprise" [ref=e354] [cursor=pointer]:
+                    - /url: /enterprise
+                - listitem [ref=e355]:
+                  - link "Pricing" [ref=e356] [cursor=pointer]:
+                    - /url: /pricing
+                - listitem [ref=e357]:
+                  - link "Help" [ref=e358] [cursor=pointer]:
+                    - /url: /help
+            - generic [ref=e359]:
+              - heading "Legal & Trust" [level=2] [ref=e360]
+              - list [ref=e361]:
+                - listitem [ref=e362]:
+                  - link "Privacy Policy" [ref=e363] [cursor=pointer]:
+                    - /url: /legal/privacy-notice
+                - listitem [ref=e364]:
+                  - link "Terms of Service" [ref=e365] [cursor=pointer]:
+                    - /url: /legal/terms
+                - listitem [ref=e366]:
+                  - link "Cookie Policy" [ref=e367] [cursor=pointer]:
+                    - /url: /legal/cookie-policy
+                - listitem [ref=e368]:
+                  - link "DPA" [ref=e369] [cursor=pointer]:
+                    - /url: /legal/dpa
+                - listitem [ref=e370]:
+                  - link "Acceptable Use Policy" [ref=e371] [cursor=pointer]:
+                    - /url: /legal/acceptable-use-policy
+                - listitem [ref=e372]:
+                  - link "Legal (all documents)" [ref=e373] [cursor=pointer]:
+                    - /url: /legal
+                - listitem [ref=e374]:
+                  - link "Trust Center" [ref=e375] [cursor=pointer]:
+                    - /url: https://security.vercel.com
+                - listitem [ref=e376]:
+                  - link "Status" [ref=e377] [cursor=pointer]:
+                    - /url: https://www.vercel-status.com
+                - listitem [ref=e378]:
+                  - button "Cookie Preferences"
+            - generic [ref=e379]:
+              - heading "Social" [level=2] [ref=e380]
+              - list [ref=e381]:
+                - listitem [ref=e382]:
+                  - link "GitHub" [ref=e383] [cursor=pointer]:
+                    - /url: https://github.com/vercel
+                - listitem [ref=e384]:
+                  - link "X" [ref=e385] [cursor=pointer]:
+                    - /url: https://x.com/vercel
+                - listitem [ref=e386]:
+                  - link "LinkedIn" [ref=e387] [cursor=pointer]:
+                    - /url: https://linkedin.com/company/vercel
+                - listitem [ref=e388]:
+                  - link "YouTube" [ref=e389] [cursor=pointer]:
+                    - /url: https://youtube.com/@VercelHQ
+                - listitem [ref=e390]:
+                  - link "Instagram" [ref=e391] [cursor=pointer]:
+                    - /url: https://www.instagram.com/vercel/
+            - list [ref=e393]:
+              - listitem [ref=e394]:
+                - link [ref=e395] [cursor=pointer]:
+                  - /url: /home
+                  - img "Vercel" [ref=e396]
+        - generic [ref=e397]:
+          - link [ref=e398] [cursor=pointer]:
+            - /url: https://www.vercel-status.com
+            - paragraph [ref=e401]: Loading status…
+          - generic [ref=e402]:
+            - group "Select a display theme:" [ref=e403]:
+              - generic [ref=e405]:
+                - radio "system"
+                - generic [ref=e406] [cursor=pointer]: system
+              - generic [ref=e411]:
+                - radio "light"
+                - generic [ref=e412] [cursor=pointer]: light
+              - generic [ref=e417]:
+                - radio "dark"
+                - generic [ref=e418] [cursor=pointer]: dark
+            - button "View as AI agent" [ref=e424] [cursor=pointer]
+    - complementary

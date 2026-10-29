@@ -28,8 +28,10 @@ export type OutEvent =
 export interface RunInput {
   apiKey: string
   baseUrl?: string
-  /** The linked project, if any. Chats without one start in Documents\\MoreCode Projects. */
+  /** The linked project, if any. Chats without one run in their own private folder. */
   projectPath?: string
+  /** The chat this run belongs to. A chat with no project works in a private folder keyed by this. */
+  chatId?: string
   model: string
   cwd: string
   prompt: string
@@ -81,7 +83,7 @@ export function buildSystem(cwd: string, style: Style, hasProject = true, progre
       break
     }
   }
-  return `You are MoreCode, an AI coding assistant${hasProject ? " working inside the person's project folder on their computer." : ' helping in a chat that is not linked to a project folder; commands start in the person\'s MoreCode Projects folder.'}
+  return `You are MoreCode, an AI coding assistant${hasProject ? " working inside the person's project folder on their computer." : ' in a chat that is not part of any project. Commands start in this chat\'s own private, empty folder. You do not know about, and must not go looking for, the person\'s other projects or the MoreCode Projects folder: only read or change them if the person names a specific folder. If they want to work on an existing project, tell them to open it from the sidebar and move this chat into it.'}
 
 ${VOICE[style]}
 
@@ -94,7 +96,7 @@ How to work:
 - If the person asks for a plan, or the change is large or risky, call present_plan and stop. Do not change files until they approve.
 - You can read files and list folders anywhere on the computer, including outside the project (use full paths). If the person points you at other code to copy from, read it directly.
 - write_file and edit_file only work inside the project folder. run_command is not limited to the project: to create or change anything elsewhere, use a command (copy, move, mkdir, and so on).
-- To start a new project, scaffold it with run_command (for example npm create vite@latest, npm init, or writing the files yourself) in the folder the person names. If they name none, ${hasProject ? 'create it inside the current project folder' : "create it in the current folder"}. Pick the right stack for what they asked for, such as Electron for a desktop app.
+- To start a new project, scaffold it with run_command (for example npm create vite@latest, npm init, or writing the files yourself) in the folder the person names. If they name none, ${hasProject ? 'create it inside the current project folder' : "create it in the current folder (this chat's private folder)"}. Pick the right stack for what they asked for, such as Electron for a desktop app.
 - If a command is refused, do not look for a way around it; explain and ask.
 - Servers and watchers never finish, so start them with run_command and run_in_background: true. Then carry on, and use command_output (with wait_seconds, or until set to text like "ready" or "Local:") to see when it is up and to read errors. If a normal command is still running when its timeout ends it is not stopped: it becomes a background job, so use command_output to wait for the rest instead of running it again. Stop servers you started with stop_command when you are done with them.
 - Only a tool call changes anything. Never type tool activity as text (for example "[Edited file]"), and never say you created or changed something unless a tool result confirmed it.

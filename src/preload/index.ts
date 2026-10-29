@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 export interface WorkspaceInfo {
   root: string
   name: string
+  /** True when this is a chat's own private folder rather than a project. */
+  scratch?: boolean
 }
 export interface DocInfo {
   path: string
@@ -40,6 +42,8 @@ export type GitState =
       remoteUrl: string | null
       lastMessage: string | null
       hasGh: boolean
+      /** Files left out of `files` (build folders, or more than the list can show). */
+      hidden: number
     }
 export type GitCommitResult = { ok: true; branch: string } | { ok: false; error: string }
 export type GitPrResult = { ok: true; url: string; opened: boolean } | { ok: false; error: string }
@@ -186,6 +190,8 @@ const api = {
     choose: (): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:choose'),
     /** Change the active project to an existing folder without showing the folder picker. */
     open: (folder: string): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:open', folder),
+    /** Point the app at this chat's own empty folder (a chat that is not in any project). */
+    openChat: (chatId: string): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:open-chat', chatId),
     /** Create or reopen an empty Documents-based folder for a sidebar project. */
     createProject: (name: string): Promise<WorkspaceInfo | null> => ipcRenderer.invoke('workspace:create-project', name),
     /** Every file in the project, as relative paths (for @ mentions). */

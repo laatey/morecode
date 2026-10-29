@@ -16,6 +16,8 @@ export interface RealConfig {
   missing?: string | null
   /** Set only for a chat that was explicitly added to a project. */
   projectPath?: string
+  /** The chat being run, so a chat with no project gets its own private folder. */
+  chatId?: string
   /** Called with the real token counts after every step the AI takes. */
   onUsage: (detail: UsageDetail) => void
   /** The connectors switched on, with their sign-in details, read when a request starts. */
@@ -67,6 +69,7 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         model: req.model,
         baseUrl: cfg.baseUrl,
         projectPath: cfg.projectPath,
+        chatId: cfg.chatId,
         headers: cfg.hosted ? { 'x-morecode-run': runId, 'x-tz-offset': String(new Date().getTimezoneOffset()) } : undefined,
         prompt: req.prompt,
         images: req.images,

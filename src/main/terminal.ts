@@ -1,4 +1,5 @@
 import { app, ipcMain } from 'electron'
+import { getWorkspaceRoot, isChatSpace } from './workspace'
 import { spawn, execFile, type ChildProcess } from 'child_process'
 import { existsSync, statSync } from 'fs'
 import { homedir } from 'os'
@@ -34,9 +35,12 @@ function killTree(child: ChildProcess): void {
 
 export function registerTerminalIpc(): void {
   // A terminal starts in the folder of the project it belongs to (or the home folder for a loose chat).
-  ipcMain.handle('term:start-dir', (_event, folder: unknown) =>
-    typeof folder === 'string' && isDir(folder) ? folder : homedir()
-  )
+  ipcMain.handle('term:start-dir', (_event, folder: unknown) => {
+    if (typeof folder === 'string' && isDir(folder)) return folder
+    // a chat with no project: its own empty folder (the app points the workspace there), else home
+    const here = getWorkspaceRoot()
+    return isChatSpace(here) && isDir(here) ? here : homedir()
+  })
 
   ipcMain.handle(
     'term:cd',

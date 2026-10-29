@@ -231,6 +231,12 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
             </h3>
           </div>
           <FileTree items={files} render={row} />
+          {repo.hidden > 0 && (
+            <p className="mt-1.5 px-1.5 text-[11.5px] leading-[17px] text-muted-foreground">
+              {repo.hidden.toLocaleString()} more {repo.hidden === 1 ? 'file is' : 'files are'} not shown (build folders such as
+              node_modules, or more than the list can hold). Add them to .gitignore to keep them out of your versions.
+            </p>
+          )}
 
           <div className="mt-3 space-y-2.5 border-t border-white/[0.07] pt-3">
             <div>
@@ -352,8 +358,14 @@ export function GitPanel(): React.JSX.Element {
       return
     }
     setLoading(true)
-    setState(await window.api.git.state())
-    setLoading(false)
+    try {
+      setState(await window.api.git.state())
+    } catch {
+      // never leave the panel on "Checking your project…" forever
+      setState({ ok: false, reason: 'not-repo' })
+    } finally {
+      setLoading(false)
+    }
   }, [hasProject])
 
   useEffect(() => {

@@ -196,7 +196,7 @@ function ListView({
         </div>
       )}
 
-      <div className="mt-4 flex justify-end border-t border-[#323230] pt-3">
+      <div className="mt-4 flex justify-end pt-3">
         <Btn onClick={onClose}>Done</Btn>
       </div>
     </div>

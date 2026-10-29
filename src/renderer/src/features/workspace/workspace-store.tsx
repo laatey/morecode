@@ -12,6 +12,7 @@ import { useAuth } from '@/features/auth/auth-store'
 import type { Msg } from '@/features/ai-assistant/types'
 import { workspaceKey } from '@/lib/storage-keys'
 import { useChatSync, type RemoteChat } from './chat-sync'
+import { environmentOf, workspaceKey as targetKey } from './environment'
 
 export interface Chat {
   id: string
@@ -212,16 +213,32 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
 
   const active = chats.find((c) => c.id === activeId) ?? chats[0]
 
-  // Switching to a chat in another project must point the app's file access at that project's folder.
+  // Every chat lives in exactly one environment, and the app's file access follows it:
+  //   chat in a project  -> that project's folder
+  //   chat with no project (or its folder is missing) -> the chat's own private empty folder
+  // Without the second case a new chat kept looking at whichever project was open last.
   const activeFolder = groups.find((g) => g.id === active.projectId)?.folder
-  const syncedFolder = useRef<string | undefined>(undefined)
+  const syncedKey = useRef<string>('')
   useEffect(() => {
-    if (!activeFolder || activeFolder === syncedFolder.current) return
-    syncedFolder.current = activeFolder
     const api = window.api?.workspace
-    if (!api?.open) return
-    void api.open(activeFolder).then(() => window.dispatchEvent(new CustomEvent('workspace:changed')))
-  }, [activeFolder])
+    if (!api?.openChat) return
+    const key = targetKey(active.id, environmentOf(active, groups))
+    if (key === syncedKey.current) return
+    syncedKey.current = key
+    const done = (): void => void window.dispatchEvent(new CustomEvent('workspace:changed'))
+    if (!activeFolder) {
+      void api.openChat(active.id).then(done)
+      return
+    }
+    void api.open(activeFolder).then((opened) => {
+      if (opened) return done()
+      // the folder was deleted or lives on another computer: fall back to the chat's own folder
+      void api.openChat(active.id).then(done)
+      toast.error('That project’s folder could not be found', {
+        description: 'This chat is working in its own empty space until you relink the project.'
+      })
+    })
+  }, [activeFolder, active.id, active, groups])
 
   const go = useCallback((id: string, push: boolean) => {
     setActiveId(id)

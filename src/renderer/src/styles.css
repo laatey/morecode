@@ -598,3 +598,28 @@
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+
+/* Drag-and-drop overlay: the veil blurs in, the three icons slide out from behind the middle one into a
+   slightly angled fan, and the label follows. Short on purpose. */
+@keyframes drop-veil-in {
+  from { opacity: 0; backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); }
+  to { opacity: 1; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+}
+@keyframes drop-icon-out {
+  from { opacity: 0; filter: blur(6px); transform: translate(var(--from), 10px) rotate(0deg) scale(0.6); }
+  to { opacity: 1; filter: blur(0); transform: translate(0, var(--lift)) rotate(var(--rot)) scale(1); }
+}
+@keyframes drop-label-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.drop-veil { animation: drop-veil-in 160ms ease-out both; }
+.drop-icon {
+  animation: drop-icon-out 280ms cubic-bezier(0.2, 0.9, 0.25, 1.15) var(--delay, 0ms) both;
+  transform: translate(0, var(--lift)) rotate(var(--rot));
+}
+.drop-label { animation: drop-label-in 220ms ease-out 120ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .drop-veil, .drop-icon, .drop-label { animation: none; }
+}

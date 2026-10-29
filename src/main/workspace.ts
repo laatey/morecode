@@ -41,8 +41,28 @@ export function getNewProjectRoot(): string {
   return folder
 }
 
+/**
+ * A private, empty folder for one chat that is not in a project. Nothing else lives in it, so the AI,
+ * the terminal and the file panels can never see (or write into) another project from here.
+ */
+export function getChatRoot(chatId: string): string {
+  const safe = chatId.replace(/[^a-z0-9_-]/gi, '').slice(0, 64) || 'chat'
+  const folder = join(app.getPath('userData'), 'chat-spaces', safe)
+  try {
+    mkdirSync(folder, { recursive: true })
+  } catch {
+    // commands will report a useful error if the folder cannot be made
+  }
+  return folder
+}
+
+export const isChatSpace = (folder: string): boolean =>
+  resolve(folder).startsWith(resolve(join(app.getPath('userData'), 'chat-spaces')) + sep)
+
 export function setWorkspaceRoot(next: string): void {
   root = next
+  // A chat's private folder is never "the project": do not bring it back at the next launch.
+  if (isChatSpace(next)) return
   try {
     writeFileSync(stateFile(), JSON.stringify({ root: next }))
   } catch {
@@ -56,9 +76,10 @@ const folderName = (raw: string): string =>
     .replace(/[^a-z0-9]+/gi, '-')
     .replace(/^-+|-+$/g, '')
 
-const info = (): { root: string; name: string } => ({
+const info = (): { root: string; name: string; scratch: boolean } => ({
   root: getWorkspaceRoot(),
-  name: basename(getWorkspaceRoot()) || getWorkspaceRoot()
+  name: basename(getWorkspaceRoot()) || getWorkspaceRoot(),
+  scratch: isChatSpace(getWorkspaceRoot())
 })
 
 const DOC_EXTENSIONS = new Set(['.md', '.mdx', '.markdown'])
@@ -267,6 +288,13 @@ export function registerWorkspaceIpc(): void {
     } catch {
       return null
     }
+  })
+
+  /** A chat with no project works in its own empty folder, never in the last project that was open. */
+  ipcMain.handle('workspace:open-chat', (_event, chatId: unknown) => {
+    if (typeof chatId !== 'string' || !chatId) return null
+    setWorkspaceRoot(getChatRoot(chatId))
+    return info()
   })
 
   ipcMain.handle('workspace:files', () => listFiles())

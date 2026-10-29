@@ -104,6 +104,7 @@ export function ChatProvider({
       hosted: route.kind === 'subscription' && Boolean(route.baseUrl),
       missing: route.missing,
       projectPath,
+      chatId: active.id,
       style: account?.profile?.experience ?? 'some',
       connectors: connectorsForRun,
       onUsage: (u) => {
@@ -120,7 +121,7 @@ export function ChatProvider({
         if (route.kind === 'subscription') refreshAccount()
       }
     }
-  }, [route, account, active.projectId, groups, refreshAccount, connectorsForRun])
+  }, [route, account, active.id, active.projectId, groups, refreshAccount, connectorsForRun])
   const runner = useMemo<AgentRunner>(
     () =>
       typeof window !== 'undefined' && window.api?.agent

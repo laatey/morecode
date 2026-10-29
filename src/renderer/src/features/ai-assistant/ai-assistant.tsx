@@ -48,7 +48,19 @@ const took = (ms?: number): string | null => {
 const tokensLabel = (n?: number): string | null =>
   n ? `${n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n} tokens` : null
 
-const SUGGESTIONS = ['Explain how this project is organised', 'Find and fix a bug', 'Add a feature']
+/** Starting points for an empty chat. They depend on where the chat lives: a chat in a project can be pointed at its files, a loose one cannot. */
+const PROJECT_STARTERS = [
+  { label: 'Explain this project', text: 'Explain how this project is organised and where I should start reading.' },
+  { label: 'Look for bugs', text: 'Look through this project for bugs or mistakes and list what you find, most serious first.' },
+  { label: 'Run the tests', text: 'Run the tests and tell me what fails and why.' },
+  { label: 'Review my changes', text: 'Review the changes I have made since my last saved version and point out any problems.' }
+]
+const LOOSE_STARTERS = [
+  { label: 'Build something new', text: 'Build me a small app that ' },
+  { label: 'Explain an error', text: 'Explain this error and how to fix it:\n\n' },
+  { label: 'Plan before building', text: 'Help me plan how to build ' },
+  { label: 'Automate a task', text: 'Write a script that ' }
+]
 const MAX_ATTACHMENTS = 10
 
 function composerContent(root: HTMLElement): string {
@@ -730,15 +742,15 @@ export function AiAssistant(): React.JSX.Element {
       )}
     >
       {dragging && createPortal(
-        <div className="pointer-events-none fixed inset-0 z-[9999] grid place-items-center bg-black/20 p-3">
+        <div className="drop-veil pointer-events-none fixed inset-0 z-[9999] grid place-items-center bg-black/20 p-3 backdrop-blur-[6px]">
           <div className="absolute inset-3 rounded-[20px] border border-dashed border-[#3b82f6]/70 bg-[#3b82f6]/[0.04]" />
           <div className="relative flex flex-col items-center gap-3 text-[#1683ff]">
-            <div className="flex items-center gap-7">
-              <ImageIcon className="h-9 w-9 stroke-[1.6]" />
-              <FileIcon className="h-9 w-9 stroke-[1.6]" />
-              <Folder className="h-9 w-9 stroke-[1.6]" />
+            <div className="flex items-center justify-center gap-1">
+              <ImageIcon className="drop-icon h-9 w-9 stroke-[1.6]" style={{ '--from': '34px', '--rot': '-14deg', '--lift': '3px', '--delay': '40ms' } as React.CSSProperties} />
+              <FileIcon className="drop-icon h-9 w-9 stroke-[1.6]" style={{ '--from': '0px', '--rot': '0deg', '--lift': '-3px', '--delay': '0ms' } as React.CSSProperties} />
+              <Folder className="drop-icon h-9 w-9 stroke-[1.6]" style={{ '--from': '-34px', '--rot': '14deg', '--lift': '3px', '--delay': '80ms' } as React.CSSProperties} />
             </div>
-            <span className="text-[18px] font-medium text-[#5aa6ff]">Drop files here</span>
+            <span className="drop-label text-[18px] font-medium text-[#5aa6ff]">Drop files here</span>
           </div>
         </div>,
         document.body
@@ -1137,21 +1149,23 @@ export function AiAssistant(): React.JSX.Element {
       {empty && (
         <div className="mx-auto mt-2 flex w-full max-w-[46rem] flex-col items-center gap-2 px-3">
           <div className="flex flex-wrap justify-center gap-1.5">
-            {SUGGESTIONS.map((t) => (
+            {(projectPath ? PROJECT_STARTERS : LOOSE_STARTERS).map((t) => (
               <button
-                key={t}
+                key={t.label}
                 type="button"
                 onClick={() => {
-                  setInput(t)
+                  setInput(t.text)
                   field.current?.focus()
                 }}
                 className="cursor-pointer rounded-full border border-white/[0.08] px-2.5 py-0.5 text-[11.5px] text-[#a8a8a6] transition-colors hover:border-white/[0.2] hover:text-foreground"
               >
-                {t}
+                {t.label}
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-[#77776f]">Type @ to mention a file, or / for commands.</p>
+          <p className="text-[11px] text-[#77776f]">
+            {projectPath ? 'Type @ to mention a file, or / for commands.' : 'Type / for commands. Move this chat into a project to work on its files.'}
+          </p>
         </div>
       )}
 

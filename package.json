@@ -19,7 +19,7 @@
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run typecheck && electron-vite build && electron-builder --mac",
     "build:linux": "npm run typecheck && electron-vite build && electron-builder --linux",
-    "test": "node --experimental-strip-types --no-warnings --test test/prompt.test.mjs test/secrets.test.mjs test/background.test.mjs",
+    "test": "node --experimental-strip-types --no-warnings --test test/prompt.test.mjs test/environment.test.mjs test/secrets.test.mjs test/background.test.mjs",
     "check:icons": "node scripts/check-icons.mjs"
   },
   "dependencies": {
