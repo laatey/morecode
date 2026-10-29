@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowLeft, GitBranch } from 'lucide-react'
+import { ArrowLeft, GitBranch } from '@/components/icons'
 import { Tip } from '@/components/tooltip'
 
 export interface GitInfo {

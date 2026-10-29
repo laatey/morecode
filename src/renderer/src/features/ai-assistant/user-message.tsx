@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { History, Pencil } from 'lucide-react'
+import { Pencil, Undo2 } from '@/components/icons'
 import { AttachmentChip } from './attachments'
 import { useChatContext } from './chat-context'
 import { CopyButton, IconAction } from './message-actions'
@@ -91,7 +91,7 @@ export function UserMessage({
   }
 
   return (
-    <div className="group/msg">
+    <div className="group/msg" data-turn={msg.id}>
       <div className="flex items-start justify-end gap-1">
         <div className="mt-1 flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover/msg:opacity-100">
           {hasText && <CopyButton text={msg.shown ?? msg.text} />}
@@ -108,7 +108,7 @@ export function UserMessage({
             </IconAction>
           )}
           <IconAction label="Rewind to before this message" disabled={running} onClick={() => setConfirm((c) => !c)}>
-            <History className="h-3.5 w-3.5" />
+            <Undo2 className="h-3.5 w-3.5" />
           </IconAction>
         </div>
         <UserBubble text={msg.shown ?? msg.text} images={msg.images}>

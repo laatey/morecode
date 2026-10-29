@@ -1,5 +1,5 @@
 import React from 'react'
-import { Check, ShieldCheck, X } from 'lucide-react'
+import { Check, ShieldCheck, X } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { useChatContext } from './chat-context'
 import type { ToolBlock } from './types'
@@ -27,14 +27,14 @@ export function PermissionCard({ tool }: { tool: Permission }): React.JSX.Elemen
   if (tool.state !== 'pending') {
     const ok = tool.state === 'allowed' || tool.state === 'always'
     return (
-      <div className="flex min-h-6 items-center gap-2 px-1 py-0.5 text-[12.5px]">
+      <div className="flex min-h-6 min-w-0 items-center gap-2 px-1 py-0.5 text-[12.5px]">
         {ok ? (
           <Check className="h-3 w-3 shrink-0 text-[var(--diff-add)]" />
         ) : (
           <X className="h-3 w-3 shrink-0 text-muted-foreground" />
         )}
-        <span className="text-[#d6d6d3]">{RESULT[tool.state]}</span>
-        <code className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 font-mono text-[11.5px] leading-[18px] text-[#a9a9a6]">
+        <span className="shrink-0 whitespace-nowrap text-[#d6d6d3]">{RESULT[tool.state]}</span>
+        <code className="min-w-0 flex-1 truncate rounded-[4px] bg-white/[0.05] px-1.5 font-mono text-[11.5px] leading-[18px] text-[#a9a9a6]">
           {tool.command}
         </code>
       </div>

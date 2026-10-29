@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { ModalOverlay } from '@/components/modal-overlay'
-import { Clock, X } from 'lucide-react'
+import { Clock, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/auth-store'
 import { getPlan } from './plans'

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { ArrowLeft, Check, ClipboardList, Copy, Play, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, ClipboardList, Copy, Play, Plus, Trash2, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { IconButton } from '@/components/layout/icon-button'
 import { cn } from '@/lib/utils'

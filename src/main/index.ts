@@ -16,7 +16,8 @@ const TITLEBAR_HEIGHT = 38
 
 function createWindow(): void {
   const state = loadWindowState()
-  const iconPath = join(__dirname, '../../resources/icon.png')
+  // Windows wants an .ico for the taskbar; the other systems use the .png
+  const iconPath = join(__dirname, `../../resources/icon.${process.platform === 'win32' ? 'ico' : 'png'}`)
 
   const mainWindow = new BrowserWindow({
     width: state.width,

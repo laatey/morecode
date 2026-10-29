@@ -45,6 +45,8 @@ export type ToolBlock =
       added: number
       removed: number
       /** The real change to this file since before its first edit waiting for review (rewrites do not pile up). */
+      /** Why the edit failed, when it did. */
+      error?: string
       netAdded?: number
       netRemoved?: number
       status: ToolStatus
@@ -62,7 +64,7 @@ export type ToolBlock =
     }
   | { kind: 'todos'; id: string; items: TodoItem[] }
   | { kind: 'agent'; id: string; task: string; status: ToolStatus; steps: number; report?: string }
-  | { kind: 'read'; id: string; paths: string[]; status: ToolStatus }
+  | { kind: 'read'; id: string; paths: string[]; status: ToolStatus; error?: string }
   | ({ kind: 'permission'; state: PermissionState } & PermissionRequest)
   | {
       /** The agent's reasoning. `text` grows while it thinks; `durationMs` is set when it finishes. */

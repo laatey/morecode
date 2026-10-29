@@ -14,8 +14,8 @@ import {
   Pencil,
   ShieldCheck,
   UserRound,
-  type LucideIcon
-} from 'lucide-react'
+  type IconComponent
+} from '@/components/icons'
 import type { Step } from './types'
 
 export { type Step }
@@ -39,7 +39,7 @@ const logos: Record<string, string> = Object.fromEntries(
 
 const MONOCHROME = new Set(['resend', 'openai', 'anthropic'])
 
-const GENERIC: Record<string, LucideIcon> = {
+const GENERIC: Record<string, IconComponent> = {
   activity: Activity,
   'book-open': BookOpen,
   clock: Clock,

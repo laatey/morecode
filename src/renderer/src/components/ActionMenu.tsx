@@ -1,6 +1,6 @@
 import React from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight } from '@/components/icons'
 
 export interface ActionMenuItem {
   id: string

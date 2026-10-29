@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ExternalLink, Loader2, Lock } from 'lucide-react'
+import { ExternalLink, Loader2, Lock } from '@/components/icons'
 import { useAuth } from '@/features/auth/auth-store'
 import { errorText, FormError, Submit, TextLink } from '@/features/auth/ui'
 import type { BillingConfig } from '@/features/auth/auth-service'

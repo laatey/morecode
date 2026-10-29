@@ -1,4 +1,4 @@
-import { Globe, FileText, GitCompare, SquareTerminal, ListTodo, ClipboardList, FileCode2 } from 'lucide-react'
+import { Globe, FileText, GitCompare, SquareTerminal, ListTodo, ClipboardList, FileCode2 } from '@/components/icons'
 import type { TabDefinition } from './types'
 import { BrowserTab } from './tabs/browser-tab'
 import { DocsTab } from './tabs/docs-tab'

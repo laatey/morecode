@@ -8,7 +8,7 @@ import {
   Plus,
   RefreshCw,
   Search
-} from 'lucide-react'
+} from '@/components/icons'
 import { toast } from 'sonner'
 import { IconButton } from '@/components/layout/icon-button'
 import { Markdown } from '@/features/ai-assistant/message-parts'

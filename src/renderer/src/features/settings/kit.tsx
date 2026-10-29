@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { ChevronDown, Loader2 } from '@/components/icons'
 import { ActionMenu } from '@/components/action-menu'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'

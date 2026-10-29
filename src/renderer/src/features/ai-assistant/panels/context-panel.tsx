@@ -1,5 +1,5 @@
 import React, { useSyncExternalStore } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight } from '@/components/icons'
 import { Tip } from '@/components/tooltip'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/features/auth/auth-store'

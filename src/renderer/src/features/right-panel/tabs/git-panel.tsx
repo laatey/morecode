@@ -1,6 +1,6 @@
 import { FileIcon } from '@/components/file-icon'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, ExternalLink, GitBranch, GitPullRequest, RefreshCw, Sparkles } from 'lucide-react'
+import { Check, ExternalLink, GitBranch, GitPullRequest, RefreshCw, Sparkles } from '@/components/icons'
 import { toast } from 'sonner'
 import { IconButton } from '@/components/layout/icon-button'
 import { useChatContext } from '@/features/ai-assistant/chat-context'

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, Close, Plus, Stop } from 'fluid-icons/react'
-import { AppWindow, Asterisk, ChevronDown, File as FileIcon, Folder, Image as ImageIcon, Mic, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { AppWindow, ChevronDown, File as FileIcon, Folder, Image as ImageIcon, Mic, RefreshCw, ThumbsDown, ThumbsUp } from '@/components/icons'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ActionMenu } from '@/components/action-menu'
@@ -13,6 +13,9 @@ import { useWorkspace } from '@/features/workspace/workspace-store'
 import { AttachmentChip, folderFrom, pathFor, readDrop } from './attachments'
 import { useChatContext } from './chat-context'
 import { ChangesBar } from './changes-bar'
+import { fileIconHtml } from '@/components/file-icon'
+import { MessageRail } from './message-rail'
+import { QueueBar } from './queue-bar'
 import { ErrorCard } from './error-card'
 import { toDataUrl } from './image-utils'
 import { MentionMenu } from './mention-menu'
@@ -24,7 +27,7 @@ import { SlashMenu } from './slash-menu'
 import {
   buildCommands,
   filterCommands,
-  parseSlash,
+  parseCommands,
   type PanelId,
   type SlashCommand
 } from './slash-commands'
@@ -75,7 +78,7 @@ function placeComposerCaret(root: HTMLElement, offset: number): void {
   // the text inside a chip is not part of the message, so the walk skips it
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
     acceptNode: (n) =>
-      n.nodeType === Node.TEXT_NODE && (n.parentElement as HTMLElement | null)?.dataset.mentionToken
+      n.nodeType === Node.TEXT_NODE && (n.parentElement as HTMLElement | null)?.closest('[data-mention-token]')
         ? NodeFilter.FILTER_REJECT
         : NodeFilter.FILTER_ACCEPT
   })
@@ -112,18 +115,31 @@ function placeComposerCaret(root: HTMLElement, offset: number): void {
   selection.addRange(range)
 }
 
-/** The leading "/command" of the message, if it is a real command. */
-function slashToken(text: string, ids: string[]): string | null {
-  const m = /^\/([a-z0-9-]+)(?=\s|$)/.exec(text)
-  return m && ids.includes(m[1]) ? m[0] : null
+/** Every leading "/command" of the message that is a real command, in order. */
+function slashTokens(text: string, ids: string[]): string[] {
+  const out: string[] = []
+  let pos = 0
+  for (;;) {
+    const m = /^\/([a-z0-9-]+)(?=\s|$)/.exec(text.slice(pos))
+    if (!m || !ids.includes(m[1])) break
+    out.push(m[0])
+    pos += m[0].length
+    const gap = /^\s+/.exec(text.slice(pos))
+    if (!gap) break
+    pos += gap[0].length
+  }
+  return out
 }
 
-function populateComposer(root: HTMLElement, text: string, slash: string | null = null): void {
+function populateComposer(root: HTMLElement, text: string, slashes: string[] = []): void {
   root.replaceChildren()
   const pattern = /(^|\s)(@[^\s@]+)/g
   let cursor = 0
-  if (slash) {
-    // one block, like an @file chip: it is deleted whole with Backspace and the caret cannot enter it
+  for (const slash of slashes) {
+    // one block each, like an @file chip: deleted whole with Backspace, and the caret cannot enter it
+    const at = text.indexOf(slash, cursor)
+    if (at < 0) break
+    if (at > cursor) root.append(document.createTextNode(text.slice(cursor, at)))
     const tag = document.createElement('span')
     tag.contentEditable = 'false'
     tag.dataset.slashToken = '1'
@@ -131,9 +147,9 @@ function populateComposer(root: HTMLElement, text: string, slash: string | null 
     tag.className = 'inline-flex select-all items-center rounded-[5px] bg-[#3b82f6]/15 px-1 text-[#3b8cff]'
     tag.textContent = slash
     root.append(tag)
-    cursor = slash.length
-    pattern.lastIndex = cursor
+    cursor = at + slash.length
   }
+  pattern.lastIndex = cursor
   let match: RegExpExecArray | null
   while ((match = pattern.exec(text))) {
     const tokenStart = match.index + match[1].length
@@ -143,7 +159,11 @@ function populateComposer(root: HTMLElement, text: string, slash: string | null 
     chip.contentEditable = 'false'
     chip.dataset.mentionToken = token
     chip.className = 'inline-flex select-all items-center rounded-[5px] bg-[#3b82f6]/15 px-1.5 text-[#70a7ff]'
-    chip.textContent = token.slice(1)
+    const path = token.slice(1)
+    chip.innerHTML = fileIconHtml(path.split('/').pop() ?? path)
+    const label = document.createElement('span')
+    label.textContent = path
+    chip.append(label)
     root.append(chip)
     cursor = tokenStart + token.length
   }
@@ -249,12 +269,11 @@ function AgentMessage({ msg, isLast }: { msg: AgentMsg; isLast: boolean }): Reac
           )}
           {isLast && (
             <IconAction label="Try again" disabled={running} onClick={() => retry(msg.id)}>
-              <RotateCcw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-3.5 w-3.5" />
             </IconAction>
           )}
           {meta && (
             <span className="ml-1.5 flex items-center gap-1.5">
-              <Asterisk className="h-3 w-3" />
               {meta}
             </span>
           )}
@@ -273,6 +292,7 @@ export function AiAssistant(): React.JSX.Element {
     acceptAll,
     discardAll,
     stop,
+    owner,
     compact,
     clear,
     model,
@@ -311,13 +331,26 @@ export function AiAssistant(): React.JSX.Element {
   const projectPath = group?.folder
   const files = useWorkspaceFiles(projectPath ?? '')
 
-  const slashOpen = input.startsWith('/') && !/\s/.test(input) && !dismissed
   const skills = useSkills()
   const commands = useMemo(
     () => buildCommands(skills.active, skills.commands),
     [skills.active, skills.commands]
   )
-  const slashList = slashOpen ? filterCommands(commands, input.slice(1)) : []
+  // a "/" at the end of the typed text opens the menu, also after earlier commands ("/plan /code-review")
+  const slashMatch = useMemo(() => {
+    const m = /^((?:\/[a-z0-9-]+\s+)*)\/([a-z0-9-]*)$/i.exec(input.slice(0, caret))
+    if (!m) return null
+    const used = [...m[1].matchAll(/\/([a-z0-9-]+)/g)].map((x) => x[1])
+    if (!used.every((id) => commands.some((c) => c.id === id))) return null
+    return { start: m[1].length, query: m[2], used }
+  }, [input, caret, commands])
+  const slashOpen = Boolean(slashMatch) && !dismissed
+  const promptLike = (c: SlashCommand): boolean => c.kind === 'skill' || c.kind === 'custom' || c.kind === 'prompt'
+  const slashList = slashMatch && slashOpen
+    ? filterCommands(commands, slashMatch.query).filter(
+        (c) => !slashMatch.used.includes(c.id) && (slashMatch.used.length === 0 || promptLike(c))
+      )
+    : []
 
   // the AI offers a skill when the message sounds like one the person has switched on
   const [skipped, setSkipped] = useState<string[]>([])
@@ -359,14 +392,13 @@ export function AiAssistant(): React.JSX.Element {
     const editor = field.current
     if (!editor) return
     const current = composerContent(editor)
-    const slash = slashToken(input, commands.map((c) => c.id))
-    const first = editor.firstChild
-    const shown = first instanceof HTMLElement && first.dataset.slashToken ? first.textContent : null
-    const inSync = current === input && shown === slash
+    const slashes = slashTokens(input, commands.map((c) => c.id))
+    const shown = Array.from(editor.children).flatMap((el) => (el instanceof HTMLElement && el.dataset.slashToken ? [el.textContent ?? ''] : []))
+    const inSync = current === input && shown.length === slashes.length && shown.every((t, i) => t === slashes[i])
     if (inSync && nextCaret.current === null) return
     const typing = current === input && document.activeElement === editor
     const typedAt = typing ? composerOffset(editor) : input.length
-    if (!inSync) populateComposer(editor, input, slash)
+    if (!inSync) populateComposer(editor, input, slashes)
     const position = nextCaret.current ?? typedAt
     placeComposerCaret(editor, position)
     setCaret(position)
@@ -449,40 +481,76 @@ export function AiAssistant(): React.JSX.Element {
     setInput(voiceBase.current ? `${voiceBase.current} ${spoken}` : spoken)
   )
 
-  const submit = (raw: string): void => {
-    let text = raw
-    let shown: string | undefined
-    const parsed = parseSlash(commands, raw)
-    if (parsed) {
-      const { command: c, args } = parsed
-      if (c.kind === 'skill') {
-        text = skillPrompt(c.skill, args)
-        shown = slashLabel(c.id, args)
-      } else if (c.kind === 'custom') {
-        text = customPrompt(c.command, args)
-        shown = slashLabel(c.id, args)
-      } else if (c.kind === 'prompt') {
-        if (!args.trim() && !c.bare) return
-        text = args.trim() ? `${c.prompt}\n\n${args}` : c.prompt
-        shown = slashLabel(c.id, args)
-      } else {
-        runCommand(c)
-        return
+  type Resolved = { q: string; shown?: string } | { handled: true } | null
+  /** Turn what was typed into the message to send. `exec` lets a typed panel or action command run now. */
+  const resolve = (raw: string, exec = true): Resolved => {
+    const { list, tokens, args } = parseCommands(commands, raw)
+    if (!list.length) return { q: raw.trim() }
+    if (list.length === 1) {
+      const c = list[0]
+      if (c.kind === 'skill') return { q: skillPrompt(c.skill, args), shown: slashLabel(c.id, args) }
+      if (c.kind === 'custom') return { q: customPrompt(c.command, args), shown: slashLabel(c.id, args) }
+      if (c.kind === 'prompt') {
+        if (!args.trim() && !c.bare) return null
+        return { q: args.trim() ? `${c.prompt}\n\n${args}` : c.prompt, shown: slashLabel(c.id, args) }
+      }
+      if (!exec) return null
+      runCommand(c)
+      return { handled: true }
+    }
+    // several commands: all their instructions apply, then the task
+    const bits: string[] = []
+    for (const c of list) {
+      if (c.kind === 'skill') bits.push(`Use the “${c.skill.name}” skill. Follow these instructions:\n\n${c.skill.instructions}`)
+      else if (c.kind === 'custom') bits.push(c.command.prompt.replaceAll('$ARGUMENTS', args.trim()))
+      else if (c.kind === 'prompt') bits.push(c.prompt)
+      else {
+        if (exec) toast.error(`/${c.id} cannot be combined with other commands`)
+        return exec ? { handled: true } : null
       }
     }
-    const q = text.trim() || (images.length || attachments.length ? ATTACH_ONLY[0] : '')
-    if (!q || running) return
+    const task = args.trim() ? `Task: ${args.trim()}` : 'Task: apply them to what we are working on in this chat.'
+    return { q: `${bits.join('\n\n')}\n\n${task}`, shown: `${tokens.join(' ')}${args.trim() ? ` ${args.trim()}` : ''}` }
+  }
+
+  // messages typed while the AI is busy wait here, per chat, and go out one by one
+  interface Queued {
+    id: string
+    raw: string
+    q: string
+    shown?: string
+    images: string[]
+    attachments: Attachment[]
+  }
+  const [queues, setQueues] = useState<Record<string, Queued[]>>({})
+  const chatKey = ws.activeId
+  const queue = queues[chatKey] ?? []
+  const setQueue = (fn: (list: Queued[]) => Queued[]): void =>
+    setQueues((cur) => ({ ...cur, [chatKey]: fn(cur[chatKey] ?? []) }))
+
+  const submit = (raw: string): void => {
+    const r = resolve(raw)
+    if (!r || 'handled' in r) return
+    const q = r.q || (images.length || attachments.length ? ATTACH_ONLY[0] : '')
+    if (!q) return
     stopVoice()
+    if (running) {
+      setQueue((l) => [...l, { id: crypto.randomUUID(), raw: raw.trim() || q, q, shown: r.shown, images, attachments }])
+      setInput('')
+      setImages([])
+      setAttachments([])
+      return
+    }
     // not sent (out of messages, or the plan lacks this model): the plan dialog opens and the draft stays
-    if (!send(q, images, model, autoAccept, attachments, shown)) return
+    if (!send(q, images, model, autoAccept, attachments, r.shown)) return
     setInput('')
     setImages([])
     setAttachments([])
     setAtBottom(true)
   }
 
-  const runCommand = (c: SlashCommand): void => {
-    setInput('')
+  const runCommand = (c: SlashCommand, keepInput = ''): void => {
+    setInput(keepInput)
     setPickIndex(0)
     if (c.kind === 'panel') setPanel(c.panel)
     else if (c.kind === 'prompt' && c.bare) {
@@ -508,6 +576,28 @@ export function AiAssistant(): React.JSX.Element {
       else if (totals.files > 0) toast.error('Keep or undo the pending changes first')
       else clear()
     }
+  }
+
+  /** Put "/command " into the text where the "/" was typed, keeping any commands before it. */
+  const insertToken = (c: SlashCommand): void => {
+    if (!slashMatch) return
+    const before = input.slice(0, slashMatch.start)
+    const after = input.slice(caret)
+    const insert = `/${c.id} `
+    nextCaret.current = before.length + insert.length
+    setInput(before + insert + after)
+    setPickIndex(0)
+    setDismissed(true)
+    requestAnimationFrame(() => field.current?.focus())
+  }
+  const pickCommand = (c: SlashCommand): void => {
+    if (!slashMatch) return runCommand(c)
+    const before = input.slice(0, slashMatch.start)
+    const after = input.slice(caret)
+    const alone = !before.trim() && !after.trim()
+    if (promptLike(c) && !(c.kind === 'prompt' && c.bare && alone)) return insertToken(c)
+    // panels and actions never combine with other commands: drop the typed "/…" and run it
+    runCommand(c, alone ? '' : before + after)
   }
 
   const pickMention = (path: string): void => {
@@ -559,8 +649,8 @@ export function AiAssistant(): React.JSX.Element {
       if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
         e.preventDefault()
         if (slashOpen) {
-          if (e.key === 'Tab') setInput(`/${slashList[pickIndex].id} `)
-          else runCommand(slashList[pickIndex])
+          if (e.key === 'Tab') insertToken(slashList[pickIndex])
+          else pickCommand(slashList[pickIndex])
         } else pickMention(mentionList[pickIndex])
         return
       }
@@ -582,6 +672,49 @@ export function AiAssistant(): React.JSX.Element {
         document.execCommand('insertLineBreak')
       }
     }
+  }
+
+  const queueNow = useRef<string | null>(null)
+  const queueBlocked = useRef(false)
+  const dispatchQueued = (item: Queued): boolean => {
+    const ok = send(item.q, item.images, model, autoAccept, item.attachments, item.shown)
+    if (ok) {
+      setQueue((l) => l.filter((x) => x.id !== item.id))
+      setAtBottom(true)
+    }
+    return ok
+  }
+  useEffect(() => {
+    if (running || owner !== chatKey) return
+    if (!queue.length) {
+      queueBlocked.current = false
+      return
+    }
+    const forced = queueNow.current ? queue.find((x) => x.id === queueNow.current) : undefined
+    const last = [...messages].reverse().find((m) => m.role === 'agent')
+    // after an error or a stop the queue waits; "Send now" still sends one
+    const clean = !last || (last.role === 'agent' && !last.stopped && !last.parts.some((p) => p.type === 'error'))
+    const target = forced ?? (clean && !queueBlocked.current ? queue[0] : undefined)
+    if (!target) return
+    queueNow.current = null
+    if (!dispatchQueued(target)) queueBlocked.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, queues, messages, owner, chatKey])
+  const sendQueuedNow = (id: string): void => {
+    const item = queue.find((x) => x.id === id)
+    if (!item) return
+    if (running) {
+      queueNow.current = id
+      stop()
+    } else dispatchQueued(item)
+  }
+  const editQueued = (id: string, raw: string): void => {
+    const r = resolve(raw, false)
+    if (!r || 'handled' in r) {
+      toast.error('That message needs some text after the command')
+      return
+    }
+    setQueue((l) => l.map((x) => (x.id === id ? { ...x, raw, q: r.q, shown: r.shown } : x)))
   }
 
   const revealLabel = isMac ? 'Reveal in Finder' : 'Show in file explorer'
@@ -615,13 +748,15 @@ export function AiAssistant(): React.JSX.Element {
           className="pointer-events-none absolute inset-0 -z-10 [background-image:radial-gradient(rgba(255,255,255,0.1)_1px,transparent_1.2px)] [background-size:22px_22px] [-webkit-mask-image:radial-gradient(ellipse_75%_65%_at_50%_48%,#000_20%,transparent_100%)] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_48%,#000_20%,transparent_100%)]"
         />
       )}
+      <div className={cn('@container relative flex flex-col', empty ? 'flex-none' : 'min-h-0 flex-1')}>
+      {!empty && <MessageRail messages={messages} scroller={scroller} />}
       <div
         ref={scroller}
         onScroll={(e) => {
           const el = e.currentTarget
           setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80)
         }}
-        className={cn(empty ? 'flex-none px-3 md:px-4' : 'flex-1 overflow-y-auto px-3 py-3 md:px-4')}
+        className={cn(empty ? 'flex-none px-3 md:px-4' : 'flex-1 overflow-y-auto px-3 py-3 md:px-4 @[512px]:px-9')}
       >
         <div className="mx-auto w-full max-w-[var(--content-w,56rem)] space-y-5 pb-3 pt-1">
           {empty && (
@@ -659,10 +794,9 @@ export function AiAssistant(): React.JSX.Element {
           )}
         </div>
       </div>
+      </div>
 
       <div className="relative shrink-0 px-3 pb-1 pt-1">
-        {/* messages fade out above the message box instead of being cut off */}
-        {!empty && <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-full h-7 bg-gradient-to-t from-background to-transparent" />}
         <div className="relative mx-auto w-full max-w-[46rem]">
           {!atBottom && messages.length > 0 && (
             <button
@@ -678,9 +812,9 @@ export function AiAssistant(): React.JSX.Element {
             <SlashMenu
               commands={slashList}
               index={pickIndex}
-              query={input.slice(1)}
+              query={slashMatch?.query ?? ''}
               onHover={setPickIndex}
-              onPick={runCommand}
+              onPick={pickCommand}
             />
           )}
           {suggested && !slashOpen && !mentionOpen && (
@@ -718,6 +852,15 @@ export function AiAssistant(): React.JSX.Element {
             <MentionMenu files={mentionList} index={pickIndex} onHover={setPickIndex} onPick={pickMention} />
           )}
 
+          {queue.length > 0 && (
+            <QueueBar
+              items={queue.map((x) => ({ id: x.id, raw: x.raw }))}
+              running={running}
+              onSendNow={sendQueuedNow}
+              onEdit={editQueued}
+              onDelete={(id) => setQueue((l) => l.filter((x) => x.id !== id))}
+            />
+          )}
           {totals.files > 0 && (
             <ChangesBar
               files={totals.files}
@@ -737,7 +880,7 @@ export function AiAssistant(): React.JSX.Element {
           <div
             data-tour="composer"
             className={cn(
-              'relative rounded-3xl border bg-background p-3 shadow-sm transition-colors focus-within:border-primary/50'
+              'relative rounded-3xl border bg-background p-3 transition-colors focus-within:border-primary/50'
             )}
           >
             {images.length || attachments.length ? (
@@ -967,7 +1110,8 @@ export function AiAssistant(): React.JSX.Element {
             <ActionMenu
               side="top"
               align="end"
-              contentClassName="min-w-[230px]"
+              compact
+              contentClassName="min-w-[205px]"
               items={modelChoices.map((c) => ({
                 id: c.model.id,
                 label: c.model.name,

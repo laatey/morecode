@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { AlertCircle, WifiOff } from 'lucide-react'
+import { AlertCircle, WifiOff } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { useChatContext } from './chat-context'
 import { modelName, sourceOf } from './models'

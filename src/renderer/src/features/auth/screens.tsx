@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowLeft, Check, MailCheck } from 'lucide-react'
+import { ArrowLeft, Check, MailCheck } from '@/components/icons'
 import { toast } from 'sonner'
 import { useAuth } from './auth-store'
 import { DEMO_CODE, isEmail } from './auth-service'

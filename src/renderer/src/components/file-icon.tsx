@@ -1,78 +1,100 @@
 import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { Folder } from '@/components/icons'
+import {
+  createFileTreeIconResolver,
+  getBuiltInSpriteSheet,
+} from '@pierre/trees'
+import { cn } from '@/lib/utils'
 
-/** A small "letters in a rounded square" badge, the way editors draw JS, TS, CSS and similar files. */
-function Badge({ label, color, size = 7.2 }: { label: string; color: string; size?: number }): React.JSX.Element {
-  return (
-    <>
-      <rect x="1" y="1" width="14" height="14" rx="3.6" fill="#2b2a24" stroke={color} strokeOpacity="0.55" strokeWidth="1" />
-      <text x="8" y="11.1" textAnchor="middle" fontSize={size} fontWeight="700" fontFamily="system-ui, sans-serif" fill={color}>
-        {label}
-      </text>
-    </>
-  )
+// File icons come from @pierre/trees (its "complete" set). Every use goes through this file,
+// so changing the icon set means changing only this file.
+// Pierre ships no folder icon (its tree uses a chevron only), so folders use a plain outline folder.
+const box = 'inline-flex h-4 w-4 shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full'
+const fileIconResolver = createFileTreeIconResolver('complete')
+
+// The sprite is put in the page once; each icon is then a single <use> pointing at it.
+let spriteReady = false
+function ensureSprite(): void {
+  if (spriteReady || typeof document === 'undefined' || !document.body) return
+  spriteReady = true
+  const host = document.createElement('div')
+  host.setAttribute('aria-hidden', 'true')
+  host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none'
+  host.innerHTML = getBuiltInSpriteSheet('complete')
+  document.body.appendChild(host)
 }
 
-const Braces = ({ color }: { color: string }): React.JSX.Element => (
-  <path
-    d="M5.6 2.5C4.2 2.5 3.8 3.3 3.8 4.4v1.3c0 .8-.5 1.3-1.3 1.6v1.4c.8.3 1.3.8 1.3 1.6v1.3c0 1.1.4 1.9 1.8 1.9M10.4 2.5c1.4 0 1.8.8 1.8 1.9v1.3c0 .8.5 1.3 1.3 1.6v1.4c-.8.3-1.3.8-1.3 1.6v1.3c0 1.1-.4 1.9-1.8 1.9"
-    fill="none"
-    stroke={color}
-    strokeWidth="1.3"
-    strokeLinecap="round"
-    transform="translate(0 .1)"
-  />
-)
+// Pierre colours its icons inside the tree only. Outside the tree we set the colour ourselves:
+// Pierre's own variable wins if it is defined, otherwise the fallback below is used.
+const colours: Record<string, string> = {
+  typescript: '#3b82f6',
+  javascript: '#e5c07b',
+  react: '#38bdf8',
+  json: '#d4b24c',
+  css: '#60a5fa',
+  sass: '#ec6fa6',
+  html: '#f0743c',
+  markdown: '#4ade80',
+  python: '#4b8bbe',
+  go: '#22b8cf',
+  rust: '#e08a5a',
+  ruby: '#e5484d',
+  swift: '#fa7343',
+  vue: '#41b883',
+  svelte: '#ff5a1f',
+  astro: '#a78bfa',
+  nextjs: '#e5e7eb',
+  docker: '#38a3ee',
+  git: '#f1502f',
+  npm: '#e5484d',
+  yml: '#c084fc',
+  image: '#a78bfa',
+  svg: '#f59e0b',
+  zip: '#d4a24c',
+  bash: '#86efac',
+  database: '#94a3b8',
+  table: '#4ade80',
+  claude: '#d97757',
+  eslint: '#8b5cf6',
+  prettier: '#f472b6',
+  vite: '#a78bfa',
+  tailwind: '#38bdf8'
+}
 
-const Whale = (): React.JSX.Element => (
-  <g fill="#2f9bf0">
-    <rect x="3.2" y="5.2" width="1.9" height="1.7" rx=".2" />
-    <rect x="5.4" y="5.2" width="1.9" height="1.7" rx=".2" />
-    <rect x="7.6" y="5.2" width="1.9" height="1.7" rx=".2" />
-    <rect x="5.4" y="3.2" width="1.9" height="1.7" rx=".2" />
-    <rect x="7.6" y="3.2" width="1.9" height="1.7" rx=".2" />
-    <rect x="7.6" y="1.3" width="0" height="0" />
-    <path d="M1 7.5h11.6c.4-.8.9-1.3 1.7-1.5.5.5.6 1.2.4 1.8-.7 2.7-3.2 4.2-6.6 4.2C4.4 12 1.9 10.6 1 7.5Z" />
-  </g>
-)
-
-const File = (): React.JSX.Element => (
-  <path d="M4 1.6h5l3.2 3.2v8.9c0 .4-.3.7-.7.7H4a.7.7 0 0 1-.7-.7V2.3c0-.4.3-.7.7-.7Z" fill="#8c8c88" fillOpacity=".85" />
-)
-
-const ImageGlyph = (): React.JSX.Element => (
-  <g fill="none" stroke="#7bc98f" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round">
-    <rect x="2" y="3" width="12" height="10" rx="2" />
-    <circle cx="5.7" cy="6.3" r="1" />
-    <path d="m2.6 11.6 3.3-3 2.4 2.1 1.9-1.6 3 2.5" />
-  </g>
-)
-
-/** Which badge a file name gets. The first match wins. */
-function pick(name: string): React.JSX.Element {
-  const lower = name.toLowerCase()
-  const ext = lower.includes('.') ? lower.slice(lower.lastIndexOf('.') + 1) : ''
-  if (lower === 'dockerfile' || lower.startsWith('dockerfile.') || lower.endsWith('.dockerfile')) return <Whale />
-  if (lower === 'package.json' || lower === 'package-lock.json' || ext === 'json' || ext === 'jsonc') return <Braces color="#f0883e" />
-  if (['js', 'mjs', 'cjs'].includes(ext)) return <Badge label="JS" color="#f0c93b" />
-  if (['ts', 'mts', 'cts'].includes(ext)) return <Badge label="TS" color="#4aa3f5" />
-  if (ext === 'jsx') return <Badge label="JSX" color="#5fd0e8" size={5.4} />
-  if (ext === 'tsx') return <Badge label="TSX" color="#4aa3f5" size={5.4} />
-  if (ext === 'css' || ext === 'scss' || ext === 'less') return <Badge label="CSS" color="#6c9ff5" size={5.4} />
-  if (ext === 'html' || ext === 'htm') return <Badge label="HTM" color="#f08a4b" size={5.4} />
-  if (ext === 'md' || ext === 'mdx') return <Badge label="MD" color="#9bb7d4" />
-  if (ext === 'py') return <Badge label="PY" color="#5aa7e6" />
-  if (ext === 'yml' || ext === 'yaml') return <Badge label="YML" color="#e0707a" size={5.4} />
-  if (ext === 'sh' || ext === 'bash' || ext === 'zsh' || ext === 'ps1') return <Badge label="SH" color="#8fd18f" />
-  if (ext === 'sql') return <Badge label="SQL" color="#e3b35a" size={5.4} />
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif'].includes(ext)) return <ImageGlyph />
-  return <File />
+function tokenFor(name: string): string {
+  return fileIconResolver.resolveIcon('file-tree-icon-file', name).token ?? 'default'
 }
 
 /** The icon for a file, chosen from its name. */
 export function FileIcon({ name, className }: { name: string; className?: string }): React.JSX.Element {
+  ensureSprite()
+  const token = tokenFor(name)
+  const fallback = colours[token] ?? 'var(--muted-foreground, #8b8f98)'
   return (
-    <svg viewBox="0 0 16 16" aria-hidden className={className ?? 'h-4 w-4 shrink-0'}>
-      {pick(name)}
-    </svg>
+    <span
+      aria-hidden
+      className={cn(box, className)}
+      style={{ color: `var(--trees-file-icon-color-${token}, ${fallback})` }}
+    >
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+        <use href={`#file-tree-builtin-${token}`} />
+      </svg>
+    </span>
   )
+}
+
+/** The icon for a folder. */
+export function FolderIcon({ className }: { name?: string; className?: string }): React.JSX.Element {
+  return (
+    <span aria-hidden className={cn(box, className)} style={{ color: 'var(--muted-foreground, #8b8f98)' }}>
+      <Folder strokeWidth={1.6} />
+    </span>
+  )
+}
+
+/** The same file icon as an HTML string, for places built by hand (the chips in the message box). */
+export function fileIconHtml(name: string): string {
+  ensureSprite()
+  return renderToStaticMarkup(<FileIcon name={name} className="mr-1" />)
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { CalendarClock, ChevronDown, CodeXml, FileText, MessagesCircle } from 'lucide-react'
+import { CalendarClock, ChevronDown, CodeXml, FileText, MessagesCircle } from '@/components/icons'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable'
 import { SegmentedSwitch, SegmentedSwitchOption } from './components/segmented-switch'
 import { ActionMenu } from './components/action-menu'

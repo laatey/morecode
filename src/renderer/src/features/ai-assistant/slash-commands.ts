@@ -1,5 +1,5 @@
 import { skillIcon, type CustomCommand, type Skill } from '@/features/skills/skills-data'
-import { BarChart3, CircleHelp, ClipboardList, Command, Eraser, FileText, Gauge, Minimize2, NotebookText, Puzzle, ScanSearch, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { BarChart3, CircleHelp, ClipboardList, Command, Eraser, FileText, Gauge, Minimize2, NotebookText, Puzzle, ShieldCheck, type IconComponent } from '@/components/icons'
 
 export type PanelId =
   | 'model'
@@ -21,7 +21,7 @@ export type CommandGroup =
 export type SlashCommand = {
   id: string
   description: string
-  icon: LucideIcon
+  icon: IconComponent
   group: CommandGroup
   /** Hint shown after the name when the command takes extra text, e.g. "[what to focus on]". */
   hint?: string
@@ -54,16 +54,6 @@ export const BUILT_IN_COMMANDS: SlashCommand[] = [
     group: 'Utilities',
     kind: 'action',
     action: 'compact'
-  },
-  {
-    id: 'review',
-    description: 'Review your changes for bugs and risks',
-    icon: ScanSearch,
-    group: 'Conversation',
-    kind: 'prompt',
-    bare: true,
-    hint: '[what to focus on]',
-    prompt: 'Review the uncommitted changes in this project for bugs, risks and mistakes. Use git diff through run_command, read the changed files, and report what you find, most serious first. Do not change any files.'
   },
   {
     id: 'init',
@@ -197,4 +187,23 @@ export function parseSlash(
   if (!m) return null
   const command = list.find((c) => c.id === m[1])
   return command ? { command, args: m[2] ?? '' } : null
+}
+
+/** "/plan /code-review fix the tests" → every leading command, and what was typed after them. */
+export function parseCommands(
+  list: SlashCommand[],
+  text: string
+): { list: SlashCommand[]; tokens: string[]; args: string } {
+  const found: SlashCommand[] = []
+  const tokens: string[] = []
+  let rest = text.trim()
+  for (;;) {
+    const m = /^\/([a-z0-9-]+)(?=\s|$)/.exec(rest)
+    const command = m ? list.find((c) => c.id === m[1]) : undefined
+    if (!m || !command || found.includes(command)) break
+    found.push(command)
+    tokens.push(m[0])
+    rest = rest.slice(m[0].length).trimStart()
+  }
+  return { list: found, tokens, args: rest }
 }

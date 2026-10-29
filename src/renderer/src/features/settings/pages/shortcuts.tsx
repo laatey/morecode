@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { Btn, Group, Page, Row, TextInput } from '../kit'
 import { useSettings } from '../settings-store'

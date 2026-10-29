@@ -9,7 +9,7 @@ import {
   FolderInput,
   Link2,
   Link2Off
-} from 'lucide-react'
+} from '@/components/icons'
 import { toast } from 'sonner'
 import type { ActionMenuItem } from '@/components/action-menu'
 import { HOSTED, hostedRequest } from '@/features/auth/http-auth-service'

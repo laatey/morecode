@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { FolderOpen, FolderPlus, Loader2, X } from 'lucide-react'
+import { FolderOpen, FolderPlus, Loader2, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/auth-store'

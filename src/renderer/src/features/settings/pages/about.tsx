@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink } from '@/components/icons'
 import { toast } from 'sonner'
 import { LogoMark } from '@/components/logo'
 import { useAuth } from '@/features/auth/auth-store'

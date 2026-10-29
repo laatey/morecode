@@ -160,6 +160,9 @@ const api = {
     files: (): Promise<string[]> => ipcRenderer.invoke('workspace:files'),
     /** Read a small project file for MoreCode's in-app file preview. */
     readFile: (path: string): Promise<DocResult> => ipcRenderer.invoke('workspace:read-file', path),
+    /** Save edited text back to a project file. */
+    writeFile: (path: string, text: string): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('workspace:write-file', path, text),
     /** Read a project image as a safe data URL for MoreCode's in-app preview. */
     readImage: (
       path: string

@@ -1,5 +1,5 @@
 import React from 'react'
-import { File as FileIcon, Folder, X } from 'lucide-react'
+import { File as FileIcon, Folder, X } from '@/components/icons'
 import type { Attachment } from './types'
 
 /** Absolute path of a picked or dropped file (desktop only). */

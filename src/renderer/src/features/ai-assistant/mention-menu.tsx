@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import { File as FileIcon } from 'lucide-react'
+import { FileIcon } from '@/components/file-icon'
 import { cn } from '@/lib/utils'
 
 /** File suggestions that appear while typing "@". Keyboard handling lives in the composer. */
@@ -49,7 +49,7 @@ export function MentionMenu({
                   i === index ? 'bg-white/[0.1]' : 'bg-transparent hover:bg-white/[0.07]'
                 )}
               >
-                <FileIcon className="h-3.5 w-3.5 shrink-0 text-[#a8a8a6]" />
+                <FileIcon name={f.slice(cut + 1)} />
                 <span className="min-w-0 flex-1 truncate text-[#e2e2e0]" title={f}>{f.slice(cut + 1)}</span>
                 {cut > 0 && <span className="max-w-[80px] shrink-0 truncate text-[10.5px] text-[#77776f]">{f.slice(0, cut)}</span>}
               </button>

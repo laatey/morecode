@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
 /**

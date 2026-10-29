@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Bot, Columns2, Eraser, Square, SquareTerminal } from 'lucide-react'
+import { Bot, Columns2, Eraser, Square, SquareTerminal } from '@/components/icons'
 import { IconButton } from '@/components/layout/icon-button'
 import { useChatInsights } from '@/features/ai-assistant/chat-context'
 import { useWorkspace } from '@/features/workspace/workspace-store'

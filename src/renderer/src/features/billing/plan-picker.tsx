@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, KeyRound, Loader2, Lock } from 'lucide-react'
+import { Check, KeyRound, Loader2, Lock } from '@/components/icons'
 import { useAuth } from '@/features/auth/auth-store'
 import { errorText, FormError, Submit, TextLink } from '@/features/auth/ui'
 import { cn } from '@/lib/utils'

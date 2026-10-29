@@ -1,3 +1,4 @@
+import { FileIcon } from '@/components/file-icon'
 import React, { useState } from 'react'
 import {
   ChevronRight,
@@ -9,7 +10,7 @@ import {
   Plus,
   Search,
   SquarePen
-} from 'lucide-react'
+} from '@/components/icons'
 import { ActionMenu } from '@/components/action-menu'
 import { IconButton } from '@/components/layout/icon-button'
 import { cn } from '@/lib/utils'
@@ -148,8 +149,9 @@ function SidebarFileTree({
                 type="button"
                 title={node.path}
                 onClick={() => onFile(node.path)}
-                className="flex h-6 w-full cursor-pointer items-center px-1.5 pl-4 text-left text-[12px] text-[#aaa9a5] hover:bg-white/[0.05] hover:text-foreground"
+                className="flex h-6 w-full cursor-pointer items-center gap-1.5 px-1.5 pl-4 text-left text-[12px] text-[#aaa9a5] hover:bg-white/[0.05] hover:text-foreground"
               >
+                <FileIcon name={node.name} />
                 <span className="truncate">{node.name}</span>
               </button>
             </li>
@@ -165,7 +167,7 @@ function SidebarFileTree({
               onClick={() => toggle(node.path)}
               className="flex h-6 w-full cursor-pointer items-center gap-1 px-1.5 text-left text-[12px] text-[#cacac6] hover:bg-white/[0.05] hover:text-foreground"
             >
-              <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
+              <ChevronRight strokeWidth={2.35} className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
               <span className="truncate">{node.name}</span>
             </button>
             {open && <SidebarFileTree nodes={node.children} onFile={onFile} depth={depth + 1} />}
@@ -189,7 +191,7 @@ function FilesSection(): React.JSX.Element {
   }
   return (
     <section className="flex min-h-0 flex-1 flex-col px-2 pt-2">
-      <div className="flex h-6 shrink-0 items-center px-2 text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Explorer</div>
+      <div className="flex h-6 shrink-0 items-center px-2 text-[12px] font-medium text-muted-foreground">Explorer</div>
       <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-0.5 pb-2">
         {!project?.folder ? (
           <p className="px-2 py-2 text-[12px] leading-5 text-[#77776f]">

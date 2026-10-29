@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import * as ContextMenu from '@radix-ui/react-context-menu'
-import { Columns2, Pencil, Plus, RotateCcw, X, XCircle } from 'lucide-react'
+import { Columns2, Pencil, Plus, RotateCcw, X, XCircle } from '@/components/icons'
 import { ActionMenu, ActionMenuItem } from '@/components/action-menu'
 import { IconButton } from '@/components/layout/icon-button'
+import { FileIcon } from '@/components/file-icon'
 import { cn } from '@/lib/utils'
 import { getTabDefinition, TAB_DEFINITIONS } from './registry'
 import { getLayout, LAYOUTS } from './layouts'
@@ -90,7 +91,7 @@ export function TabStrip(): React.JSX.Element {
   const LayoutIcon = getLayout(layout).icon
 
   return (
-    <div className="app-no-drag flex h-[34px] shrink-0 items-center gap-1 border-b border-white/[0.07] px-2">
+    <div className="app-no-drag flex h-[34px] shrink-0 items-center gap-1 border-b border-white/[0.06] px-2">
       <div
         role="tablist"
         className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -149,7 +150,11 @@ export function TabStrip(): React.JSX.Element {
                       'before:absolute before:-left-[3px] before:inset-y-1 before:w-[2px] before:rounded-full before:bg-[#3b82f6]'
                   )}
                 >
-                  <Icon className="h-3 w-3 shrink-0 stroke-[1.8]" />
+                  {tab.kind === 'file' && /\.\w+/.test(name) ? (
+                    <FileIcon name={name.replace(/ •$/, '')} className="h-3.5 w-3.5" />
+                  ) : (
+                    <Icon className="h-3 w-3 shrink-0 stroke-[1.8]" />
+                  )}
                   {editing ? (
                     <RenameField
                       initial={name}

@@ -1,7 +1,7 @@
 import { ModalOverlay } from '@/components/modal-overlay'
 import React, { useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { FolderOpen, FolderPlus, Laptop, X } from 'lucide-react'
+import { FolderOpen, FolderPlus, Laptop, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from './workspace-store'

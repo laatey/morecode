@@ -1,6 +1,7 @@
 import { ipcMain, type WebContents } from 'electron'
 import { getNewProjectRoot } from '../workspace'
 import { ApiFailure, looksDropped } from './anthropic'
+import { stopAllJobs } from './background'
 import { runAgent, type RunInput, type Style } from './run'
 import { keepEdit, revertEdit, type Decision } from './tools'
 
@@ -191,4 +192,5 @@ export function registerAgentIpc(): void {
 /** Stop anything still running when the app quits, so no command is left behind. */
 export function stopAllAgents(): void {
   runs.forEach((r) => r.abort.abort())
+  stopAllJobs()
 }

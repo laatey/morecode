@@ -1,7 +1,7 @@
 import { ModalOverlay } from '@/components/modal-overlay'
 import React, { useEffect, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { AboutPage } from './pages/about'
 import { AppearancePage } from './pages/appearance'

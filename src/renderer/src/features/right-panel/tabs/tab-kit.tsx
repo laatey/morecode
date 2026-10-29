@@ -1,5 +1,5 @@
 import React from 'react'
-import type { LucideIcon } from 'lucide-react'
+import type { IconComponent } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 
@@ -10,7 +10,7 @@ export function TabEmpty({
   children,
   action
 }: {
-  icon: LucideIcon
+  icon: IconComponent
   title: string
   children: React.ReactNode
   action?: React.ReactNode
@@ -29,7 +29,7 @@ export function TabEmpty({
   )
 }
 
-/** Thin bar at the top of a tab (summary on the left, actions on the right). */
+/** Slim sub-bar under the tab strip (summary on the left, actions on the right). Kept low and quiet so it never reads as a second header. */
 export function TabToolbar({
   children,
   className
@@ -40,7 +40,7 @@ export function TabToolbar({
   return (
     <div
       className={cn(
-        'flex min-h-[38px] shrink-0 items-center gap-2 border-b border-white/[0.07] px-3 py-1.5',
+        'flex min-h-[30px] shrink-0 items-center gap-1.5 border-b border-white/[0.045] px-2.5 py-0.5',
         className
       )}
     >

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { Btn, Group, Page, Pick, Row, TextInput } from '../kit'
 import { useSettings, type Rule, type Settings } from '../settings-store'
 

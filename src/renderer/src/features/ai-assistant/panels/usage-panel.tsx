@@ -1,5 +1,5 @@
 import React, { useSyncExternalStore } from 'react'
-import { Copy } from 'lucide-react'
+import { Copy } from '@/components/icons'
 import { toast } from 'sonner'
 import { Tip } from '@/components/tooltip'
 import { cn } from '@/lib/utils'

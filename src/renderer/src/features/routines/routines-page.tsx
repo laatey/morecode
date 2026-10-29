@@ -10,7 +10,7 @@ import {
   Play,
   Plus,
   Trash2
-} from 'lucide-react'
+} from '@/components/icons'
 import { toast } from 'sonner'
 import { ActionMenu, type ActionMenuItem } from '@/components/action-menu'
 import { IconButton } from '@/components/layout/icon-button'

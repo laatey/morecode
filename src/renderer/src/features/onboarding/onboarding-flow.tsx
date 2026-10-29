@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowLeft, Check, Code2 } from 'lucide-react'
+import { ArrowLeft, Check, Code2 } from '@/components/icons'
 import { toast } from 'sonner'
 import { AuthShell, Heading } from '@/features/auth/auth-layout'
 import { useAuth } from '@/features/auth/auth-store'

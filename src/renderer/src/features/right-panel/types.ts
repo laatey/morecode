@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import type { LucideIcon } from 'lucide-react'
+import type { IconComponent } from '@/components/icons'
 
 /** Props every tab body receives. `tabId` is unique per open tab (useful when allowMultiple). */
 export interface TabContentProps {
@@ -14,7 +14,7 @@ export interface TabDefinition {
   title: string
   /** One plain-language line shown on the empty "new tab" page. */
   description: string
-  icon: LucideIcon
+  icon: IconComponent
   /** false/undefined: opening it again just focuses the existing tab. */
   allowMultiple?: boolean
   component: ComponentType<TabContentProps>

@@ -159,6 +159,11 @@
     border-color: var(--color-border);
   }
 
+  /* Surfaces stay deliberately flat; button depth is the one intentional exception. */
+  body :where(*):not(button):not(button *) {
+    box-shadow: none !important;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -515,6 +520,31 @@
 .slim-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+/* Pierre renders the code and syntax tokens; these app tokens keep it in MoreCode's visual system. */
+.morecode-pierre-diff {
+  --diffs-dark-bg: #272726;
+  --diffs-dark: #d6d6d3;
+  --diffs-dark-addition-color: var(--diff-add);
+  --diffs-dark-deletion-color: var(--diff-del);
+  --diffs-dark-modified-color: #78a9ff;
+  --diffs-font-family: var(--font-mono-family);
+  --diffs-header-font-family: var(--font-sans-family);
+  --diffs-font-size: 11.5px;
+  --diffs-line-height: 20px;
+  --diffs-gap-fallback: 0px;
+  --diffs-gap-block: 0px;
+  --diffs-bg-context-override: #272726;
+  --diffs-bg-separator-override: color-mix(in oklch, #272726 92%, white);
+  --diffs-fg-number-override: #858582;
+}
+
+/* Token markup from Pierre/Shiki, deliberately without its own code-surface styling. */
+.pierre-code .line {
+  display: block;
+  height: 1lh;
+  min-height: 1lh;
 }
 
 /* Error notifications use the compact red banner treatment from the reference. */

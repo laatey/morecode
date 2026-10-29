@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, ChevronRight, ChevronsUpDown, CircleHelp, LifeBuoy, LogOut, Plus, Rocket, Settings } from 'lucide-react'
+import { Check, ChevronRight, ChevronsUpDown, CircleHelp, LifeBuoy, LogOut, Plus, Rocket, Settings } from '@/components/icons'
 import { toast } from 'sonner'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAuth } from '@/features/auth/auth-store'

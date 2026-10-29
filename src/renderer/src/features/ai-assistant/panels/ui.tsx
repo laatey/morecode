@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown, X } from '@/components/icons'
 import { ActionMenu } from '@/components/action-menu'
 import { cn } from '@/lib/utils'
 

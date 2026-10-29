@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, ChevronRight, ListTodo, Terminal } from 'lucide-react'
+import { Check, ChevronRight, ListTodo, Terminal } from '@/components/icons'
 import { useChatContext, useChatInsights } from '@/features/ai-assistant/chat-context'
 import { cn } from '@/lib/utils'
 import { useRightPanel } from '../store'

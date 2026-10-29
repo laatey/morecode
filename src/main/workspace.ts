@@ -282,6 +282,18 @@ export function registerWorkspaceIpc(): void {
     }
   })
 
+  ipcMain.handle('workspace:write-file', (_event, rel: string, text: string): { ok: true } | { ok: false; error: string } => {
+    const full = typeof rel === 'string' ? safeFilePath(rel) : null
+    if (!full || typeof text !== 'string') return { ok: false, error: 'That file is outside your project.' }
+    if (Buffer.byteLength(text) > MAX_BYTES) return { ok: false, error: 'This file is too large to save from here.' }
+    try {
+      writeFileSync(full, text, 'utf8')
+      return { ok: true }
+    } catch {
+      return { ok: false, error: 'Could not save this file. It may be read-only or in use.' }
+    }
+  })
+
   ipcMain.handle('workspace:read-image', (_event, rel: string): { ok: true; dataUrl: string } | { ok: false; error: string } => {
     const full = typeof rel === 'string' ? safeFilePath(rel) : null
     const mime = full ? IMAGE_TYPES[extname(full).toLowerCase()] : undefined

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Check, Lock } from 'lucide-react'
+import { Check, Lock } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { useModelChoices } from '../use-model-choices'
 import type { PanelContext } from './panel-shell'

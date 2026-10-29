@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, ChevronRight, Circle, CircleDot, ClipboardList, X } from 'lucide-react'
+import { Check, ChevronRight, Circle, CircleDot, ClipboardList, X } from '@/components/icons'
 import { DiffView } from '@/components/diff-view'
 import { Tip } from '@/components/tooltip'
 import { Button } from '@/components/ui/button'
@@ -44,7 +44,7 @@ function Row({
       type="button"
       onClick={expandable ? onToggle : undefined}
       className={cn(
-        'group flex min-h-6 w-full items-center gap-2 rounded-[4px] px-1 py-0.5 text-left text-[12.5px] text-[#c9c9c6]',
+        'group flex min-h-6 min-w-0 w-full items-center gap-2 rounded-[4px] px-1 py-0.5 text-left text-[12.5px] text-[#c9c9c6] [overflow-wrap:normal]',
         expandable ? 'cursor-pointer hover:bg-white/[0.04]' : 'cursor-default'
       )}
     >
@@ -112,12 +112,15 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
   if (tool.kind === 'read') {
     const names = tool.paths.map((p) => p.split('/').pop() ?? p)
     return (
-      <Row expandable={false} open={false} onToggle={() => undefined} status={tool.status}>
+      <div>
+      <Row expandable={Boolean(tool.error)} open={open} onToggle={() => setOpen((o) => !o)} status={tool.status}>
         <span className="text-muted-foreground">{tool.status === 'running' ? 'Reading' : 'Read'}</span>
         <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
           {names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ')}
         </span>
       </Row>
+      {open && tool.error && <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-red-400/25 bg-red-950/30 p-2 text-[12px] leading-5 text-red-100">{tool.error}</p>}
+      </div>
     )
   }
 
@@ -125,9 +128,17 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
     return (
       <div>
         <Row expandable={Boolean(tool.report)} open={open} onToggle={() => setOpen((o) => !o)} status={tool.status}>
-          <span className="text-muted-foreground">{tool.status === 'running' ? 'Helper researching' : 'Helper'}</span>
-          <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">{tool.task}</span>
-          {tool.steps > 0 && <span className="text-[11px] text-muted-foreground">{tool.steps} {tool.steps === 1 ? 'step' : 'steps'}</span>}
+          <span className="shrink-0 whitespace-nowrap text-muted-foreground">
+            {tool.status === 'running' ? 'Helper researching' : 'Helper'}
+          </span>
+          <span className="min-w-0 flex-1 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
+            {tool.task}
+          </span>
+          {tool.steps > 0 && (
+            <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">
+              {tool.steps} {tool.steps === 1 ? 'step' : 'steps'}
+            </span>
+          )}
         </Row>
         {open && tool.report && (
           <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-white/[0.08] bg-[#242423] p-2.5 text-[12px] leading-5 text-[#b4b4b0]">{tool.report}</p>
@@ -160,7 +171,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
     return (
       <div>
         <Row
-          expandable={Boolean(tool.diff) && !discarded}
+          expandable={(Boolean(tool.diff) && !discarded) || Boolean(tool.error)}
           open={open}
           onToggle={() => setOpen((o) => !o)}
           status={tool.status}
@@ -187,6 +198,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
             </>
           )}
         </Row>
+        {open && tool.error && <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-red-400/25 bg-red-950/30 p-2 text-[12px] leading-5 text-red-100">{tool.error}</p>}
         {open && tool.diff && (
           <div className="my-1 ml-1 overflow-hidden rounded-[6px] border border-white/[0.08] text-[11.5px]">
             <DiffView file={tool.diff} />

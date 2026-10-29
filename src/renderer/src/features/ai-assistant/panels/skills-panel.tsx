@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Check, FileText, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, FileText, Loader2, Pencil, Plus, Search, Trash2, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { Btn, TextInput, Toggle } from '@/features/settings/kit'
 import { useSkills } from '@/features/skills/skills-store'

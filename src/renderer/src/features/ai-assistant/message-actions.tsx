@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy } from '@/components/icons'
 import { toast } from 'sonner'
 import { Tip } from '@/components/tooltip'
 import { cn } from '@/lib/utils'

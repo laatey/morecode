@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { CreditCard, Download } from 'lucide-react'
+import { CreditCard, Download } from '@/components/icons'
 import { toast } from 'sonner'
 import { Bar, limitTone } from '@/features/ai-assistant/panels/ui'
 import { useAuth } from '@/features/auth/auth-store'

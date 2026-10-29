@@ -1,10 +1,10 @@
-import { Columns2, Grid2x2, Rows2, Square, type LucideIcon } from 'lucide-react'
+import { Columns2, Grid2x2, Rows2, Square, type IconComponent } from '@/components/icons'
 import type { LayoutId } from './types'
 
 export interface LayoutDefinition {
   id: LayoutId
   label: string
-  icon: LucideIcon
+  icon: IconComponent
   /** How many panes (tab viewports) this layout shows. */
   panes: number
 }

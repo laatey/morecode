@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ChevronRight, Copy, ExternalLink, Folder } from 'lucide-react'
+import { ChevronRight, Copy, ExternalLink } from '@/components/icons'
 import { toast } from 'sonner'
 import { IconButton } from '@/components/layout/icon-button'
 import { cn } from '@/lib/utils'
@@ -74,8 +74,7 @@ function Branch<T>({
               onClick={() => toggle(n.path)}
               className="flex w-full cursor-pointer items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left text-[12px] text-[#c9c9c6] transition-colors hover:bg-white/[0.05]"
             >
-              <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', !shut && 'rotate-90')} />
-              <Folder className="h-3.5 w-3.5 shrink-0 stroke-[1.6] text-[#a8a8a6]" />
+              <ChevronRight strokeWidth={2.35} className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', !shut && 'rotate-90')} />
               <span className="min-w-0 flex-1 truncate">{n.name}</span>
               <span className="shrink-0 text-[11px] tabular-nums text-[#77776f]">{countFiles(n)}</span>
             </button>

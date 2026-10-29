@@ -1,6 +1,6 @@
 import React from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
 export interface ActionMenuItem {
@@ -29,12 +29,18 @@ export interface ActionMenuProps {
   sideOffset?: number
   className?: string
   contentClassName?: string
+  compact?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
 
 const ROW =
   'relative flex w-full items-center gap-2 rounded-[4px] py-[5.5px] pl-2.5 pr-3 text-[12.5px] leading-[18px] ' +
+  'cursor-pointer outline-none select-none transition-colors ' +
+  'data-[disabled]:opacity-40 data-[disabled]:pointer-events-none'
+
+const COMPACT_ROW =
+  'relative flex w-full items-center gap-1.5 rounded-[4px] py-1 pl-2 pr-2.5 text-[12px] leading-4 ' +
   'cursor-pointer outline-none select-none transition-colors ' +
   'data-[disabled]:opacity-40 data-[disabled]:pointer-events-none'
 
@@ -47,6 +53,7 @@ export function ActionMenu({
   sideOffset = 5,
   className = '',
   contentClassName = '',
+  compact = false,
   open: controlledOpen,
   onOpenChange
 }: ActionMenuProps): React.JSX.Element {
@@ -99,7 +106,14 @@ export function ActionMenu({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{item.label}</span>
                   {item.description && (
-                    <span className="block truncate text-[11px] leading-4 text-[#8e8e8a]">{item.description}</span>
+                    <span
+                      className={cn(
+                        'block truncate text-[#8e8e8a]',
+                        compact ? 'text-[10.5px] leading-[14px]' : 'text-[11px] leading-4'
+                      )}
+                    >
+                      {item.description}
+                    </span>
                   )}
                 </span>
                 {item.hasSubmenu ? (
@@ -122,7 +136,7 @@ export function ActionMenu({
                     checked={item.checked}
                     disabled={item.disabled}
                     onCheckedChange={() => item.onClick?.()}
-                    className={cn(ROW, tone)}
+                    className={cn(compact ? COMPACT_ROW : ROW, tone)}
                   >
                     {content}
                   </DropdownMenu.CheckboxItem>
@@ -130,7 +144,7 @@ export function ActionMenu({
                   <DropdownMenu.Item
                     disabled={item.disabled}
                     onClick={item.onClick}
-                    className={cn(ROW, tone)}
+                    className={cn(compact ? COMPACT_ROW : ROW, tone)}
                   >
                     {content}
                   </DropdownMenu.Item>

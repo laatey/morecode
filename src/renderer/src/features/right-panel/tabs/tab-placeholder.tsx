@@ -1,12 +1,12 @@
 import React from 'react'
-import type { LucideIcon } from 'lucide-react'
+import type { IconComponent } from '@/components/icons'
 
 /** Temporary body for every tab until its real content is built. Delete when no longer used. */
 export function TabPlaceholder({
   icon: Icon,
   title
 }: {
-  icon: LucideIcon
+  icon: IconComponent
   title: string
 }): React.JSX.Element {
   return (

@@ -10,8 +10,8 @@ import {
   Sparkles,
   TestTube2,
   Wand2,
-  type LucideIcon
-} from 'lucide-react'
+  type IconComponent
+} from '@/components/icons'
 
 export type SkillCategory = 'Quality' | 'Writing' | 'Learning' | 'Maintenance'
 export const CATEGORIES: SkillCategory[] = ['Quality', 'Writing', 'Learning', 'Maintenance']
@@ -41,7 +41,7 @@ export type CustomCommand = {
   prompt: string
 }
 
-export const ICONS: Record<string, LucideIcon> = {
+export const ICONS: Record<string, IconComponent> = {
   review: ScanSearch,
   test: TestTube2,
   learn: GraduationCap,
@@ -54,7 +54,7 @@ export const ICONS: Record<string, LucideIcon> = {
   package: Package,
   spark: Sparkles
 }
-export const skillIcon = (key: string): LucideIcon => ICONS[key] ?? Sparkles
+export const skillIcon = (key: string): IconComponent => ICONS[key] ?? Sparkles
 
 /** No built-in skills: everything in the list is made by the person. */
 export const CATALOG: Skill[] = []

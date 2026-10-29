@@ -1,6 +1,6 @@
 import { FileIcon } from '@/components/file-icon'
 import React, { useMemo, useState } from 'react'
-import { Check, ChevronRight, GitCompare, List, ListTree, Undo2 } from 'lucide-react'
+import { Check, ChevronRight, GitCompare, List, ListTree, Undo2 } from '@/components/icons'
 import { IconButton } from '@/components/layout/icon-button'
 import { DiffView, type FileDiff } from '@/components/diff-view'
 import { useChatContext, useChatInsights } from '@/features/ai-assistant/chat-context'

@@ -1,8 +1,8 @@
-import { spawn, execFile, type ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { ToolDef } from './anthropic'
 import { diffFiles } from './diff'
+import { dropJob, getJob, listJobs, seconds, startJob, stopJob, takeNew, waitForJob, type Job } from './background'
 
 /**
  * The things the AI is allowed to do. Reading is free anywhere on the computer; the file-edit
@@ -133,18 +133,6 @@ const TITLE: Record<PermissionAction, string> = {
   install: 'Install packages',
   remove: 'Delete files',
   network: 'Use the internet'
-}
-
-function killTree(child: ChildProcess): void {
-  if (!child.pid) return
-  if (process.platform === 'win32') execFile('taskkill', ['/pid', String(child.pid), '/t', '/f'], () => undefined)
-  else {
-    try {
-      process.kill(-child.pid, 'SIGTERM')
-    } catch {
-      child.kill('SIGTERM')
-    }
-  }
 }
 
 /* ---------- the tools ---------- */
@@ -328,6 +316,9 @@ function writeNewFile(ctx: ToolContext, id: string, i: Input): ToolResult {
   return applyWrite(ctx, id, abs, before, str(i.content, 'content'))
 }
 
+const jobStatus = (job: Job): string =>
+  !job.exited ? `running for ${seconds(job)}s` : job.stopped ? 'stopped' : `exited with code ${job.exitCode}`
+
 async function runCommand(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
   const command = str(i.command, 'command').trim()
   if (!command) throw new Error('The command is empty.')
@@ -340,43 +331,91 @@ async function runCommand(ctx: ToolContext, id: string, i: Input): Promise<ToolR
     return { content: 'The person did not allow this command. Do not try to run it another way; explain what you needed and ask how to proceed.', isError: true }
   }
 
-  const timeout = Math.min(600, Math.max(5, Number(i.timeout_seconds) || 120)) * 1000
-  ctx.emit({ kind: 'command', id, label: reason?.slice(0, 60) || command.slice(0, 60), command, status: 'running' })
+  const timeout = Math.min(600, Math.max(5, Number(i.timeout_seconds) || 120))
+  const label = reason?.slice(0, 60) || command.slice(0, 60)
+  ctx.emit({ kind: 'command', id, label, command, status: 'running' })
 
-  return new Promise<ToolResult>((done) => {
-    let output = ''
-    let timedOut = false
-    const child = spawn(command, {
-      cwd: ctx.cwd,
-      shell: true,
-      detached: process.platform !== 'win32',
-      windowsHide: true,
-      env: { ...process.env, CI: '1', NO_COLOR: '1', TERM: 'dumb' }
-    })
-    const add = (d: Buffer): void => {
-      output += d.toString('utf8')
-      if (output.length > 200_000) output = output.slice(-100_000) // keep memory bounded on noisy commands
-    }
-    child.stdout?.on('data', add)
-    child.stderr?.on('data', add)
-    const timer = setTimeout(() => {
-      timedOut = true
-      killTree(child)
-    }, timeout)
-    const onAbort = (): void => killTree(child)
-    ctx.signal.addEventListener('abort', onAbort, { once: true })
-    const finish = (code: number | null, error?: string): void => {
-      clearTimeout(timer)
-      ctx.signal.removeEventListener('abort', onAbort)
-      const text = clip(output.trim() || error || '(no output)')
-      const ok = code === 0 && !timedOut
-      ctx.emit({ kind: 'command', id, label: reason?.slice(0, 60) || command.slice(0, 60), command, status: ok ? 'done' : 'error', output: text })
-      const tail = timedOut ? `\n[stopped after ${timeout / 1000}s]` : code !== 0 ? `\n[exit code ${code}]` : ''
-      done({ content: `${text}${tail}`, isError: !ok })
-    }
-    child.on('error', (e) => finish(1, e.message))
-    child.on('close', (code) => finish(code))
-  })
+  const job = startJob(command, ctx.cwd)
+  const background = i.run_in_background === true
+
+  // A command that has already ended: report it like a normal command.
+  const finishExited = (): ToolResult => {
+    const { text } = takeNew(job)
+    const out = clip(text.trim() || '(no output)')
+    const ok = job.exitCode === 0 && !job.stopped
+    ctx.emit({ kind: 'command', id, label, command, status: ok ? 'done' : 'error', output: out })
+    dropJob(job.id)
+    const tail = job.stopped ? '\n[stopped]' : job.exitCode !== 0 ? `\n[exit code ${job.exitCode}]` : ''
+    return { content: `${out}${tail}`, isError: !ok }
+  }
+
+  // Leave it running and hand the AI what it has printed so far.
+  const detach = (why: string): ToolResult => {
+    const { text } = takeNew(job)
+    const out = clip(text.trim() || '(no output yet)')
+    const note = `[${why} It is job ${job.id}. Use command_output with id "${job.id}" to read new output or to wait for more (wait_seconds, until), and stop_command to end it.]`
+    ctx.emit({ kind: 'command', id, label, command, status: 'done', output: `${out}\n${note}` })
+    return { content: `${out}\n${note}` }
+  }
+
+  if (background) {
+    // Give it a moment, so a command that fails straight away is reported as a failure.
+    await waitForJob(job, 3, undefined, ctx.signal)
+    return job.exited ? finishExited() : detach('Started in the background and still running; it keeps going while you work.')
+  }
+
+  const result = await waitForJob(job, timeout, undefined, ctx.signal)
+  if (result === 'aborted') {
+    await stopJob(job)
+    const { text } = takeNew(job)
+    const out = clip(text.trim() || '(no output)')
+    ctx.emit({ kind: 'command', id, label, command, status: 'error', output: out })
+    dropJob(job.id)
+    return { content: `${out}\n[stopped]`, isError: true }
+  }
+  if (result === 'timeout') return detach(`Still running after ${timeout}s. It was NOT stopped; it now runs in the background.`)
+  return finishExited()
+}
+
+function pickJob(raw: unknown): Job {
+  const all = listJobs()
+  const list = all.length ? all.map((j) => `${j.id} (${jobStatus(j)}): ${j.command.slice(0, 60)}`).join('\n') : 'There are no background commands.'
+  if (typeof raw === 'string' && raw.trim()) {
+    const job = getJob(raw.trim())
+    if (!job) throw new Error(`There is no background command “${raw}”.\n${list}`)
+    return job
+  }
+  const running = all.filter((j) => !j.exited)
+  const only = running.length === 1 ? running[0] : all.length === 1 ? all[0] : undefined
+  if (!only) throw new Error(`Say which one with id.\n${list}`)
+  return only
+}
+
+async function commandOutput(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
+  const job = pickJob(i.id)
+  const until = typeof i.until === 'string' && i.until ? i.until : undefined
+  const wait = Math.min(300, Math.max(0, Number(i.wait_seconds) || 0))
+  const label = `Output of ${job.id}`
+  ctx.emit({ kind: 'command', id, label, command: job.command, status: 'running' })
+
+  const result = wait > 0 || until ? await waitForJob(job, wait || 30, until, ctx.signal) : 'timeout'
+  const { text, skipped } = takeNew(job)
+  const out = clip(text.trim() || '(no new output)')
+  const head = skipped ? `[${skipped} characters of older output were dropped]\n` : ''
+  const extra = result === 'matched' ? `; the output contains “${until}”` : result === 'timeout' && (wait > 0 || until) ? `; waited ${wait || 30}s` : ''
+  ctx.emit({ kind: 'command', id, label, command: job.command, status: 'done', output: out })
+  return { content: `${head}${out}\n[${job.id}: ${jobStatus(job)}${extra}]` }
+}
+
+async function stopCommand(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
+  const job = pickJob(i.id)
+  const label = `Stop ${job.id}`
+  ctx.emit({ kind: 'command', id, label, command: job.command, status: 'running' })
+  await stopJob(job)
+  const { text } = takeNew(job)
+  const out = clip(text.trim() || '(no new output)')
+  ctx.emit({ kind: 'command', id, label, command: job.command, status: 'done', output: out })
+  return { content: `${out}\n[${job.id}: ${jobStatus(job)}]` }
 }
 
 function todoWrite(ctx: ToolContext, i: Input): ToolResult {
@@ -494,16 +533,37 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'run_command',
     description:
-      'Run a shell command, starting in the project folder (tests, type checks, builds, git, package managers, scaffolding new projects). Commands are not limited to the project: they can use any folder on the computer, which is also how to create or change files outside the project. The person is asked to approve it first. Do not run long-lived servers; they will be stopped after the timeout.',
+      'Run a shell command, starting in the project folder (tests, type checks, builds, git, package managers, scaffolding new projects). Commands are not limited to the project: they can use any folder on the computer, which is also how to create or change files outside the project. The person is asked to approve it first. ' +
+      'For anything that keeps running (a dev server, a watcher, a database) set run_in_background to true: it starts, you get what it printed in the first seconds and a job id, and you can keep working. ' +
+      'A normal command that is still running when timeout_seconds ends is NOT stopped; it moves to the background and you get its output so far plus a job id. Check on any job with command_output and end it with stop_command.',
     input_schema: {
       type: 'object',
       properties: {
         command: { type: 'string' },
         reason: { type: 'string', description: 'One short sentence, in plain language, on why this is needed.' },
-        timeout_seconds: { type: 'integer' }
+        timeout_seconds: { type: 'integer', description: 'How long to wait for it to finish before it moves to the background. Default 120, at most 600.' },
+        run_in_background: { type: 'boolean', description: 'Start it and return at once, leaving it running. Use for servers and watchers.' }
       },
       required: ['command', 'reason']
     }
+  },
+  {
+    name: 'command_output',
+    description:
+      'Read what a background command has printed since you last looked, and whether it is still running. Use wait_seconds to wait (it returns early if the command exits), and until to return as soon as the output contains some text, for example "ready" or "Local:". With neither it returns straight away. If there is only one background command, id can be left out.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The job id, for example bg1.' },
+        wait_seconds: { type: 'integer', description: 'How long to wait, at most 300.' },
+        until: { type: 'string', description: 'Return early once the new output contains this text (not case sensitive).' }
+      }
+    }
+  },
+  {
+    name: 'stop_command',
+    description: 'Stop a background command and everything it started. Use it when you are finished with a server, or before restarting it. If there is only one background command, id can be left out.',
+    input_schema: { type: 'object', properties: { id: { type: 'string', description: 'The job id, for example bg1.' } } }
   },
   {
     name: 'todo_write',
@@ -557,6 +617,10 @@ export async function executeTool(name: string, id: string, input: Input, ctx: T
         return writeNewFile(ctx, id, input)
       case 'run_command':
         return await runCommand(ctx, id, input)
+      case 'command_output':
+        return await commandOutput(ctx, id, input)
+      case 'stop_command':
+        return await stopCommand(ctx, id, input)
       case 'todo_write':
         return todoWrite(ctx, input)
       case 'present_plan':
@@ -567,8 +631,8 @@ export async function executeTool(name: string, id: string, input: Input, ctx: T
   } catch (err) {
     const message = (err as Error).message
     // close the row that was opened for this call, so nothing stays "running"
-    if (name === 'edit_file' || name === 'write_file') ctx.emit({ kind: 'edit', id, path: String(input.path ?? ''), added: 0, removed: 0, status: 'error' })
-    else if (name === 'read_file' || name === 'list_dir' || name === 'search') ctx.emit({ kind: 'read', id, paths: [String(input.path ?? input.pattern ?? '')], status: 'error' })
+    if (name === 'edit_file' || name === 'write_file') ctx.emit({ kind: 'edit', id, path: String(input.path ?? ''), added: 0, removed: 0, status: 'error', error: message })
+    else if (name === 'read_file' || name === 'list_dir' || name === 'search') ctx.emit({ kind: 'read', id, paths: [String(input.path ?? input.pattern ?? '')], status: 'error', error: message })
     return { content: message, isError: true }
   }
 }

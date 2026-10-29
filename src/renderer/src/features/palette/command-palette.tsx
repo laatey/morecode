@@ -16,8 +16,8 @@ import {
   Settings as SettingsIcon,
   Sparkles,
   SquarePen,
-  type LucideIcon
-} from 'lucide-react'
+  type IconComponent
+} from '@/components/icons'
 import { useModelChoices } from '@/features/ai-assistant/use-model-choices'
 import { useChatContext } from '@/features/ai-assistant/chat-context'
 import { KeyChip } from '@/features/ai-assistant/panels/ui'
@@ -38,7 +38,7 @@ interface Item {
   group: string
   label: string
   detail?: string
-  icon: LucideIcon
+  icon: IconComponent
   /** Shortcut id, to show its keys on the right. */
   shortcut?: string
   /** Extra words that should find this item. */

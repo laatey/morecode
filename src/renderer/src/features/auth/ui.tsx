@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
-import { Check, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Check, Eye, EyeOff, Loader2 } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { AuthError } from './auth-service'

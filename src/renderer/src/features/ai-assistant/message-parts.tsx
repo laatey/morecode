@@ -1,8 +1,9 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
-import { highlightLines, languageForName } from '@/lib/highlight'
+import { languageForName } from '@/lib/highlight'
+import { escapeCodeHtml, highlightWithPierre } from '@/lib/pierre-highlight'
 
 /** What a message says when the person sent only attachments. It is never shown. */
 // eslint-disable-next-line react-refresh/only-export-components
@@ -88,10 +89,18 @@ export function UserBubble({
 function CodeBlock({ code, lang }: { code: string; lang?: string }): React.JSX.Element {
   const [copied, setCopied] = useState(false)
   const language = languageForName(lang)
-  const html = useMemo(
-    () => highlightLines(code.split('\n'), language).join('\n'),
-    [code, language]
-  )
+  const [html, setHtml] = useState(() => escapeCodeHtml(code))
+
+  useEffect(() => {
+    let cancelled = false
+    setHtml(escapeCodeHtml(code))
+    void highlightWithPierre(code, language).then((next) => {
+      if (!cancelled) setHtml(next)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [code, language])
 
   return (
     <div className="my-3 overflow-hidden rounded-md border border-white/[0.08] bg-transparent font-mono text-[11.5px]">
@@ -111,7 +120,7 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }): React.JSX.E
         </button>
       </div>
       <pre className="overflow-x-auto px-3.5 py-3 leading-relaxed bg-transparent">
-        <code className="hljs bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
+        <code className="pierre-code bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
       </pre>
     </div>
   )
