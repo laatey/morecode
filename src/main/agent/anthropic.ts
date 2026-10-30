@@ -10,7 +10,7 @@ export type ContentBlock =
   | {
       type: 'tool_result'
       tool_use_id: string
-      content: string
+      content: string | Array<{ type: 'text'; text: string } | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>
       is_error?: boolean
     }
 

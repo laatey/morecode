@@ -4,6 +4,9 @@ import type { ToolDef } from './anthropic'
 import { diffFiles } from './diff'
 import { resultText } from '../mcp/client'
 import type { McpRuntime } from '../mcp/manager'
+import { runBrowserTool } from './browser'
+import { designGuide } from './design'
+import { validateSkillDraft } from '../../shared/skill-draft'
 import { dropJob, getJob, listJobs, markDetached, seconds, startJob, stopJob, takeNew, waitForJob, type Job } from './background'
 
 /**
@@ -15,6 +18,28 @@ import { dropJob, getJob, listJobs, markDetached, seconds, startJob, stopJob, ta
 export type Decision = 'once' | 'always' | 'deny'
 export type PermissionAction = 'command' | 'install' | 'remove' | 'network'
 
+export interface PermissionRequest {
+  id: string
+  action: PermissionAction
+  title: string
+  command: string
+  reason?: string
+  connector?: {
+    id: string
+    name: string
+    tool: string
+    input?: Record<string, unknown>
+  }
+}
+
+export interface SkillData {
+  id: string
+  name: string
+  description: string
+  instructions: string
+  bundle?: Record<string, string>
+}
+
 export interface ToolContext {
   cwd: string
   /** Hand a read-only research job to a helper. Set by the run, which enforces the limits. */
@@ -23,10 +48,12 @@ export interface ToolContext {
   editFailures?: Map<string, number>
   signal: AbortSignal
   emit: (tool: Record<string, unknown>) => void
-  ask: (req: { id: string; action: PermissionAction; title: string; command: string; reason?: string }) => Promise<Decision>
+  ask: (req: PermissionRequest) => Promise<Decision>
   runId: string
   /** Tools from the person's connected connectors, when any are switched on. */
   mcp?: McpRuntime | null
+  /** Skills the person has switched on, so the AI can read their SKILL.md or bundle files on demand. */
+  skills?: SkillData[]
 }
 
 export interface ToolResult {
@@ -34,6 +61,8 @@ export interface ToolResult {
   isError?: boolean
   /** The run should end after this tool (a plan is waiting for approval). */
   stop?: boolean
+  /** Pictures to show the model along with the text (for example a browser screenshot). */
+  images?: { media_type: string; data: string }[]
 }
 
 const MAX_READ_BYTES = 200_000
@@ -454,6 +483,111 @@ function presentPlan(ctx: ToolContext, id: string, i: Input): ToolResult {
   return { content: 'The plan is now shown to the person for approval. Stop here and wait; do not change any files.', stop: true }
 }
 
+function readSkill(ctx: ToolContext, id: string, i: Input): ToolResult {
+  const query = str(i.skill, 'skill').trim().replace(/^\//, '').toLowerCase()
+  const reqPath = typeof i.path === 'string' ? i.path.trim().replace(/^\/+/, '') : ''
+  const list = ctx.skills ?? []
+
+  // Match by skill id, name, or sub-skill folder name inside bundle (e.g. skills/<query>/SKILL.md)
+  let found = list.find(
+    (s) => s.id.toLowerCase() === query || s.name.toLowerCase() === query
+  )
+  let matchedBundlePath = reqPath
+  if (!found) {
+    for (const s of list) {
+      const paths = Object.keys(s.bundle ?? {})
+      const hit = paths.find(
+        (p) =>
+          p.toLowerCase() === `skills/${query}/skill.md` ||
+          p.toLowerCase().endsWith(`/${query}/skill.md`) ||
+          p.toLowerCase() === query
+      )
+      if (hit) {
+        found = s
+        if (!matchedBundlePath) matchedBundlePath = hit
+        break
+      }
+    }
+  }
+
+  if (!found) {
+    const available = list.map((s) => s.id).join(', ') || 'none'
+    ctx.emit({
+      kind: 'skill',
+      id,
+      skillId: query,
+      skillName: query,
+      path: reqPath || undefined,
+      status: 'error',
+      error: `Skill “${query}” is not enabled. Available skills: ${available}.`
+    })
+    return {
+      content: `Skill “${query}” was not found among enabled skills (${available}).`,
+      isError: true
+    }
+  }
+
+  const bundle = found.bundle ?? {}
+  const bundleKeys = Object.keys(bundle)
+  let resolvedPath = matchedBundlePath
+  let content = ''
+
+  if (resolvedPath) {
+    const exact =
+      bundle[resolvedPath] ??
+      bundleKeys.find((k) => k.toLowerCase() === resolvedPath.toLowerCase() || k.toLowerCase().endsWith(`/${resolvedPath.toLowerCase()}`))
+    if (typeof exact === 'string') {
+      if (bundle[exact] !== undefined) {
+        resolvedPath = exact
+        content = bundle[exact]
+      } else {
+        content = exact
+      }
+    } else {
+      const err = `File “${resolvedPath}” does not exist in skill “${found.name}”. Available files: ${bundleKeys.join(', ') || 'none'}.`
+      ctx.emit({
+        kind: 'skill',
+        id,
+        skillId: found.id,
+        skillName: found.name,
+        path: resolvedPath,
+        status: 'error',
+        error: err
+      })
+      return { content: err, isError: true }
+    }
+  } else {
+    const defaultKey =
+      bundleKeys.find((k) => /^skills\/[^/]+\/skill\.md$/i.test(k) && k.toLowerCase().includes(found.id.toLowerCase())) ??
+      bundleKeys.find((k) => /(?:^|\/)skill\.md$/i.test(k)) ??
+      bundleKeys.find((k) => /(?:^|\/)readme\.md$/i.test(k))
+    if (defaultKey && bundle[defaultKey]) {
+      resolvedPath = defaultKey
+      content = bundle[defaultKey]
+    } else {
+      resolvedPath = `skills/${found.id}/SKILL.md`
+      content = `# ${found.name}\n\n${found.description}\n\n${found.instructions}`
+    }
+  }
+
+  const fileListNote =
+    bundleKeys.length > 1
+      ? `\n\n---\nOther files in the “${found.name}” skill bundle (pass path to read_skill to inspect): ${bundleKeys.join(', ')}`
+      : ''
+
+  ctx.emit({
+    kind: 'skill',
+    id,
+    skillId: found.id,
+    skillName: found.name,
+    path: resolvedPath,
+    content: content.slice(0, 6000),
+    status: 'done'
+  })
+
+  return { content: clip(`${content}${fileListNote}`) }
+}
+
 /** A short listing of the project (two levels deep) so the AI knows what already exists. */
 export function projectTree(cwd: string, limit = 80): string {
   const out: string[] = []
@@ -599,8 +733,51 @@ export const TOOL_DEFS: ToolDef[] = [
       properties: { title: { type: 'string' }, summary: { type: 'string' }, steps: { type: 'array', items: { type: 'string' } } },
       required: ['title', 'steps']
     }
+  },
+  {
+    name: 'read_skill',
+    description:
+      'Read the instructions or a specific bundle file (such as SKILL.md or a sub-skill file) from one of the person\'s enabled skills listed under "Available skills". When a skill matches the person\'s task, call read_skill before proceeding.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        skill: { type: 'string', description: 'Skill id or name (for example "data" or "design").' },
+        path: { type: 'string', description: 'Optional file path inside the skill bundle (for example "skills/analyze/SKILL.md"). Omit to read the main skill instructions.' }
+      },
+      required: ['skill']
+    }
+  },
+  {
+    name: 'draft_skill',
+    description: 'When the user asks to create a reusable skill, draft focused instructions and when to use them. This creates a reviewable draft in chat, not files or a saved skill. The user must review and Save skill. Never claim it is saved or overwrite existing skills. Do not use this for unrelated tasks.',
+    input_schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        id: { type: 'string', description: 'Unique lowercase hyphenated slash-command name, max 64 characters.' },
+        name: { type: 'string', maxLength: 80 },
+        description: { type: 'string', maxLength: 500, description: 'What this skill does and when it should be used.' },
+        instructions: { type: 'string', maxLength: 30000, description: 'Focused reusable steps, safeguards and output expectations.' },
+        example: { type: 'string', maxLength: 1000 }
+      },
+      required: ['id', 'name', 'description', 'instructions']
+    }
+  },
+  {
+    name: 'design_guide',
+    description:
+      'Get the design rules for building or restyling UI so it looks crafted rather than generic, or the step-by-step process for copying a screenshot or mockup. Call it before visual work when the rules are not already in your instructions.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', enum: ['build', 'replicate', 'all'], description: 'build: rules for new or restyled UI. replicate: matching an attached image. all: both.' }
+      }
+    }
   }
 ]
+
+const isAuthError = (msg: string): boolean =>
+  /\b(401|403)\b|sign-in expired|unauthorized|forbidden|invalid_token|token expired/i.test(msg)
 
 /** One call to a connector's tool: asks first when the person asked it to, shows a row, returns text for the model. */
 async function callConnector(ctx: ToolContext, id: string, name: string, input: Input): Promise<ToolResult> {
@@ -612,8 +789,20 @@ async function callConnector(ctx: ToolContext, id: string, name: string, input: 
   if (perm === 'block') return { content: `The person has blocked ${hit.tool} in Customize.`, isError: true }
   let always = false
   if (perm === 'ask') {
-    const shown = JSON.stringify(input)
-    const d = await ctx.ask({ id: `${id}:ask`, action: 'network', title: `Use ${label}: ${hit.tool}`, command: shown.length > 400 ? `${shown.slice(0, 400)}…` : shown, reason: `Connector: ${label}` })
+    const shown = JSON.stringify(input, null, 2)
+    const d = await ctx.ask({
+      id: `${id}:ask`,
+      action: 'network',
+      title: `Use ${label}: ${hit.tool}`,
+      command: shown.length > 800 ? `${shown.slice(0, 800)}…` : shown,
+      reason: `Connector: ${label}`,
+      connector: {
+        id: hit.config.id,
+        name: label,
+        tool: hit.tool,
+        input: input as Record<string, unknown>
+      }
+    })
     if (d === 'deny') return { content: 'The person did not allow this call.', isError: true }
     always = d === 'always'
   }
@@ -622,11 +811,13 @@ async function callConnector(ctx: ToolContext, id: string, name: string, input: 
   try {
     const r = await hit.client.call(hit.tool, input, AbortSignal.any([ctx.signal, AbortSignal.timeout(90_000)]))
     const text = resultText(r)
-    ctx.emit({ ...row, status: r.isError ? 'error' : 'done', output: text.slice(0, 6000), ms: Date.now() - started })
+    const authFailed = r.isError && isAuthError(text)
+    ctx.emit({ ...row, status: r.isError ? 'error' : 'done', output: text.slice(0, 6000), authError: authFailed, ms: Date.now() - started })
     return { content: clip(text), isError: r.isError }
   } catch (err) {
     const message = (err as Error).message
-    ctx.emit({ ...row, status: 'error', output: message, ms: Date.now() - started })
+    const authFailed = isAuthError(message)
+    ctx.emit({ ...row, status: 'error', output: message, authError: authFailed, ms: Date.now() - started })
     return { content: message, isError: true }
   }
 }
@@ -637,6 +828,7 @@ export async function executeTool(name: string, id: string, input: Input, ctx: T
       throw new Error('Your tool call arrived cut off or was not valid JSON, so nothing ran. Send it again. For a big file, write it in smaller pieces.')
     }
     if (name.startsWith('mcp__')) return await callConnector(ctx, id, name, input)
+    if (name.startsWith('browser_')) return await runBrowserTool(name, id, input, ctx)
     switch (name) {
       case 'list_dir':
         return listDir(ctx, id, input)
@@ -662,6 +854,16 @@ export async function executeTool(name: string, id: string, input: Input, ctx: T
         return todoWrite(ctx, input)
       case 'present_plan':
         return presentPlan(ctx, id, input)
+      case 'read_skill':
+        return readSkill(ctx, id, input)
+      case 'draft_skill': {
+        const draft = validateSkillDraft(input)
+        if (ctx.skills?.some((skill) => skill.id === draft.id)) throw new Error('That enabled skill already exists. Choose a new skill id.')
+        ctx.emit({ kind: 'skill-draft', id, draft, status: 'done' })
+        return { content: `Drafted ${draft.name}. The draft is shown in chat for review. It is NOT saved or active; the user must choose Review skill, then Save skill.` }
+      }
+      case 'design_guide':
+        return { content: designGuide({ topic: typeof input.topic === 'string' ? input.topic : undefined }) }
       default:
         return { content: `There is no tool called ${name}.`, isError: true }
     }

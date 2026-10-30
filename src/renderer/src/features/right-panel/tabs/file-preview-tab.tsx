@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, FileText, Search, X } from '@/components/icons'
 import { FileIcon } from '@/components/file-icon'
+import { SegmentedSwitch } from '@/components/segmented-switch'
 import { Markdown } from '@/features/ai-assistant/message-parts'
 import { languageFor } from '@/lib/highlight'
 import { escapeCodeHtml, getCachedHighlight, highlightWithPierre } from '@/lib/pierre-highlight'
-import { cn } from '@/lib/utils'
 import { takeFilePreviewRequest } from '../file-preview-request'
 import { useRightPanel } from '../store'
 import type { TabContentProps } from '../types'
@@ -189,21 +189,16 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
     <div className="flex h-full min-h-0 flex-col">
       {richKind && saved !== null && !error && (
         <div className="flex h-8 shrink-0 items-center justify-between border-b border-white/[0.07] px-3">
-          <div className="inline-flex rounded-[6px] bg-white/[0.05] p-0.5 text-[11.5px]">
-            {(['preview', 'code'] as const).map((m, idx) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setViewMode(m)}
-                className={cn(
-                  'cursor-pointer rounded-[5px] px-2.5 py-0.5 transition-colors',
-                  viewMode === m ? 'bg-white/[0.12] font-medium text-[#ececea]' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {PREVIEW_LABELS[richKind][idx]}
-              </button>
-            ))}
-          </div>
+          <SegmentedSwitch
+            options={[
+              { value: 'preview', label: PREVIEW_LABELS[richKind][0] },
+              { value: 'code', label: PREVIEW_LABELS[richKind][1] }
+            ]}
+            value={viewMode}
+            onChange={setViewMode}
+            itemWidth={62}
+            height={24}
+          />
           {dirty && (
             <button
               type="button"

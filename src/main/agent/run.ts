@@ -4,7 +4,11 @@ import { join } from 'path'
 import { ApiFailure, streamMessage, type ApiMessage, type ContentBlock } from './anthropic'
 import { openRuntime, type McpRuntime } from '../mcp/manager'
 import type { McpConfig } from '../mcp/client'
-import { executeTool, projectTree, TOOL_DEFS, type Decision, type PermissionAction } from './tools'
+import { BROWSER_TOOL_DEFS } from './browser'
+import { DESIGN_POINTER, designSection } from './design'
+import { executeTool, projectTree, TOOL_DEFS, type Decision, type PermissionRequest, type SkillData } from './tools'
+
+export type SkillInput = SkillData
 
 export type Style = 'new' | 'some' | 'pro'
 
@@ -45,6 +49,8 @@ export interface RunInput {
   noTools?: boolean
   /** Connectors the person switched on (with their sign-in details). */
   connectors?: McpConfig[]
+  /** Skills the person switched on, so the AI knows their names/descriptions and can read their files with read_skill. */
+  skills?: SkillInput[]
   runId: string
   /** Extra headers for the MoreCode server (never sent to anyone else). */
   headers?: Record<string, string>
@@ -52,7 +58,7 @@ export interface RunInput {
 
 export interface RunIo {
   emit: (e: OutEvent) => void
-  ask: (req: { id: string; action: PermissionAction; title: string; command: string; reason?: string }) => Promise<Decision>
+  ask: (req: PermissionRequest) => Promise<Decision>
   signal: AbortSignal
   fetchImpl?: typeof fetch
 }
@@ -99,6 +105,8 @@ How to work:
 - To start a new project, scaffold it with run_command (for example npm create vite@latest, npm init, or writing the files yourself) in the folder the person names. If they name none, ${hasProject ? 'create it inside the current project folder' : "create it in the current folder (this chat's private folder)"}. Pick the right stack for what they asked for, such as Electron for a desktop app.
 - If a command is refused, do not look for a way around it; explain and ask.
 - Servers and watchers never finish, so start them with run_command and run_in_background: true. Then carry on, and use command_output (with wait_seconds, or until set to text like "ready" or "Local:") to see when it is up and to read errors. If a normal command is still running when its timeout ends it is not stopped: it becomes a background job, so use command_output to wait for the rest instead of running it again. Stop servers you started with stop_command when you are done with them.
+- To look at or test a web page (such as the dev server you started), use the browser_* tools (browser_navigate, browser_snapshot, browser_screenshot, browser_click, browser_type, browser_select, browser_press, browser_scroll, browser_wait_for, browser_back, browser_tabs). They drive the person's Browser tab, which must be open; if a tool says it is not, ask them to open it. Refs like e12 change on every snapshot, so always use the newest one. Use browser_screenshot when how something looks matters (layout, colours, spacing), not just what it says.
+${DESIGN_POINTER}
 - Only a tool call changes anything. Never type tool activity as text (for example "[Edited file]"), and never say you created or changed something unless a tool result confirmed it.
 - Use paths relative to the project root (src/main.js), with no leading slash.
 - Keep todo_write up to date: mark each task completed as soon as it is done, so the list is true if the person says "continue".
@@ -186,10 +194,42 @@ function userContent(input: RunInput): ContentBlock[] {
 export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
   const hasProject = Boolean(input.projectPath)
   const mcp: McpRuntime | null = input.noTools ? null : await openRuntime(input.connectors ?? [], input.cwd, io.signal)
+  const activeSkills = input.skills ?? []
+  const skillsSection =
+    !input.noTools && activeSkills.length > 0
+      ? `\n\nAvailable skills (switched on by the person):\n${activeSkills
+          .map((s) => {
+            const files = Object.keys(s.bundle ?? {})
+            const fileHint = files.length > 0 ? ` (files: ${files.slice(0, 12).join(', ')})` : ''
+            return `- ${s.id} (${s.name}): ${s.description}${fileHint}`
+          })
+          .join('\n')}\nIf a skill is relevant to the person's task, call read_skill with its id (and an optional file path from its files list, such as "skills/analyze/SKILL.md") to read its instructions before proceeding.`
+      : ''
   const system =
     buildSystem(input.cwd, input.style, hasProject, input.progress ?? '') +
+    skillsSection +
+    designSection({ prompt: input.prompt, images: input.images, history: input.history }) +
     (mcp ? `\n\nConnected connectors: ${mcp.names.join(', ')}. Their tools start with mcp__. Use them when the task needs that service's data or actions, and say which one you used. When a connector tool saves a file (such as a screenshot), pass a path inside the working folder (${input.cwd}) unless the person asked for another place.` : '')
-  const tools = input.noTools ? [] : [...TOOL_DEFS, ...(mcp?.defs ?? [])]
+  const baseTools = activeSkills.length > 0 ? TOOL_DEFS : TOOL_DEFS.filter((t) => t.name !== 'read_skill')
+  const tools = input.noTools ? [] : [...baseTools, ...BROWSER_TOOL_DEFS, ...(mcp?.defs ?? [])]
+  if (mcp?.failedAuth?.length) {
+    for (const f of mcp.failedAuth) {
+      io.emit({
+        type: 'tool',
+        tool: {
+          kind: 'mcp',
+          id: `auth-${f.id}-${Date.now()}`,
+          connectorId: f.id,
+          connector: f.name,
+          tool: 'authenticate',
+          input: {},
+          status: 'error',
+          authError: true,
+          output: f.error
+        }
+      })
+    }
+  }
   const past = buildHistory(input.history)
   const next = userContent(input)
   // two person turns in a row are not allowed, so a trailing one (a summary, or a message that never got a reply) rides along with the new prompt
@@ -250,6 +290,7 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
     ask: io.ask,
     delegate,
     mcp,
+    skills: activeSkills,
     editFailures: new Map<string, number>()
   }
 
@@ -299,7 +340,10 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
       if (block.type !== 'tool_use') continue
       if (io.signal.aborted) return
       const r = await executeTool(block.name, block.id, block.input, ctx)
-      results.push({ type: 'tool_result', tool_use_id: block.id, content: r.content, ...(r.isError ? { is_error: true } : {}) })
+      const content = r.images?.length
+        ? [{ type: 'text' as const, text: r.content }, ...r.images.map((im) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: im.media_type, data: im.data } }))]
+        : r.content
+      results.push({ type: 'tool_result', tool_use_id: block.id, content, ...(r.isError ? { is_error: true } : {}) })
       if (r.stop) stop = true
     }
     if (stop) return

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { Puzzle } from '@/components/icons'
 
 import asanaLogo from '@/assets/brand-logos/asana.svg'
 import atlassianLogo from '@/assets/brand-logos/atlassian.svg'
@@ -80,7 +81,7 @@ function resolveBrandLogo(id?: string, domain?: string, name?: string): string |
   return undefined
 }
 
-/** A connector's logo: using local crisp brand logos where available, falling back to Google favicons or a letter tile. */
+/** Preserve available brand logos; missing logos use the skill symbol. */
 export function ConnectorLogo({
   id,
   domain,
@@ -123,9 +124,7 @@ export function ConnectorLogo({
           className="object-contain"
         />
       ) : (
-        <span style={{ fontSize: size * 0.52 }} className="font-medium uppercase">
-          {name.trim().charAt(0) || '?'}
-        </span>
+        <Puzzle className="h-3.5 w-3.5" aria-hidden />
       )}
     </span>
   )

@@ -126,8 +126,8 @@ export const BUILT_IN_COMMANDS: SlashCommand[] = [
 export const SLASH_COMMANDS = BUILT_IN_COMMANDS
 
 export const GROUP_ORDER: CommandGroup[] = [
-  'Conversation',
   'Skills',
+  'Conversation',
   'Your commands',
   'Insights',
   'Utilities',
@@ -171,10 +171,10 @@ const grouped = (list: SlashCommand[]): SlashCommand[] =>
 export function filterCommands(list: SlashCommand[], query: string): SlashCommand[] {
   const q = query.toLowerCase()
   if (!q) return grouped(list) // grouped order, so the keyboard index matches what is drawn
-  const starts = list.filter((c) => c.id.startsWith(q))
-  const rest = list.filter(
+  const starts = grouped(list.filter((c) => c.id.startsWith(q)))
+  const rest = grouped(list.filter(
     (c) => !c.id.startsWith(q) && (c.id.includes(q) || c.description.toLowerCase().includes(q))
-  )
+  ))
   return [...starts, ...rest]
 }
 

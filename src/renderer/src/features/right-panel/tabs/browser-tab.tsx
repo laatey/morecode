@@ -65,6 +65,8 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
   const [loading, setLoading] = useState(false)
   const [nav, setNav] = useState({ back: false, forward: false })
   const [error, setError] = useState<{ url: string; message: string } | null>(null)
+  const [agentActive, setAgentActive] = useState(false)
+  const contentsId = useRef<number | null>(null)
 
   const go = useCallback((raw: string): void => {
     const next = toUrl(raw)
@@ -95,7 +97,17 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
       el.addEventListener(name, handler)
       return () => el.removeEventListener(name, handler)
     }
+    const register = (): void => {
+      try {
+        contentsId.current = el.getWebContentsId()
+        window.api.browser.register(contentsId.current)
+      } catch {
+        // not attached yet
+      }
+    }
     const off = [
+      on('dom-ready', register),
+      on('focus', register),
       on('did-start-loading', () => setLoading(true)),
       on('did-stop-loading', () => {
         setLoading(false)
@@ -133,6 +145,15 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
     ]
     return () => off.forEach((f) => f())
   }, [opened, tabId, setAutoTitle])
+
+  // blue glow while the AI is using this browser
+  useEffect(
+    () =>
+      window.api.browser.onAgent((e) => {
+        if (e.id === contentsId.current) setAgentActive(e.active)
+      }),
+    []
+  )
 
   const starred = opened && has(url)
 
@@ -237,6 +258,12 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
       </div>
 
       <div className="relative min-h-0 flex-1 bg-[#1f1f1e]">
+        {agentActive && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-30 animate-[agent-glow_2s_ease-in-out_infinite]"
+          />
+        )}
         {loading && (
           <div className="absolute inset-x-0 top-0 z-10 h-[2px] overflow-hidden bg-transparent">
             <div className="h-full w-1/3 animate-[load-slide_1.2s_ease-in-out_infinite] bg-[#3b82f6]" />

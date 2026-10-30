@@ -19,6 +19,7 @@ import { ProfileMenu } from '@/features/account/profile-menu'
 import { InlineRename } from '@/features/workspace/dialogs'
 import { useChatMenu } from '@/features/workspace/chat-menu'
 import { useWorkspace, type Chat } from '@/features/workspace/workspace-store'
+import { useRoutines } from '@/features/routines/routines-store'
 import { useWorkspaceFiles } from '@/features/ai-assistant/workspace-files'
 import { buildTree, type TreeNode } from '@/features/right-panel/tabs/file-tree'
 import { requestFilePreview } from '@/features/right-panel/file-preview-request'
@@ -234,10 +235,11 @@ export function LeftSidebar({
 }): React.JSX.Element {
   const onPage = routinesActive || customizeActive || Boolean(settingsActive)
   const ws = useWorkspace()
+  const { routines } = useRoutines()
   const [view, setView] = useState<'active' | 'archived'>('active')
   const [shut, setShut] = useState<Set<string>>(loadShutProjects)
 
-  const visible = ws.chats.filter((c) => (view === 'archived' ? c.archived : !c.archived))
+  const visible = ws.chats.filter((c) => !c.routineId && (view === 'archived' ? c.archived : !c.archived))
   const byRecent = (a: Chat, b: Chat): number => b.updatedAt - a.updatedAt
   const pinned = visible.filter((c) => c.pinned && !c.projectId).sort(byRecent)
   const loose = visible.filter((c) => !c.pinned && !c.projectId).sort(byRecent)
@@ -399,6 +401,53 @@ export function LeftSidebar({
                 </div>
               )
             })}
+
+            <SectionLabel
+              action={
+                <IconButton title="New routine" className="p-1" onClick={onOpenRoutines}>
+                  <Plus className={SMALL} />
+                </IconButton>
+              }
+            >
+              Routines
+            </SectionLabel>
+            {routines.length === 0 && (
+              <button
+                type="button"
+                onClick={onOpenRoutines}
+                className="mt-0.5 flex h-7 w-full cursor-pointer items-center rounded-md px-2 text-left text-[12.5px] text-[#77776f] hover:text-foreground"
+              >
+                Schedule a recurring task
+              </button>
+            )}
+            <ul className="flex flex-col gap-px">
+              {routines.map((r) => {
+                const chat = ws.chats.find((c) => c.id === r.chatId)
+                if (!chat) return null
+                const selected = !onPage && ws.activeId === chat.id
+                return (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        ws.select(chat.id)
+                        onOpenChat()
+                      }}
+                      title={chat.title}
+                      aria-current={selected ? 'true' : undefined}
+                      className={cn(
+                        'flex h-7 w-full cursor-pointer items-center gap-2 rounded-md pl-2 pr-2 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                        selected ? 'bg-white/[0.09] text-foreground' : 'text-[#b9b9b6] hover:bg-white/[0.05] hover:text-foreground',
+                        !r.enabled && 'opacity-60'
+                      )}
+                    >
+                      <CalendarClock className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{chat.title}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
 
             {pinned.length > 0 && (
               <>

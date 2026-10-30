@@ -172,8 +172,19 @@ function AppShell(): React.JSX.Element {
     onLeftResize,
     onRightResize,
     toggleLeft,
-    toggleRight
+    toggleRight,
+    overlay,
+    overlayWidth,
+    closeOverlay
   } = useResponsiveSidebars()
+  useEffect(() => {
+    if (!overlay) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') closeOverlay()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [overlay, closeOverlay])
 
   // Chat keeps the sidebar focused on chats; Code adds the project file tree there.
   const [mode, setMode] = useState<Mode>(() => (localStorage.getItem('morecode:mode') === 'code' ? 'code' : 'chat'))
@@ -208,7 +219,12 @@ function AppShell(): React.JSX.Element {
   useEffect(() => {
     const open = (e: Event): void => {
       try {
-        localStorage.setItem('morecode:customize-tab', String((e as CustomEvent<string>).detail ?? 'skills'))
+        const detail = (e as CustomEvent<string | { tab?: string; sub?: string }>).detail
+        const tab = typeof detail === 'string' ? detail : detail?.tab ?? 'skills'
+        localStorage.setItem('morecode:customize-tab', tab)
+        if (detail && typeof detail === 'object' && detail.sub) {
+          localStorage.setItem('morecode:customize-sub', detail.sub)
+        }
       } catch {
         // harmless
       }
@@ -273,19 +289,20 @@ function AppShell(): React.JSX.Element {
 
   const { openTab, closeTab, tabs, paneTabs, layout } = useRightPanel()
   const visibleTabIds = paneTabs.slice(0, getLayout(layout).panes)
+  const rightVisible = !rightCollapsed || overlay === 'right'
   const docsOpen =
-    !rightCollapsed && tabs.some((t) => t.kind === 'docs' && visibleTabIds.includes(t.id))
+    rightVisible && tabs.some((t) => t.kind === 'docs' && visibleTabIds.includes(t.id))
   /** Document button: open or focus Docs; click again while visible to close it. */
   const openDocs = (): void => {
     const visibleDocs = tabs.find((t) => t.kind === 'docs' && visibleTabIds.includes(t.id))
-    if (visibleDocs && !rightCollapsed) closeTab(visibleDocs.id)
+    if (visibleDocs && rightVisible) closeTab(visibleDocs.id)
     else openTab('docs')
   }
 
   // opening any tab (from a button, a menu or a chat message) expands the sidebar if needed
-  const reveal = useRef({ collapsed: rightCollapsed, toggle: toggleRight })
+  const reveal = useRef({ collapsed: !rightVisible, toggle: toggleRight })
   useEffect(() => {
-    reveal.current = { collapsed: rightCollapsed, toggle: toggleRight }
+    reveal.current = { collapsed: !rightVisible, toggle: toggleRight }
   })
   // Collapse only when the user closes the last tab. An empty panel can still be
   // opened manually so people can reach its tab controls and empty states.
@@ -617,9 +634,72 @@ function AppShell(): React.JSX.Element {
               </IconButton>
             </RightControls>
           </div>
-          <RightPanel />
+          {rightCollapsed && overlay === 'right' ? null : <RightPanel />}
         </ResizablePanel>
       </ResizablePanelGroup>
+      {overlay && (
+        <div className="fixed inset-0 z-40 flex" role="presentation">
+          <button
+            type="button"
+            aria-label="Close sidebar"
+            onClick={closeOverlay}
+            className="absolute inset-0 cursor-default bg-black/45 animate-in fade-in-0"
+          />
+          <aside
+            aria-label={overlay === 'left' ? 'Sidebar' : 'Secondary sidebar'}
+            className={cn(
+              'relative flex h-full max-w-[calc(100vw-48px)] flex-col border-white/[0.08] bg-background shadow-[0_0_60px_rgba(0,0,0,0.5)] animate-in duration-150',
+              overlay === 'left' ? 'border-r slide-in-from-left-4' : 'ml-auto border-l slide-in-from-right-4'
+            )}
+            style={{ width: overlayWidth }}
+          >
+            {overlay === 'left' ? (
+              <div
+                className="app-drag @container h-[38px] w-full flex items-center justify-between px-2 shrink-0 min-w-0 overflow-hidden"
+                style={{ paddingLeft: WINDOW_CONTROLS_LEFT_PX || undefined }}
+              >
+                <NavControls
+                  mode={mode}
+                  onModeChange={(m) => { handleModeChange(m); closeOverlay() }}
+                  onToggleSidebar={closeOverlay}
+                  sidebarTitle="Close sidebar"
+                  {...nav}
+                  arrowsClass="@max-[200px]:hidden"
+                />
+              </div>
+            ) : (
+              <div
+                className="app-drag h-[38px] w-full flex items-center justify-end px-2 shrink-0 overflow-hidden"
+                style={{ paddingRight: WINDOW_CONTROLS_RIGHT_PX || undefined }}
+              >
+                <RightControls docActive={docsOpen} onDocument={openDocs} onShare={share}>
+                  <IconButton title="Close secondary sidebar" onClick={closeOverlay}>
+                    <SidebarRightIcon />
+                  </IconButton>
+                </RightControls>
+              </div>
+            )}
+            {overlay === 'left' ? (
+              <LeftSidebar
+                mode={mode}
+                routinesActive={showRoutines}
+                customizeActive={showCustomize}
+                settingsActive={showSettings}
+                onOpenRoutines={() => { setShowRoutines(true); closeOverlay() }}
+                onOpenCustomize={() => { setShowCustomize(true); closeOverlay() }}
+                onOpenChat={() => {
+                  closeSettings()
+                  setShowRoutines(false)
+                  setMode('chat')
+                  closeOverlay()
+                }}
+              />
+            ) : (
+              <RightPanel />
+            )}
+          </aside>
+        </div>
+      )}
     </div>
   )
 }

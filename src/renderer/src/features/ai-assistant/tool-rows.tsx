@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { toast } from 'sonner'
+import { SkillDraftReview } from '@/features/skills/skill-draft-review'
 import { Check, ChevronRight, Circle, CircleDot, ClipboardList, X } from '@/components/icons'
 import { DiffView } from '@/components/diff-view'
 import { Tip } from '@/components/tooltip'
@@ -109,6 +111,127 @@ const clipJson = (v: unknown): string => {
   return t.length > 4000 ? `${t.slice(0, 4000)}\n…` : t
 }
 
+const isAuthError = (msg: string): boolean =>
+  /\b(401|403)\b|sign-in expired|unauthorized|forbidden|invalid_token|token expired/i.test(msg)
+
+/** Inline auth card displayed in chat when an MCP connector's authorization fails or expires. */
+function McpAuthCard({
+  connectorId,
+  connectorName,
+  error
+}: {
+  connectorId: string
+  connectorName: string
+  error?: string
+}): React.JSX.Element {
+  const { get, reauth } = useConnectors()
+  const c = get(connectorId)
+  const [signingIn, setSigningIn] = useState(false)
+  const [reconnected, setReconnected] = useState(false)
+  const [showError, setShowError] = useState(false)
+
+  const handleSignIn = async (): Promise<void> => {
+    if (c?.auth === 'oauth' || c?.url) {
+      setSigningIn(true)
+      try {
+        const err = await reauth(connectorId)
+        if (err) {
+          toast.error(err)
+        } else {
+          setReconnected(true)
+          toast.success(`Connected to ${connectorName}`)
+        }
+      } catch (e) {
+        toast.error((e as Error).message || 'Sign-in failed')
+      } finally {
+        setSigningIn(false)
+      }
+    } else {
+      window.dispatchEvent(
+        new CustomEvent('app:open-customize', {
+          detail: { tab: 'connectors', view: 'edit', id: connectorId }
+        })
+      )
+    }
+  }
+
+  const handleOpenSettings = (): void => {
+    window.dispatchEvent(
+      new CustomEvent('app:open-customize', {
+        detail: { tab: 'connectors', sub: 'connected' }
+      })
+    )
+  }
+
+  return (
+    <div className="my-2 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] p-3 text-[12.5px]">
+      <div className="flex items-start gap-2.5">
+        <ConnectorLogo
+          id={c?.catalogId ?? connectorId}
+          domain={c?.domain}
+          name={connectorName}
+          size={20}
+          className="mt-0.5 shrink-0 rounded-[4px]"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-[#ededeb]">{connectorName}</span>
+            <span className="rounded-[4px] bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300">
+              {reconnected ? 'Connected' : 'Sign-in expired'}
+            </span>
+          </div>
+          <p className="mt-1 text-[12px] leading-relaxed text-[#b4b4b0]">
+            {reconnected
+              ? `Reconnected to ${connectorName}. You can continue chatting or ask the AI to try again.`
+              : `Your sign-in for ${connectorName} expired or was rejected. Reconnect to allow the AI to use its tools.`}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-2.5">
+        {error ? (
+          <button
+            type="button"
+            onClick={() => setShowError((s) => !s)}
+            className="cursor-pointer text-[11.5px] text-muted-foreground hover:text-foreground"
+          >
+            {showError ? 'Hide error' : 'Show details'}
+          </button>
+        ) : (
+          <div />
+        )}
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="xs" onClick={handleOpenSettings}>
+            Manage
+          </Button>
+          {!reconnected && (
+            <Button
+              variant="secondary"
+              size="xs"
+              disabled={signingIn}
+              onClick={handleSignIn}
+              className="gap-1.5 border-amber-500/30 text-amber-200 hover:bg-amber-500/15"
+            >
+              {signingIn ? (
+                <>
+                  <Spinner />
+                  <span>Signing in…</span>
+                </>
+              ) : (
+                <span>{c?.auth === 'oauth' || c?.url ? 'Sign in again' : 'Update token'}</span>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+      {showError && error && (
+        <pre className="slim-scroll mt-2 max-h-[140px] overflow-auto whitespace-pre-wrap break-words rounded bg-black/40 p-2 font-mono text-[11px] leading-4 text-amber-200/80">
+          {error}
+        </pre>
+      )}
+    </div>
+  )
+}
+
 function Block({ label, text, error }: { label: string; text: string; error?: boolean }): React.JSX.Element {
   return (
     <div className="min-w-0">
@@ -130,6 +253,18 @@ function McpRow({ tool }: { tool: Extract<ToolBlock, { kind: 'mcp' }> }): React.
   const [open, setOpen] = useState(false)
   const { get } = useConnectors()
   const c = get(tool.connectorId)
+  const isAuth = Boolean(tool.authError) || (tool.status === 'error' && isAuthError(tool.output ?? ''))
+
+  if (isAuth) {
+    return (
+      <McpAuthCard
+        connectorId={tool.connectorId}
+        connectorName={tool.connector}
+        error={tool.output}
+      />
+    )
+  }
+
   return (
     <div>
       <Row expandable open={open} onToggle={() => setOpen((o) => !o)} status={tool.status === 'done' ? undefined : tool.status}>
@@ -157,6 +292,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
 
   if (tool.kind === 'permission') return <PermissionCard tool={tool} />
   if (tool.kind === 'mcp') return <McpRow tool={tool} />
+  if (tool.kind === 'skill-draft') return <SkillDraftReview draft={tool.draft} />
 
   if (tool.kind === 'read') {
     const names = tool.paths.map((p) => p.split('/').pop() ?? p)
@@ -173,6 +309,35 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
     )
   }
 
+  if (tool.kind === 'skill') {
+    const expandable = Boolean(tool.content || tool.error)
+    return (
+      <div>
+        <Row expandable={expandable} open={open} onToggle={() => setOpen((o) => !o)} status={tool.status}>
+          <span className="text-muted-foreground">{tool.status === 'running' ? 'Reading skill' : 'Read skill'}</span>
+          <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
+            {tool.skillName}
+          </span>
+          {tool.path && (
+            <span className="min-w-0 truncate font-mono text-[11.5px] text-muted-foreground/80">
+              {tool.path}
+            </span>
+          )}
+        </Row>
+        {open && tool.error && (
+          <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-red-400/25 bg-red-950/30 p-2 text-[12px] leading-5 text-red-100">
+            {tool.error}
+          </p>
+        )}
+        {open && tool.content && (
+          <pre className="slim-scroll my-1 ml-5 max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[6px] border border-white/[0.08] bg-[#242423] px-3 py-2 font-mono text-[11.5px] leading-[18px] text-[#b4b4b0]">
+            {tool.content}
+          </pre>
+        )}
+      </div>
+    )
+  }
+
   if (tool.kind === 'agent') {
     return (
       <div>
@@ -180,7 +345,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
           <span className="shrink-0 whitespace-nowrap text-muted-foreground">
             {tool.status === 'running' ? 'Helper researching' : 'Helper'}
           </span>
-          <span className="min-w-0 flex-1 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
+          <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
             {tool.task}
           </span>
           {tool.steps > 0 && (

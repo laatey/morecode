@@ -1,7 +1,7 @@
 import { FileIcon } from '@/components/file-icon'
 import React, { useMemo, useState } from 'react'
 import { Check, ChevronRight, GitCompare, List, ListTree, Undo2 } from '@/components/icons'
-import { IconButton } from '@/components/layout/icon-button'
+import { SegmentedSwitch } from '@/components/segmented-switch'
 import { DiffView, type FileDiff } from '@/components/diff-view'
 import { useChatContext, useChatInsights } from '@/features/ai-assistant/chat-context'
 import { cn } from '@/lib/utils'
@@ -237,23 +237,16 @@ export function DiffTab(): React.JSX.Element {
         </div>
         <span className="flex-1" />
         {mode === 'review' && (
-          <div className="flex items-center rounded-[6px] bg-white/[0.06] p-0.5">
-            {(
-              [
-                [false, List, 'Show as a list'],
-                [true, ListTree, 'Group by folder']
-              ] as const
-            ).map(([value, Icon, label]) => (
-              <IconButton
-                key={label}
-                title={label}
-                onClick={() => setTree(value)}
-                className={cn('p-1', tree === value && 'bg-white/[0.12] text-[#ececea]')}
-              >
-                <Icon className="h-3 w-3" />
-              </IconButton>
-            ))}
-          </div>
+          <SegmentedSwitch
+            options={[
+              { value: 'list', icon: <List className="h-3.5 w-3.5" />, title: 'Show as a list' },
+              { value: 'tree', icon: <ListTree className="h-3.5 w-3.5" />, title: 'Group by folder' }
+            ]}
+            value={tree ? 'tree' : 'list'}
+            onChange={(v) => setTree(v === 'tree')}
+            itemWidth={30}
+            height={24}
+          />
         )}
       </TabToolbar>
       <div className="min-h-0 flex-1">{mode === 'review' ? <ReviewView tree={tree} /> : <GitPanel />}</div>

@@ -22,6 +22,8 @@ export interface Chat {
   pinned: boolean
   archived: boolean
   updatedAt: number
+  /** Set on a routine's own chat. Those live in the Routines section and stay out of the normal chat lists. */
+  routineId?: string
 }
 
 export interface ProjectGroup {
@@ -72,6 +74,12 @@ interface WorkspaceApi {
   renameGroup: (id: string, name: string) => void
   removeGroup: (id: string) => void
   setSearchOpen: (open: boolean) => void
+  /** A routine's one chat. It is created without opening it, and only the Routines section shows it. */
+  createRoutineChat: (routineId: string, title: string, projectId: string | null) => string
+  /** Change a chat's title or project without a message to the person (used when a routine is edited). */
+  patchChat: (id: string, p: { title?: string; projectId?: string | null }) => void
+  /** Delete a routine's chat along with the routine. */
+  removeRoutineChat: (id: string) => void
   /** Delete every chat (projects stay) and start a fresh one. */
   deleteAllChats: () => void
   /** Messages for a chat, as last saved. Read once when a chat opens. */
@@ -323,7 +331,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   const leave = useCallback(
     (id: string) => {
       if (latest.current.activeId !== id) return
-      const next = latest.current.chats.find((c) => c.id !== id && !c.archived)
+      const next = latest.current.chats.find((c) => c.id !== id && !c.archived && !c.routineId)
       if (next) go(next.id, false)
       else newChat()
     },
@@ -428,10 +436,36 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     [patch, persist]
   )
 
+  const createRoutineChat = useCallback((routineId: string, title: string, projectId: string | null) => {
+    const id = uid()
+    messages.current[id] = []
+    setChats((l) => [{ id, title: title.trim().slice(0, 80) || 'Routine', projectId, pinned: false, archived: false, updatedAt: now(), routineId }, ...l])
+    return id
+  }, [])
+
+  const patchChat = useCallback(
+    (id: string, p: { title?: string; projectId?: string | null }) => {
+      const title = p.title?.trim().slice(0, 80)
+      patch(id, { ...(title ? { title } : {}), ...(p.projectId !== undefined ? { projectId: p.projectId } : {}) })
+    },
+    [patch]
+  )
+
+  const removeRoutineChat = useCallback(
+    (id: string) => {
+      leave(id)
+      setChats((l) => l.filter((x) => x.id !== id))
+      delete messages.current[id]
+    },
+    [leave]
+  )
+
   const deleteAllChats = useCallback(() => {
     const id = uid()
-    messages.current = { [id]: [] }
-    setChats([{ id, title: NEW_CHAT_TITLE, projectId: null, pinned: false, archived: false, updatedAt: now() }])
+    // a routine's chat belongs to the routine, so it stays
+    const kept = latest.current.chats.filter((c) => c.routineId)
+    messages.current = Object.fromEntries([[id, [] as Msg[]], ...kept.map((c) => [c.id, messages.current[c.id] ?? []] as [string, Msg[]])])
+    setChats([{ id, title: NEW_CHAT_TITLE, projectId: null, pinned: false, archived: false, updatedAt: now() }, ...kept])
     setActiveId(id)
     setRenamingId(null)
     setTrail({ ids: [id], at: 0 })
@@ -469,6 +503,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       renameGroup,
       removeGroup,
       setSearchOpen,
+      createRoutineChat,
+      patchChat,
+      removeRoutineChat,
       deleteAllChats,
       getMessages,
       saveMessages,
@@ -494,6 +531,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       linkGroup,
       renameGroup,
       removeGroup,
+      createRoutineChat,
+      patchChat,
+      removeRoutineChat,
       deleteAllChats,
       getMessages,
       saveMessages,

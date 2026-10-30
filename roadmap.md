@@ -1,0 +1,13 @@
+# MoreCode roadmap
+- [x] Routine setup modal: redesign to match app style
+- [x] Settings sidebar: grow with wide windows (not tiny)
+- [x] Sidebars: when no room, open as overlay instead of silently failing
+- [x] Agent can create skills (draft -> user review -> save), minimal UI
+- [x] Slash menu: clearer, easier to use
+- [x] Skills screens: drop custom icons, use generic docs icon
+- [x] Run all tests, package updated download (v3)
+- [x] Targeted menu fixes: sentence case, fallback skill icons, no search key guide, skills first, narrower model selector, remove data version chip
+- [x] Window controls: native chrome prevents overlap; packaged icon and taskbar identity configured (Windows appearance unverified here)
+- [x] Verify targeted changes and deliver clean v5 archive: 35 tests pass; existing unused UI dependency errors still block full type checking; no Electron executable available for visual checks
+- [x] Restore original integrated title bar only, retaining other v5 changes; regression test covers all desktop platforms; Windows visual appearance remains unverified
+- [x] Tab opening preserves already-open right overlay; regression test added

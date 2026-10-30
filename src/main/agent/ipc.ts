@@ -6,7 +6,7 @@ import { disconnect, disconnectAll, testConnector } from '../mcp/manager'
 import type { McpConfig } from '../mcp/client'
 import { ApiFailure, looksDropped } from './anthropic'
 import { dropJob, getJob, listJobSnapshots, onJobsChange, stopAllJobs, stopJob } from './background'
-import { runAgent, type RunInput, type Style } from './run'
+import { runAgent, type RunInput, type SkillInput, type Style } from './run'
 import { keepEdit, revertEdit, type Decision } from './tools'
 
 interface Live {
@@ -44,7 +44,20 @@ function valid(p: unknown): p is Payload {
         Object.entries(x.headers).every(
           ([k, v]) => /^x-morecode-[a-z-]+$/.test(k) && typeof v === 'string' && v.length < 80
         ))) &&
-    (x.connectors === undefined || (Array.isArray(x.connectors) && x.connectors.length < 30 && x.connectors.every(goodConfig)))
+    (x.connectors === undefined || (Array.isArray(x.connectors) && x.connectors.length < 30 && x.connectors.every(goodConfig))) &&
+    (x.skills === undefined || (Array.isArray(x.skills) && x.skills.length < 100 && x.skills.every(goodSkill)))
+  )
+}
+
+function goodSkill(s: unknown): s is SkillInput {
+  const x = s as SkillInput
+  return (
+    !!x &&
+    typeof x.id === 'string' &&
+    typeof x.name === 'string' &&
+    typeof x.description === 'string' &&
+    typeof x.instructions === 'string' &&
+    (x.bundle === undefined || (typeof x.bundle === 'object' && x.bundle !== null && Object.values(x.bundle).every((v) => typeof v === 'string')))
   )
 }
 

@@ -53,6 +53,13 @@ export interface AppInfo {
   electron: string
   chrome: string
 }
+export interface SkillInput {
+  id: string
+  name: string
+  description: string
+  instructions: string
+  bundle?: Record<string, string>
+}
 export interface AgentStart {
   runId: string
   apiKey: string
@@ -70,6 +77,7 @@ export interface AgentStart {
   chatId?: string
   headers?: Record<string, string>
   connectors?: McpConfig[]
+  skills?: SkillInput[]
 }
 export interface McpConfig {
   id: string
@@ -132,6 +140,12 @@ export type AgentMessage = { runId: string } & (
         title: string
         command: string
         reason?: string
+        connector?: {
+          id: string
+          name: string
+          tool: string
+          input?: Record<string, unknown>
+        }
       }
     }
   | { kind: 'done' }
@@ -177,6 +191,16 @@ const api = {
         | { provider: 'gateway'; key: string; endpoint: string }
     ): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('agent:test-provider', check),
     onEvent: (cb: (m: AgentMessage) => void): (() => void) => listen('agent:event', cb)
+  },
+  browser: {
+    /** Tell the main process which <webview> is the Browser tab, so the AI can drive it. */
+    register: (webContentsId: number): void => ipcRenderer.send('browser:register', webContentsId),
+    onAgent: (cb: (e: { id: number; active: boolean }) => void): (() => void) => listen('browser:agent', cb)
+  },
+  background: {
+    /** Is the window showing, and does it have focus? Routines wait politely while the person is using the app. */
+    getState: (): Promise<{ visible: boolean; focused: boolean }> => ipcRenderer.invoke('window:get-state'),
+    onState: (cb: (s: { visible: boolean; focused: boolean }) => void): (() => void) => listen('window:state', cb)
   },
   mcp: {
     test: (config: McpConfig): Promise<McpTestResult> => ipcRenderer.invoke('mcp:test', config),

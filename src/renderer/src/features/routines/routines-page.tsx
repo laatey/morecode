@@ -12,8 +12,8 @@ import { useChatContext } from '@/features/ai-assistant/chat-context'
 import { useWorkspace } from '@/features/workspace/workspace-store'
 import { useRoutines, type Routine, type RoutineCadence } from './routines-store'
 
-const field =
-  'h-9 w-full rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] px-3 text-[13px] text-[#f1f1ef] outline-none transition-colors placeholder:text-[#777773] focus:border-white/[0.24]'
+const PILL =
+  'flex h-7 cursor-pointer items-center gap-1.5 rounded-full border border-white/[0.09] bg-white/[0.03] px-2.5 text-[12px] font-normal text-[#d6d6d2] transition-colors hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white'
 const describe = (cadence: RoutineCadence, time: string, weekday: number): string => {
   if (cadence === 'hourly') return 'Every hour'
   if (cadence === 'daily') return `Every day at ${time}`
@@ -28,12 +28,14 @@ function MenuChoice({
   label,
   value,
   items,
-  onChange
+  onChange,
+  pill = false
 }: {
   label: string
   value: string
   items: { value: string; label: string }[]
   onChange: (value: string) => void
+  pill?: boolean
 }): React.JSX.Element {
   const selected = items.find((item) => item.value === value)?.label ?? value
   const menuItems: ActionMenuItem[] = items.map((item) => ({
@@ -43,8 +45,8 @@ function MenuChoice({
     onClick: () => onChange(item.value)
   }))
   return (
-    <label className="flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]">
-      {label}
+    <label className={pill ? 'contents' : 'flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]'}>
+      {!pill && label}
       <ActionMenu
         align="start"
         contentClassName="max-h-[min(300px,50vh)] overflow-y-auto slim-scroll"
@@ -53,7 +55,7 @@ function MenuChoice({
           <button
             type="button"
             aria-label={`${label}: ${selected}`}
-            className="flex h-9 w-full min-w-[126px] cursor-pointer items-center justify-between gap-3 rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] px-3 text-[13px] font-normal text-[#ececea] transition-colors hover:border-white/[0.18] hover:bg-[#222221]"
+            className={pill ? PILL : "flex h-9 w-full min-w-[126px] cursor-pointer items-center justify-between gap-3 rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] px-3 text-[13px] font-normal text-[#ececea] transition-colors hover:border-white/[0.18] hover:bg-[#222221]"}
           >
             <span className="truncate">{selected}</span>
             <ChevronDown
@@ -68,10 +70,12 @@ function MenuChoice({
 
 function ClockPicker({
   value,
-  onChange
+  onChange,
+  pill = false
 }: {
   value: string
   onChange: (value: string) => void
+  pill?: boolean
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [hourText, minuteText] = value.split(':')
@@ -104,13 +108,14 @@ function ClockPicker({
     </button>
   )
   return (
-    <label className="flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]">
-      Time
+    <label className={pill ? 'contents' : 'flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]'}>
+      {!pill && 'Time'}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex h-8 min-w-[124px] cursor-pointer items-center justify-between gap-2 rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] px-2.5 text-[12.5px] font-normal text-[#ececea] transition-colors hover:border-white/[0.18] hover:bg-[#222221]"
+            aria-label={`Time: ${format(value)}`}
+            className={pill ? PILL : "flex h-9 min-w-[124px] cursor-pointer items-center justify-between gap-2 rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] px-2.5 text-[12.5px] font-normal text-[#ececea] transition-colors hover:border-white/[0.18] hover:bg-[#222221]"}
           >
             <span className="flex items-center gap-2">
               <Clock3 className="h-3.5 w-3.5 text-[#8f8f8a]" />
@@ -217,33 +222,46 @@ const IDEAS: { title: string; prompt: string; cadence: RoutineCadence; time: str
   }
 ]
 
+/** A routine more than this late is treated as missed: the person decides instead of it running on its own. */
+const GRACE_MS = 5 * 60_000
+
 /**
- * Runs routines. Every run gets its own new chat, inside the routine's project, named after the routine
- * and the time. A routine never grabs the screen by surprise: when one is due the person gets a
- * notification with a Run button and starts it when ready. Routines marked "Start by itself" open their
- * chat on their own. A run never interrupts a response that is still being written.
+ * Runs routines. Each routine has ONE chat (in the Routines section of the sidebar) and every run is added to it.
+ * While MoreCode is open or running in the background, a routine that comes due runs by itself. If the person
+ * is actively using the app, they get a notification with a Run button instead, so their screen is never
+ * switched under them. A routine that is far past due (the app was closed, or the computer was asleep) is not
+ * run silently: the person is asked whether to run it now or wait for the next time.
  */
-export function RoutineScheduler(): null {
-  const { routines, markRun } = useRoutines()
+export function RoutineScheduler(): React.JSX.Element {
+  const { routines, markRun, skip } = useRoutines()
   const { ask, running, owner } = useChatContext()
-  const { newChat, rename, activeId, groups } = useWorkspace()
+  const { select, activeId, chats } = useWorkspace()
   const notify = useNotify()
   const [pending, setPending] = useState<{ chatId: string; text: string } | null>(null)
   const [queued, setQueued] = useState<string[]>([])
+  const [missed, setMissed] = useState<string[]>([])
   const told = useRef(new Set<string>())
+  // is the person looking at the app right now? (asked from the main process, because a focused web page does not count as the window being away)
+  const present = useRef(true)
+  useEffect(() => {
+    const bg = window.api?.background
+    if (!bg) return
+    void bg.getState().then((st) => (present.current = st.visible && st.focused))
+    return bg.onState((st) => (present.current = st.visible && st.focused))
+  }, [])
 
   const start = (id: string): void => {
     const r = routines.find((item) => item.id === id)
     if (!r) return
+    const chatId = r.chatId && chats.some((c) => c.id === r.chatId) ? r.chatId : null
+    if (!chatId) return // its chat is still being set up; the next check will try again
     const now = Date.now()
-    const project = r.projectId && groups.some((g) => g.id === r.projectId) ? r.projectId : null
-    const chatId = newChat(project)
-    rename(chatId, `${r.title} · ${stamp(now)}`)
     markRun(r.id, now, chatId)
-    setPending({ chatId, text: r.prompt })
+    select(chatId)
+    setPending({ chatId, text: `Routine run · ${stamp(now)}\n\n${r.prompt}` })
   }
 
-  // "Run now" and the Run button on a notification join one queue, handled one at a time
+  // "Run now" buttons and notifications join one queue, handled one at a time
   useEffect(() => {
     const onRun = (event: Event): void => setQueued((q) => [...q, (event as CustomEvent<string>).detail])
     window.addEventListener('routine:run', onRun)
@@ -259,33 +277,119 @@ export function RoutineScheduler(): null {
         start(queuedId)
         return
       }
+      const now = Date.now()
       for (const r of routines) {
-        if (!r.enabled || r.nextRunAt > Date.now()) continue
-        if (r.auto) return start(r.id)
+        if (!r.enabled || r.nextRunAt > now) continue
         const key = `${r.id}:${r.nextRunAt}`
-        if (told.current.has(key)) continue
-        told.current.add(key)
-        notify('finished', `Routine ready: ${r.title}`, 'Open Routines to run it, or run it from here.')
-        toast(`Routine ready: ${r.title}`, {
-          duration: 60_000,
-          action: { label: 'Run', onClick: () => window.dispatchEvent(new CustomEvent('routine:run', { detail: r.id })) }
-        })
+        if (now - r.nextRunAt > GRACE_MS) {
+          // missed while the app was closed or asleep: ask, never run silently
+          if (told.current.has(key)) continue
+          told.current.add(key)
+          setMissed((m) => (m.includes(r.id) ? m : [...m, r.id]))
+          notify('finished', `Routine missed: ${r.title}`, 'Open MoreCode to run it now or wait for the next time.')
+          continue
+        }
+        if (present.current) {
+          // in use right now: do not switch their screen; offer it instead
+          if (told.current.has(key)) continue
+          told.current.add(key)
+          toast(`Routine ready: ${r.title}`, {
+            duration: 60_000,
+            action: { label: 'Run', onClick: () => window.dispatchEvent(new CustomEvent('routine:run', { detail: r.id })) }
+          })
+          continue
+        }
+        return start(r.id)
       }
     }
     check()
     const timer = window.setInterval(check, 15_000)
     return () => window.clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routines, running, pending, queued])
+  }, [routines, running, pending, queued, chats])
 
-  // send once the new chat is open and loaded
+  // send once the routine's chat is open and loaded
   useEffect(() => {
     if (!pending || running || activeId !== pending.chatId || owner !== pending.chatId) return
     ask(pending.text)
     setPending(null)
   }, [pending, running, activeId, owner, ask])
 
-  return null
+  const waiting = missed.map((id) => routines.find((r) => r.id === id)).filter((r): r is Routine => Boolean(r && r.enabled))
+  const settle = (id: string): void => setMissed((m) => m.filter((x) => x !== id))
+
+  return (
+    <Dialog.Root open={waiting.length > 0}>
+      <Dialog.Portal>
+        <ModalOverlay tone="blurred" />
+        <Dialog.Content
+          aria-describedby="routine-missed-description"
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          className="fixed left-1/2 top-1/2 z-50 w-[min(460px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[11px] border border-white/[0.1] bg-[#272726] shadow-[0_24px_80px_rgba(0,0,0,0.6)] outline-none"
+        >
+          <div className="border-b border-white/[0.07] px-5 pb-3.5 pt-4">
+            <Dialog.Title className="text-[15px] font-semibold text-[#f1f1ef]">
+              {waiting.length === 1 ? 'A routine was missed' : `${waiting.length} routines were missed`}
+            </Dialog.Title>
+            <Dialog.Description id="routine-missed-description" className="mt-0.5 text-[12.5px] text-[#92928e]">
+              MoreCode was closed or asleep when {waiting.length === 1 ? 'it was' : 'they were'} due. Run {waiting.length === 1 ? 'it' : 'them'} now, or leave {waiting.length === 1 ? 'it' : 'them'} until the next scheduled time.
+            </Dialog.Description>
+          </div>
+          <ul className="slim-scroll max-h-[50vh] divide-y divide-white/[0.07] overflow-y-auto">
+            {waiting.map((r) => (
+              <li key={r.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-medium text-[#ececea]">{r.title}</div>
+                  <div className="mt-0.5 text-[11.5px] text-[#858580]">Was due {stamp(r.nextRunAt)}</div>
+                </div>
+                <Btn
+                  onClick={() => {
+                    skip(r.id)
+                    settle(r.id)
+                  }}
+                >
+                  Next time
+                </Btn>
+                <button
+                  type="button"
+                  className={PRIMARY}
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('routine:run', { detail: r.id }))
+                    settle(r.id)
+                  }}
+                >
+                  Run now
+                </button>
+              </li>
+            ))}
+          </ul>
+          {waiting.length > 1 && (
+            <div className="flex justify-end gap-2 border-t border-white/[0.07] px-5 py-3">
+              <Btn
+                onClick={() => {
+                  waiting.forEach((r) => skip(r.id))
+                  setMissed([])
+                }}
+              >
+                Next time for all
+              </Btn>
+              <button
+                type="button"
+                className={PRIMARY}
+                onClick={() => {
+                  waiting.forEach((r) => window.dispatchEvent(new CustomEvent('routine:run', { detail: r.id })))
+                  setMissed([])
+                }}
+              >
+                Run all now
+              </button>
+            </div>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
 }
 
 interface Draft {
@@ -295,9 +399,8 @@ interface Draft {
   time: string
   weekday: number
   projectId: string
-  auto: boolean
 }
-const BLANK: Draft = { title: '', prompt: '', cadence: 'daily', time: '09:00', weekday: 1, projectId: '', auto: false }
+const BLANK: Draft = { title: '', prompt: '', cadence: 'daily', time: '09:00', weekday: 1, projectId: '' }
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Element {
@@ -316,7 +419,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
   const openEdit = (r: Routine): void =>
     setEditing({
       id: r.id,
-      draft: { title: r.title, prompt: r.prompt, cadence: r.cadence, time: r.time, weekday: r.weekday, projectId: r.projectId ?? '', auto: Boolean(r.auto) }
+      draft: { title: r.title, prompt: r.prompt, cadence: r.cadence, time: r.time, weekday: r.weekday, projectId: r.projectId ?? '' }
     })
   const set = (patch: Partial<Draft>): void => setEditing((e) => (e ? { ...e, draft: { ...e.draft, ...patch } } : e))
 
@@ -325,7 +428,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
     if (!editing) return
     const d = editing.draft
     if (!d.title.trim() || !d.prompt.trim()) return
-    const values = { title: d.title.trim(), prompt: d.prompt.trim(), cadence: d.cadence, time: d.time, weekday: d.weekday, projectId: d.projectId || null, auto: d.auto }
+    const values = { title: d.title.trim(), prompt: d.prompt.trim(), cadence: d.cadence, time: d.time, weekday: d.weekday, projectId: d.projectId || null }
     if (editing.id) update(editing.id, values)
     else add(values)
     setEditing(null)
@@ -336,7 +439,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
       toast.error('Wait for the current response to finish before running a routine.')
       return
     }
-    // the run opens in its own new chat, so the person lands in it (they pressed Run)
+    // the run happens in the routine's own chat, so the person lands in it (they pressed Run)
     window.dispatchEvent(new CustomEvent('routine:run', { detail: id }))
     onBack()
   }
@@ -398,7 +501,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
               ))}
             </ul>
             <p className="mt-3 text-[12px] text-muted-foreground">
-              Routines run while MoreCode is open. Commands still follow your approval settings, so a run may pause to ask.
+              Each routine keeps one chat, shown under Routines in the sidebar. Routines keep running while MoreCode is closed to the tray; quit from the tray icon to stop them. Commands still follow your approval settings, so a run may pause to ask.
             </p>
           </section>
         ) : (
@@ -406,7 +509,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
             <ul className="divide-y divide-white/[0.07] overflow-hidden rounded-[10px] border border-white/[0.1]">
               {routines.map((r) => {
                 const due = r.enabled && r.nextRunAt <= now
-                const lastChat = r.lastChatId && chats.some((c) => c.id === r.lastChatId) ? r.lastChatId : null
+                const lastChat = r.chatId && chats.some((c) => c.id === r.chatId) ? r.chatId : null
                 return (
                   <li key={r.id} className="flex items-center gap-3 px-4 py-3">
                     <Toggle checked={r.enabled} onChange={() => toggle(r.id)} label={`${r.enabled ? 'Pause' : 'Resume'} ${r.title}`} />
@@ -479,115 +582,88 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
             <ModalOverlay tone="blurred" />
             <Dialog.Content
               aria-describedby="routine-create-description"
-              className="fixed left-1/2 top-1/2 z-50 w-[min(460px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[11px] border border-white/[0.1] bg-[#272726] shadow-[0_24px_80px_rgba(0,0,0,0.6)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+              className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-48px)] w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#222221] shadow-[0_20px_60px_rgba(0,0,0,0.5)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]"
             >
-              <div className="border-b border-white/[0.07] px-5 pb-3.5 pt-4">
-                <Dialog.Title className="text-[15px] font-semibold text-[#f1f1ef]">
+              <div className="flex h-10 shrink-0 items-center justify-between pl-5 pr-2.5">
+                <Dialog.Title className="text-[12px] font-medium text-[#8f8f8a]">
                   {editing?.id ? 'Edit routine' : 'New routine'}
                 </Dialog.Title>
-                <Dialog.Description id="routine-create-description" className="mt-0.5 text-[12.5px] text-[#92928e]">
-                  Say what MoreCode should do and when.
+                <Dialog.Description id="routine-create-description" className="sr-only">
+                  A task MoreCode repeats on a schedule.
                 </Dialog.Description>
+                <Dialog.Close
+                  aria-label="Close"
+                  className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-[#8f8f8a] transition-colors hover:bg-white/[0.07] hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Dialog.Close>
               </div>
               {draft && (
-                <form onSubmit={save}>
-                  <div className="slim-scroll max-h-[calc(100vh-180px)] space-y-4 overflow-y-auto px-5 py-4">
-                    <label className="flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]">
-                      Name
-                      <input
-                        autoFocus
-                        className={field}
-                        value={draft.title}
-                        onChange={(event) => set({ title: event.target.value })}
-                        placeholder="Morning check-in"
-                        maxLength={80}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]">
-                      What should it do?
-                      <textarea
-                        rows={3}
-                        className="w-full resize-none rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] px-3 py-2 text-[13px] leading-[19px] text-[#f1f1ef] outline-none transition-colors placeholder:text-[#777773] focus:border-white/[0.24]"
-                        value={draft.prompt}
-                        onChange={(event) => set({ prompt: event.target.value })}
-                        placeholder="Look at what changed since yesterday and tell me what needs attention."
-                      />
-                    </label>
+                <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
+                  <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-3">
+                    <input
+                      autoFocus
+                      aria-label="Name"
+                      className="w-full bg-transparent text-[17px] font-semibold tracking-[-0.01em] text-[#f1f1ef] outline-none placeholder:text-[#5f5f5b]"
+                      value={draft.title}
+                      onChange={(event) => set({ title: event.target.value })}
+                      placeholder="Routine name"
+                      maxLength={80}
+                    />
+                    <textarea
+                      aria-label="Instructions"
+                      rows={5}
+                      className="mt-2 min-h-[110px] w-full resize-none bg-transparent text-[13.5px] leading-[21px] text-[#d6d6d2] outline-none placeholder:text-[#5f5f5b]"
+                      value={draft.prompt}
+                      onChange={(event) => set({ prompt: event.target.value })}
+                      placeholder="What should MoreCode do each time? e.g. Look at what changed since yesterday and tell me what needs attention."
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
                     <MenuChoice
-                      label="Where it runs"
+                      pill
+                      label="Repeat"
+                      value={draft.cadence}
+                      items={[
+                        { value: 'hourly', label: 'Every hour' },
+                        { value: 'daily', label: 'Every day' },
+                        { value: 'weekly', label: 'Every week' }
+                      ]}
+                      onChange={(cadence) => set({ cadence: cadence as RoutineCadence })}
+                    />
+                    {draft.cadence === 'weekly' && (
+                      <MenuChoice
+                        pill
+                        label="Day"
+                        value={String(draft.weekday)}
+                        items={DAYS.map((day, index) => ({ value: String(index), label: day }))}
+                        onChange={(value) => set({ weekday: Number(value) })}
+                      />
+                    )}
+                    {draft.cadence !== 'hourly' && (
+                      <ClockPicker pill value={draft.time} onChange={(time) => set({ time })} />
+                    )}
+                    <MenuChoice
+                      pill
+                      label="Project"
                       value={groups.some((g) => g.id === draft.projectId) ? draft.projectId : ''}
                       items={[{ value: '', label: 'No project' }, ...groups.map((g) => ({ value: g.id, label: g.name }))]}
                       onChange={(projectId) => set({ projectId })}
                     />
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div className="flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]">
-                        Repeat
-                        <div
-                          role="radiogroup"
-                          aria-label="Repeat"
-                          className="inline-flex h-8 items-center rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] p-0.5"
-                        >
-                          {(
-                            [
-                              { value: 'hourly', label: 'Hourly' },
-                              { value: 'daily', label: 'Daily' },
-                              { value: 'weekly', label: 'Weekly' }
-                            ] as const
-                          ).map((opt) => {
-                            const activeOpt = draft.cadence === opt.value
-                            return (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                role="radio"
-                                aria-checked={activeOpt}
-                                onClick={() => set({ cadence: opt.value })}
-                                className={`h-6.5 cursor-pointer rounded-[5px] px-2.5 text-[12px] font-medium transition-colors ${
-                                  activeOpt
-                                    ? 'bg-[#343432] text-[#f1f1ef] shadow-xs'
-                                    : 'text-[#8f8f8a] hover:text-[#d8d8d4]'
-                                }`}
-                              >
-                                {opt.label}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                      {draft.cadence !== 'hourly' && <ClockPicker value={draft.time} onChange={(time) => set({ time })} />}
-                      {draft.cadence === 'weekly' && (
-                        <MenuChoice
-                          label="Day"
-                          value={String(draft.weekday)}
-                          items={DAYS.map((day, index) => ({ value: String(index), label: day }))}
-                          onChange={(value) => set({ weekday: Number(value) })}
-                        />
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between gap-4 border-t border-white/[0.07] pt-3.5">
-                      <div>
-                        <div className="text-[12.5px] font-medium text-[#f1f1ef]">Start by itself</div>
-                        <div className="mt-0.5 text-[11.5px] leading-relaxed text-[#8f8f8a]">
-                          Off: you get a notification and press Run. On: it opens a new chat and runs when it is due.
-                        </div>
-                      </div>
-                      <Toggle checked={draft.auto} onChange={(auto) => set({ auto })} label="Start by itself" />
-                    </div>
                   </div>
-                  <div className="flex justify-end gap-2 border-t border-white/[0.07] px-5 py-3">
-                    <Btn onClick={() => setEditing(null)}>Cancel</Btn>
-                    <button type="submit" disabled={!draft.title.trim() || !draft.prompt.trim()} className={PRIMARY}>
-                      {editing?.id ? 'Save' : 'Create routine'}
-                    </button>
+                  <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-4 py-3">
+                    <span className="truncate text-[11.5px] text-[#7d7d79]">
+                      Runs {describe(draft.cadence, draft.time, draft.weekday).replace(/^Every/, 'every')}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Btn onClick={() => setEditing(null)}>Cancel</Btn>
+                      <button type="submit" disabled={!draft.title.trim() || !draft.prompt.trim()} className={PRIMARY}>
+                        {editing?.id ? 'Save' : 'Create'}
+                      </button>
+                    </div>
                   </div>
                 </form>
               )}
-              <Dialog.Close
-                aria-label="Close"
-                className="absolute right-3.5 top-3.5 grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-[#8f8f8a] transition-colors hover:bg-white/[0.07] hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </Dialog.Close>
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>

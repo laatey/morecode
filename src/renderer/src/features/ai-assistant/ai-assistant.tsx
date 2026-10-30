@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, Close, Plus, Stop } from 'fluid-icons/react'
-import { AppWindow, ChevronDown, File as FileIcon, Folder, Image as ImageIcon, Mic, RefreshCw, ThumbsDown, ThumbsUp } from '@/components/icons'
+import { AppWindow, AtSign, ChevronDown, File as FileIcon, Folder, Grid2x2, Image as ImageIcon, Mic, MoreHorizontal, RefreshCw, ThumbsDown, ThumbsUp } from '@/components/icons'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ActionMenu } from '@/components/action-menu'
@@ -35,6 +35,9 @@ import {
 } from './slash-commands'
 import { useSkills } from '@/features/skills/skills-store'
 import { customPrompt, skillIcon, skillPrompt, slashLabel } from '@/features/skills/skills-data'
+import { useConnectors } from '@/features/connectors/connectors-store'
+import { ConnectorLogo } from '@/features/connectors/logo'
+import { Toggle } from '@/features/settings/kit'
 import { ThinkingGlyph } from './thinking-block'
 import { ToolRow } from './tool-rows'
 import { UserMessage } from './user-message'
@@ -198,6 +201,7 @@ function currentActivity(parts: Part[]): string {
     if (t.kind === 'edit') return `Editing ${t.path.split('/').pop()}`
     if (t.kind === 'agent') return 'A helper is researching'
     if (t.kind === 'mcp') return `Using ${t.connector}`
+    if (t.kind === 'skill') return `Reading skill ${t.skillName}`
     if (t.kind === 'read') return 'Reading files'
     if (t.kind === 'command') return t.label
   }
@@ -366,6 +370,7 @@ export function AiAssistant(): React.JSX.Element {
   const files = useWorkspaceFiles(projectPath ?? '')
 
   const skills = useSkills()
+  const cx = useConnectors()
   const commands = useMemo(
     () => buildCommands(skills.active, skills.commands),
     [skills.active, skills.commands]
@@ -1042,11 +1047,27 @@ export function AiAssistant(): React.JSX.Element {
                 side="top"
                 align="start"
                 items={[
-                  { id: 'photos', label: 'Add photos', onClick: () => photoPicker.current?.click() },
-                  { id: 'files', label: 'Add files', onClick: () => filePicker.current?.click() },
-                  { id: 'folder', label: 'Add a folder', onClick: () => folderPicker.current?.click() },
+                  {
+                    id: 'photos',
+                    icon: <ImageIcon className="h-3.5 w-3.5" />,
+                    label: 'Add photos',
+                    onClick: () => photoPicker.current?.click()
+                  },
+                  {
+                    id: 'files',
+                    icon: <FileIcon className="h-3.5 w-3.5" />,
+                    label: 'Add files',
+                    onClick: () => filePicker.current?.click()
+                  },
+                  {
+                    id: 'folder',
+                    icon: <Folder className="h-3.5 w-3.5" />,
+                    label: 'Add a folder',
+                    onClick: () => folderPicker.current?.click()
+                  },
                   {
                     id: 'mention',
+                    icon: <AtSign className="h-3.5 w-3.5" />,
                     label: 'Mention a project file',
                     shortcut: '@',
                     onClick: () => {
@@ -1055,6 +1076,54 @@ export function AiAssistant(): React.JSX.Element {
                       nextCaret.current = input.length + sep.length + 1
                       setTimeout(() => field.current?.focus(), 0)
                     }
+                  },
+                  {
+                    id: 'connectors',
+                    icon: <Grid2x2 className="h-3.5 w-3.5" />,
+                    label: 'Connectors',
+                    submenu: [
+                      ...cx.connectors.map((c) => ({
+                        id: `connector-${c.id}`,
+                        icon: <ConnectorLogo id={c.catalogId ?? c.id} domain={c.domain} name={c.name} size={15} />,
+                        label: c.name,
+                        keepOpen: true,
+                        right: (
+                          <span className="pointer-events-none flex items-center">
+                            <Toggle
+                              label={`${c.name} on or off`}
+                              checked={c.enabled}
+                              onChange={() => undefined}
+                            />
+                          </span>
+                        ),
+                        onClick: () => cx.setEnabled(c.id, !c.enabled)
+                      })),
+                      {
+                        id: 'browse-connectors',
+                        icon: <Grid2x2 className="h-3.5 w-3.5" />,
+                        label: 'Browse connectors',
+                        separatorBefore: cx.connectors.length > 0,
+                        onClick: () => {
+                          window.dispatchEvent(
+                            new CustomEvent('app:open-customize', {
+                              detail: { tab: 'connectors', sub: 'discover' }
+                            })
+                          )
+                        }
+                      },
+                      {
+                        id: 'add-custom-connector',
+                        icon: <MoreHorizontal className="h-3.5 w-3.5" />,
+                        label: 'Add custom connector',
+                        onClick: () => {
+                          window.dispatchEvent(
+                            new CustomEvent('app:open-customize', {
+                              detail: { tab: 'connectors', view: 'connect' }
+                            })
+                          )
+                        }
+                      }
+                    ]
                   }
                 ]}
                 trigger={
@@ -1164,7 +1233,7 @@ export function AiAssistant(): React.JSX.Element {
               side="top"
               align="end"
               compact
-              contentClassName="min-w-[205px]"
+              contentClassName="w-[min(280px,calc(100vw-32px))] min-w-0"
               items={modelChoices.map((c) => ({
                 id: c.model.id,
                 label: c.model.name,

@@ -170,7 +170,11 @@ interface RightPanelApi extends State {
   titleOf: (tab: TabInstance) => string
 }
 
-const Ctx = createContext<RightPanelApi | null>(null)
+const g = globalThis as {
+  __morecodeRightPanelCtx?: React.Context<RightPanelApi | null>
+  __morecodeRightPanelFallback?: RightPanelApi
+}
+const Ctx = (g.__morecodeRightPanelCtx ??= createContext<RightPanelApi | null>(null))
 
 const newTab = (kind: string): TabInstance => ({ id: `${kind}-${crypto.randomUUID().slice(0, 8)}`, kind })
 
@@ -262,12 +266,16 @@ export function RightPanelProvider({ children }: { children: React.ReactNode }):
     [state, openTab, splitTab, dispose]
   )
 
+  useEffect(() => {
+    g.__morecodeRightPanelFallback = api
+  }, [api])
+
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useRightPanel(): RightPanelApi {
-  const ctx = useContext(Ctx)
+  const ctx = useContext(Ctx) ?? g.__morecodeRightPanelFallback
   if (!ctx) throw new Error('useRightPanel must be used inside <RightPanelProvider>')
   return ctx
 }

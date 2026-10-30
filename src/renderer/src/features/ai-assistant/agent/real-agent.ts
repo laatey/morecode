@@ -22,6 +22,8 @@ export interface RealConfig {
   onUsage: (detail: UsageDetail) => void
   /** The connectors switched on, with their sign-in details, read when a request starts. */
   connectors?: () => NonNullable<Parameters<Window['api']['agent']['start']>[0]['connectors']>
+  /** The skills switched on, with their bundle files, read when a request starts. */
+  skills?: () => NonNullable<Parameters<Window['api']['agent']['start']>[0]['skills']>
 }
 
 /**
@@ -78,7 +80,8 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         progress: req.progress,
         noTools: req.noTools,
         style: cfg.style,
-        connectors: cfg.connectors?.()
+        connectors: cfg.connectors?.(),
+        skills: cfg.skills?.()
       })
       if (!started) throw new AgentError('failed', 'Could not start the AI. Please try again.')
 

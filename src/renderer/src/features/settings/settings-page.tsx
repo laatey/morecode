@@ -81,7 +81,7 @@ export function SettingsPage({ onBack }: { onBack?: () => void }): React.JSX.Ele
     <main className="flex min-h-0 flex-1 select-text overflow-hidden">
       <nav
         aria-label="Settings navigation"
-        className="flex w-[164px] shrink-0 flex-col border-r border-white/[0.08] px-2.5 pb-4 pt-3"
+        className="flex w-[clamp(164px,18vw,248px)] shrink-0 flex-col border-r border-white/[0.08] px-2.5 pb-4 pt-3"
       >
         <button
           type="button"
@@ -124,7 +124,7 @@ export function SettingsPage({ onBack }: { onBack?: () => void }): React.JSX.Ele
       </nav>
 
       <div ref={scroller} className="slim-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-12 pt-6">
-        <div className="mx-auto w-full max-w-[620px]">
+        <div className="mx-auto w-full max-w-[min(820px,100%)]">
           <Page />
         </div>
       </div>

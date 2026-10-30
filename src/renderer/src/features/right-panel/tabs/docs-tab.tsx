@@ -11,6 +11,7 @@ import {
 } from '@/components/icons'
 import { toast } from 'sonner'
 import { IconButton } from '@/components/layout/icon-button'
+import { SegmentedSwitch } from '@/components/segmented-switch'
 import { Markdown } from '@/features/ai-assistant/message-parts'
 import { useWorkspace } from '@/features/workspace/workspace-store'
 import type { DocInfo, DocMatch, WorkspaceInfo } from '@/lib/desktop'
@@ -130,27 +131,18 @@ function DocViewer({
             {status}
           </span>
         )}
-        <div className="flex shrink-0 items-center rounded-[6px] bg-white/[0.06] p-0.5">
-          {(
-            [
-              [false, 'Read'],
-              [true, 'Edit']
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={label}
-              type="button"
-              disabled={text === null}
-              onClick={() => setEditing(value)}
-              className={cn(
-                'cursor-pointer rounded-[4px] px-2 py-0.5 text-[11.5px] transition-colors disabled:opacity-40',
-                editing === value ? 'bg-white/[0.12] text-[#ececea]' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedSwitch
+          options={[
+            { value: 'read', label: 'Read' },
+            { value: 'edit', label: 'Edit' }
+          ]}
+          value={editing ? 'edit' : 'read'}
+          onChange={(v) => {
+            if (text !== null) setEditing(v === 'edit')
+          }}
+          itemWidth={44}
+          height={24}
+        />
         <IconButton title="Open in your editor" onClick={() => void window.api.docs.open(doc.path)}>
           <ExternalLink className="h-3.5 w-3.5" />
         </IconButton>

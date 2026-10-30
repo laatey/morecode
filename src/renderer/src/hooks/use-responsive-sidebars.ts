@@ -7,12 +7,16 @@ import { usePanelRef } from 'react-resizable-panels'
  * back, at the width the person chose, when there is room again.
  */
 
-export const LEFT_MIN_PX = 220
-export const RIGHT_MIN_PX = 180
-/** The chat never gets narrower than this: the message box, its toolbar and replies stop fitting below it. */
-export const CENTER_MIN_PX = 440
-export const LEFT_DEFAULT_PX = 260
-export const RIGHT_DEFAULT_PX = 360
+import {
+  CENTER_MIN_PX,
+  LEFT_DEFAULT_PX,
+  LEFT_MIN_PX,
+  RIGHT_DEFAULT_PX,
+  RIGHT_MIN_PX,
+  sidebarNeedsOverlay
+} from '@/lib/sidebar-layout'
+
+export { CENTER_MIN_PX, LEFT_DEFAULT_PX, LEFT_MIN_PX, RIGHT_DEFAULT_PX, RIGHT_MIN_PX }
 
 type Side = 'left' | 'right'
 
@@ -65,6 +69,11 @@ export function useResponsiveSidebars(): {
   onRightResize: (px: number) => void
   toggleLeft: () => void
   toggleRight: () => void
+  /** A sidebar the person asked for that cannot dock in this window, shown floating over the chat instead. */
+  overlay: Side | null
+  /** Width the sidebar last had while docked, so the floating copy matches it. */
+  overlayWidth: number
+  closeOverlay: () => void
 } {
   const leftRef = usePanelRef()
   const rightRef = usePanelRef()
@@ -75,6 +84,12 @@ export function useResponsiveSidebars(): {
   // comes back the way the person left it.
   const [rightCollapsed, setRightCollapsed] = useState(saved.right)
   const pref = useRef<Record<Side, boolean>>({ ...saved })
+  const [overlay, setOverlayState] = useState<Side | null>(null)
+  const overlayRef = useRef<Side | null>(null)
+  const setOverlay = useCallback((side: Side | null) => {
+    overlayRef.current = side
+    setOverlayState(side)
+  }, [])
   // ignore the sizes the panels report while they are first laid out
   const ready = useRef(false)
   useEffect(() => {
@@ -140,11 +155,28 @@ export function useResponsiveSidebars(): {
     const left = leftRef.current
     const right = rightRef.current
 
+    // 0. a floating sidebar docks again once the window has room for it
+    const floating = overlayRef.current
+    if (floating && !sidebarNeedsOverlay(width, floating)) {
+      setOverlay(null)
+      const other: Side = floating === 'left' ? 'right' : 'left'
+      const otherPanel = refFor(other).current
+      if (
+        width < LEFT_MIN_PX + CENTER_MIN_PX + RIGHT_MIN_PX &&
+        otherPanel &&
+        !otherPanel.isCollapsed()
+      ) {
+        setCollapsed(other, true, true)
+      }
+      setCollapsed(floating, false, false)
+    }
+
     // 1. left sidebar: it needs its own width plus the chat's minimum
     if (left) {
       const fitsLeft = width >= LEFT_MIN_PX + CENTER_MIN_PX
       if (!fitsLeft && !left.isCollapsed()) setCollapsed('left', true, true)
-      else if (fitsLeft && auto.current.left && left.isCollapsed()) setCollapsed('left', false, false)
+      else if (fitsLeft && auto.current.left && left.isCollapsed())
+        setCollapsed('left', false, false)
     }
 
     // 2. right sidebar: whatever is left after the left sidebar and the chat's minimum
@@ -161,7 +193,10 @@ export function useResponsiveSidebars(): {
         if (!right.isCollapsed() && resizedFromRightEdge) {
           // Resizing the window from its right edge directly grows/shrinks the open right panel
           const maxRight = Math.max(RIGHT_MIN_PX, Math.min(room, Math.round(width * 0.55)))
-          const nextRight = Math.max(RIGHT_MIN_PX, Math.min(maxRight, Math.round(currentRightPx + deltaW)))
+          const nextRight = Math.max(
+            RIGHT_MIN_PX,
+            Math.min(maxRight, Math.round(currentRightPx + deltaW))
+          )
           widths.current.right = nextRight
           persist()
           markBusy()
@@ -170,14 +205,18 @@ export function useResponsiveSidebars(): {
           // too wide for this window: narrow it for now without forgetting the width the person chose
           markBusy()
           right.resize(room)
-        } else if (!right.isCollapsed() && currentRightPx < widths.current.right - 1 && room > currentRightPx) {
+        } else if (
+          !right.isCollapsed() &&
+          currentRightPx < widths.current.right - 1 &&
+          room > currentRightPx
+        ) {
           // and give the chosen width back once there is room
           markBusy()
           right.resize(Math.min(widths.current.right, room))
         }
       }
     }
-  }, [leftRef, rightRef, setCollapsed, markBusy, persist])
+  }, [leftRef, rightRef, refFor, setOverlay, setCollapsed, markBusy, persist])
 
   useEffect(() => {
     reconcile()
@@ -189,7 +228,17 @@ export function useResponsiveSidebars(): {
     (side: Side) => {
       const panel = refFor(side).current
       if (!panel) return
+      if (overlayRef.current === side) {
+        setOverlay(null)
+        return
+      }
       const opening = panel.isCollapsed()
+      // no room to dock it beside the chat: float it over the chat instead of quietly doing nothing
+      if (opening && sidebarNeedsOverlay(window.innerWidth, side)) {
+        setOverlay(side)
+        return
+      }
+      setOverlay(null)
       setCollapsed(side, !opening, false)
 
       // opening one in a tight window: the other yields so the chat keeps its minimum width
@@ -200,7 +249,7 @@ export function useResponsiveSidebars(): {
       }
       requestAnimationFrame(reconcile)
     },
-    [refFor, setCollapsed, reconcile]
+    [refFor, setCollapsed, setOverlay, reconcile]
   )
 
   const onResize = useCallback(
@@ -230,6 +279,9 @@ export function useResponsiveSidebars(): {
     onLeftResize: (px) => onResize('left', px),
     onRightResize: (px) => onResize('right', px),
     toggleLeft: () => toggle('left'),
-    toggleRight: () => toggle('right')
+    toggleRight: () => toggle('right'),
+    overlay,
+    overlayWidth: overlay ? widths.current[overlay] : 0,
+    closeOverlay: () => setOverlay(null)
   }
 }

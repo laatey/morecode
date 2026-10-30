@@ -10,13 +10,13 @@ function Name({ id, query }: { id: string; query: string }): React.JSX.Element {
   return (
     <>
       /{id.slice(0, at)}
-      <span className="text-[#ececea]">{id.slice(at, at + q.length)}</span>
+      <span className="font-semibold text-white">{id.slice(at, at + q.length)}</span>
       {id.slice(at + q.length)}
     </>
   )
 }
 
-/** Command list above the composer. Keyboard handling lives in the composer. */
+/** Command list above the composer: one clear row per command, grouped. Keyboard handling lives in the composer. */
 export function SlashMenu({
   commands,
   index,
@@ -40,13 +40,13 @@ export function SlashMenu({
     <div
       role="listbox"
       aria-label="Commands"
-      className="absolute bottom-full left-0 z-30 mb-1.5 w-[240px] max-w-full overflow-hidden rounded-[11px] border border-white/[0.12] bg-[#30302e] shadow-[0_10px_32px_rgba(0,0,0,0.5)] animate-in fade-in-0 slide-in-from-bottom-1 duration-100"
+      className="absolute bottom-full left-0 z-30 mb-2 flex w-[min(380px,100%)] flex-col overflow-hidden rounded-[11px] border border-white/[0.1] bg-[#2a2a29] shadow-[0_12px_36px_rgba(0,0,0,0.5)] animate-in fade-in-0 slide-in-from-bottom-1 duration-100"
     >
-      <div className="slim-scroll max-h-[180px] overflow-y-auto p-1">
+      <div className="slim-scroll max-h-[min(320px,45vh)] overflow-y-auto p-1">
         {commands.length === 0 && (
-          <div className="px-2 py-1.5 text-[11.5px] text-[#8d8d8a]">
-            Nothing matches “/{query}”.{' '}
-            <span className="text-[#77776f]">Type /skills to find more.</span>
+          <div className="px-2.5 py-3 text-[12px] text-[#8d8d8a]">
+            No command matches “/{query}”. Type <span className="text-[#c2c2bf]">/skills</span> to
+            browse skills.
           </div>
         )}
         {commands.map((c, i) => {
@@ -55,47 +55,53 @@ export function SlashMenu({
           const isSelected = i === index
           return (
             <React.Fragment key={`${c.group}:${c.id}`}>
-              {heading ? (
-                <>
-                  {i > 0 && <div className="my-1 h-px bg-white/[0.07]" />}
-                  <div className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium text-[#8e8e8a] first:pt-0.5">
-                    {c.group}
-                  </div>
-                </>
-              ) : (
-                i > 0 && <div className="my-0.5 h-px bg-white/[0.05]" />
+              {heading && (
+                <div
+                  className={cn(
+                    'px-2.5 pb-1 text-[10.5px] font-medium text-[#7d7d79]',
+                    i > 0 ? 'mt-1.5 pt-2' : 'pt-1.5'
+                  )}
+                >
+                  {c.group}
+                </div>
               )}
               <button
                 ref={isSelected ? active : undefined}
                 role="option"
                 aria-selected={isSelected}
                 type="button"
+                title={c.hint ? `${c.description} — ${c.hint}` : c.description}
                 onMouseEnter={() => onHover(i)}
                 onMouseDown={(e) => {
                   e.preventDefault() // keep focus in the textarea
                   onPick(c)
                 }}
                 className={cn(
-                  'flex w-full cursor-pointer items-center gap-2 rounded-[6px] px-2 py-1 text-left transition-colors',
-                  isSelected ? 'bg-white/[0.09]' : 'bg-transparent hover:bg-white/[0.04]'
+                  'flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-[7px] px-2.5 text-left transition-colors',
+                  isSelected ? 'bg-white/[0.08]' : 'bg-transparent'
                 )}
               >
-                <Icon className={cn('h-3.5 w-3.5 shrink-0', isSelected ? 'text-white' : 'text-[#9c9c98]')} />
-                <span className="min-w-0 flex-1">
-                  <span className={cn('flex items-baseline gap-1.5 text-[12px] leading-tight', isSelected ? 'text-white' : 'text-[#c2c2bf]')}>
-                    <Name id={c.id} query={query} />
-                    {c.hint && isSelected && (
-                      <span className="text-[10.5px] text-[#8e8e8a]">{c.hint}</span>
-                    )}
-                    {c.badge && (
-                      <span className="rounded-full bg-[#3b82f6]/20 px-1.5 text-[9.5px] leading-[14px] text-[#7db1ff]">
-                        {c.badge}
-                      </span>
-                    )}
+                <Icon
+                  className={cn(
+                    'h-3.5 w-3.5 shrink-0',
+                    isSelected ? 'text-white' : 'text-[#8f8f8b]'
+                  )}
+                />
+                <span
+                  className={cn(
+                    'shrink-0 text-[12.5px]',
+                    isSelected ? 'text-white' : 'text-[#d4d4d0]'
+                  )}
+                >
+                  <Name id={c.id} query={query} />
+                </span>
+                {c.badge && (
+                  <span className="shrink-0 rounded-full bg-[#3b82f6]/20 px-1.5 text-[9.5px] leading-[15px] text-[#7db1ff]">
+                    {c.badge}
                   </span>
-                  <span className="block truncate text-[11px] leading-tight text-[#82827d]">
-                    {c.description}
-                  </span>
+                )}
+                <span className="min-w-0 flex-1 truncate text-right text-[11.5px] text-[#80807b]">
+                  {c.description}
                 </span>
               </button>
             </React.Fragment>

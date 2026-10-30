@@ -21,7 +21,7 @@ export function WithMentions({ text }: { text: string }): React.JSX.Element {
           <span
             key={i}
             title={part.slice(1)}
-            className="inline-block max-w-full truncate align-middle rounded-[5px] bg-[#1d4ed8]/30 px-1 py-0 text-[#a9c8ff]"
+            className="inline-block max-w-full truncate align-middle rounded-[5px] bg-[#1d4ed8]/20 px-1.5 py-[1.5px] text-[#a9c8ff]"
           >
             {part.slice(1)}
           </span>
@@ -129,7 +129,7 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }): React.JSX.E
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre className="overflow-x-auto px-3.5 py-3 leading-relaxed bg-transparent">
+      <pre className="whitespace-pre-wrap [overflow-wrap:anywhere] px-3.5 py-3 leading-relaxed bg-transparent">
         <code className="pierre-code bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
       </pre>
     </div>
@@ -208,10 +208,10 @@ const MarkdownBlock = React.memo(function MarkdownBlock({ content }: { content: 
             return (
               <code
                 className={cn(
-                  'rounded-[6px] border px-1.5 py-0.5 font-mono text-[12px]',
+                  'inline rounded-[5px] px-1.5 py-[1.5px] font-mono text-[12px]',
                   isFileReference
-                    ? 'border-[#5793ff]/65 bg-[#1d4ed8]/25 text-[#a9c8ff]'
-                    : 'border-white/[0.22] bg-white/[0.1] text-[#e1e7ff]'
+                    ? 'bg-[#1d4ed8]/20 text-[#a9c8ff]'
+                    : 'bg-white/[0.07] text-[#e1e7ff]'
                 )}
               >
                 {children}

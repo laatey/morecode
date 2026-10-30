@@ -6,6 +6,7 @@ import { CATALOG, entryById, type CatalogEntry } from '@/features/connectors/cat
 import { useConnectors, type Connector, type Draft, type Perm } from '@/features/connectors/connectors-store'
 import { ConnectorLogo } from '@/features/connectors/logo'
 import { FeatureBanner } from '@/components/feature-banner'
+import { SegmentedSwitch } from '@/components/segmented-switch'
 import { cn } from '@/lib/utils'
 
 type Tab = 'skills' | 'connectors'
@@ -88,6 +89,21 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
   const cx = useConnectors()
   const [sub, setSub] = useState<Sub>(() => pick(SUB_KEY, ['yours', 'discover'], cx.connectors.length ? 'yours' : 'discover'))
   const [q, setQ] = useState('')
+  useEffect(() => {
+    const onOpen = (e: Event): void => {
+      const detail = (e as CustomEvent<{ sub?: Sub; view?: View['name'] }>).detail
+      if (detail && typeof detail === 'object') {
+        if (detail.sub) {
+          setSub(detail.sub)
+          keep(SUB_KEY, detail.sub)
+        }
+        if (detail.view === 'connect') setView({ name: 'connect' })
+        else if (detail.sub) setView({ name: 'list' })
+      }
+    }
+    window.addEventListener('app:open-customize', onOpen)
+    return () => window.removeEventListener('app:open-customize', onOpen)
+  }, [setView])
   const set = (s: Sub): void => {
     setSub(s)
     keep(SUB_KEY, s)
@@ -101,6 +117,18 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
 
   const mine = cx.connectors.filter((c) => hit(c.name, c.description))
   const found = CATALOG.filter((e) => hit(e.name, e.description, e.by, e.category))
+  const hostOf = (u?: string): string => {
+    try {
+      return u ? new URL(u).host : ''
+    } catch {
+      return ''
+    }
+  }
+  /** A store entry counts as added if a connector came from it, or points at the same server (e.g. added as custom). */
+  const addedFor = (e: CatalogEntry): Connector | undefined =>
+    cx.connectors.find((c) => c.catalogId === e.id || (e.url && hostOf(c.url) === hostOf(e.url)))
+  const warehouse = entryById('ui-warehouse')
+  const warehouseAdded = warehouse ? addedFor(warehouse) : undefined
 
   return (
     <div className="pt-4">
@@ -165,16 +193,16 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
               tag="Featured"
               title="UI Warehouse"
               description="Query 58+ unbranded desktop, web, and mobile shells, navigation bars, and component primitives directly from the agent."
-              actionLabel={cx.connectors.some((c) => c.catalogId === 'ui-warehouse') ? 'Manage' : 'Add'}
+              actionLabel={warehouseAdded ? 'Manage' : 'Add'}
               onAction={() => {
-                const existing = cx.connectors.find((c) => c.catalogId === 'ui-warehouse')
-                setView(existing ? { name: 'detail', id: existing.id } : { name: 'connect', catalogId: 'ui-warehouse' })
+                setView(warehouseAdded ? { name: 'detail', id: warehouseAdded.id } : { name: 'connect', catalogId: 'ui-warehouse' })
               }}
               className="mb-2.5"
             />
           )}
           {found.map((e) => {
-            const added = cx.connectors.some((c) => c.catalogId === e.id)
+            const mineHere = addedFor(e)
+            const added = Boolean(mineHere)
             return (
               <Item
                 key={e.id}
@@ -182,7 +210,6 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
                 title={e.name}
                 note={e.description}
                 onClick={() => {
-                  const mineHere = cx.connectors.find((c) => c.catalogId === e.id)
                   setView(mineHere ? { name: 'detail', id: mineHere.id } : { name: 'connect', catalogId: e.id })
                 }}
                 right={
@@ -361,21 +388,13 @@ const PERMS: { value: Perm; title: string; icon: React.ReactNode }[] = [
 
 function PermControl({ value, onChange }: { value: Perm | null; onChange: (p: Perm) => void }): React.JSX.Element {
   return (
-    <div className="inline-flex shrink-0 rounded-[8px] bg-[#1c1c1b] p-0.5">
-      {PERMS.map((p) => (
-        <button
-          key={p.value}
-          type="button"
-          title={p.title}
-          aria-label={p.title}
-          aria-pressed={value === p.value}
-          onClick={() => onChange(p.value)}
-          className={cn('grid h-6 w-7 cursor-pointer place-items-center rounded-[5px] transition-colors', value === p.value ? 'bg-[#ececea] text-[#1a1a19]' : 'text-[#77776f] hover:text-white')}
-        >
-          {p.icon}
-        </button>
-      ))}
-    </div>
+    <SegmentedSwitch
+      options={PERMS}
+      value={value ?? 'ask'}
+      onChange={onChange}
+      itemWidth={28}
+      height={24}
+    />
   )
 }
 
@@ -473,11 +492,25 @@ export function CustomizePage(): React.JSX.Element {
     setView({ name: 'list' })
   }
 
-  // "/skills" and "/commands" in the chat land here
+  // "/skills", "/commands", and composer "+ -> Connectors" land here
   useEffect(() => {
-    const on = (e: Event): void => change(((e as CustomEvent<Tab>).detail ?? 'skills') as Tab)
-    window.addEventListener('customize:tab', on)
-    return () => window.removeEventListener('customize:tab', on)
+    const onTab = (e: Event): void => change(((e as CustomEvent<Tab>).detail ?? 'skills') as Tab)
+    const onOpen = (e: Event): void => {
+      const detail = (e as CustomEvent<string | { tab?: Tab; sub?: Sub; view?: View['name'] }>).detail
+      if (typeof detail === 'string') {
+        change((detail === 'connectors' ? 'connectors' : 'skills') as Tab)
+      } else if (detail && typeof detail === 'object') {
+        if (detail.sub) keep(SUB_KEY, detail.sub)
+        change(detail.tab ?? 'connectors')
+        if (detail.view === 'connect') setView({ name: 'connect' })
+      }
+    }
+    window.addEventListener('customize:tab', onTab)
+    window.addEventListener('app:open-customize', onOpen)
+    return () => {
+      window.removeEventListener('customize:tab', onTab)
+      window.removeEventListener('app:open-customize', onOpen)
+    }
   }, [])
 
   return (

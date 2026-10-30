@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { ChevronDown, Loader2 } from '@/components/icons'
 import { ActionMenu } from '@/components/action-menu'
+import { SegmentedSwitch } from '@/components/segmented-switch'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -117,8 +118,7 @@ export function Toggle({
 export function Segmented<T extends string>({
   value,
   options,
-  onChange,
-  label
+  onChange
 }: {
   value: T
   options: { value: T; label: React.ReactNode }[]
@@ -126,32 +126,13 @@ export function Segmented<T extends string>({
   label: string
 }): React.JSX.Element {
   return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="inline-flex h-7.5 shrink-0 select-none items-center rounded-[7px] border border-white/[0.08] bg-[#1f1f1e] p-0.5"
-    >
-      {options.map((o) => {
-        const active = o.value === value
-        return (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              'flex h-6 cursor-pointer items-center justify-center rounded-[5px] px-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-              active
-                ? 'bg-[#343432] font-medium text-[#f1f1ef] shadow-xs'
-                : 'text-[#9a9a95] hover:text-white'
-            )}
-          >
-            {o.label}
-          </button>
-        )
-      })}
-    </div>
+    <SegmentedSwitch
+      options={options}
+      value={value}
+      onChange={onChange}
+      itemWidth={68}
+      height={28}
+    />
   )
 }
 

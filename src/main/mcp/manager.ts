@@ -74,6 +74,7 @@ export async function testConnector(config: McpConfig): Promise<{
 export interface McpRuntime {
   defs: ToolDef[]
   names: string[]
+  failedAuth?: { id: string; name: string; error: string }[]
   /** Which connector and tool a model-facing name stands for. */
   find: (name: string) => { config: McpConfig; client: McpClient; tool: string; readOnly: boolean } | undefined
 }
@@ -83,6 +84,7 @@ const safe = (s: string): string => s.replace(/[^a-zA-Z0-9_-]/g, '_')
 /** Connect every enabled connector (in parallel, skipping any that fail) and describe their tools for the model. */
 export async function openRuntime(configs: McpConfig[], cwd: string, signal: AbortSignal): Promise<McpRuntime | null> {
   if (!configs.length) return null
+  const failedAuth: { id: string; name: string; error: string }[] = []
   const ready = (
     await Promise.all(
       configs.map(async (c) => {
@@ -91,13 +93,17 @@ export async function openRuntime(configs: McpConfig[], cwd: string, signal: Abo
             connectOne(c, cwd),
             new Promise<never>((_, no) => signal.addEventListener('abort', () => no(new Error('Stopped.')), { once: true }))
           ])
-        } catch {
+        } catch (err) {
+          const msg = (err as Error).message || ''
+          if (/\b(401|403)\b|sign-in expired|unauthorized|forbidden|invalid_token|token expired/i.test(msg)) {
+            failedAuth.push({ id: c.id, name: c.name, error: msg })
+          }
           return null
         }
       })
     )
   ).filter((c): c is McpClient => c !== null)
-  if (!ready.length) return null
+  if (!ready.length && !failedAuth.length) return null
 
   const table = new Map<string, { config: McpConfig; client: McpClient; tool: string; readOnly: boolean }>()
   const defs: ToolDef[] = []
@@ -114,7 +120,7 @@ export async function openRuntime(configs: McpConfig[], cwd: string, signal: Abo
       })
     }
   }
-  return { defs, names: ready.map((c) => c.config.name), find: (n) => table.get(n) }
+  return { defs, names: ready.map((c) => c.config.name), failedAuth, find: (n) => table.get(n) }
 }
 
 export { resultText }

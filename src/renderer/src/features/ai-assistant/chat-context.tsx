@@ -17,6 +17,8 @@ import { forgetSessionEdit, recordSessionEdit, recordUsage } from '@/features/bi
 import { mockAgent } from './agent/mock-agent'
 import { makeRealRunner, type RealConfig } from './agent/real-agent'
 import { useConnectors } from '@/features/connectors/connectors-store'
+import { useSkills } from '@/features/skills/skills-store'
+import { getSkillBundle } from '@/features/skills/skills-data'
 import { toast } from 'sonner'
 import { routeFor } from './ai-route'
 import { resolveModel } from './models'
@@ -95,6 +97,18 @@ export function ChatProvider({
     [settings, account, service.hosted]
   )
   const { forRun: connectorsForRun } = useConnectors()
+  const { active: activeSkills } = useSkills()
+  const skillsForRun = useCallback(
+    () =>
+      activeSkills.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        instructions: s.instructions,
+        bundle: getSkillBundle(s)
+      })),
+    [activeSkills]
+  )
   const config = useMemo<RealConfig>(() => {
     const projectPath = groups.find((group) => group.id === active.projectId)?.folder
     return {
@@ -107,6 +121,7 @@ export function ChatProvider({
       chatId: active.id,
       style: account?.profile?.experience ?? 'some',
       connectors: connectorsForRun,
+      skills: skillsForRun,
       onUsage: (u) => {
         recordUsage(account?.id ?? 'guest', {
           model: u.model,
@@ -121,7 +136,7 @@ export function ChatProvider({
         if (route.kind === 'subscription') refreshAccount()
       }
     }
-  }, [route, account, active.id, active.projectId, groups, refreshAccount, connectorsForRun])
+  }, [route, account, active.id, active.projectId, groups, refreshAccount, connectorsForRun, skillsForRun])
   const runner = useMemo<AgentRunner>(
     () =>
       typeof window !== 'undefined' && window.api?.agent

@@ -14,7 +14,7 @@ export type CatalogEntry = {
   by: string
   description: string
   /** Used to fetch the logo. */
-  domain: string
+  domain?: string
   kind: 'http' | 'stdio'
   url?: string
   command?: string
@@ -30,7 +30,7 @@ export type CatalogEntry = {
 const npx = (pkg: string, ...rest: string[]): string[] => ['-y', pkg, ...rest]
 
 export const CATALOG: CatalogEntry[] = [
-  { id: 'ui-warehouse', name: 'UI Warehouse', by: 'MoreCode', description: 'Search 58+ reusable UI shells, layouts and component primitives', domain: 'github.com', kind: 'http', url: 'https://ui-warehouse.morline.space/mcp', auth: 'token', tokenLabel: 'Bearer token', tokenHint: 'Enter the MCP_AUTH_TOKEN configured on your UI Warehouse server.', category: 'Developer' },
+  { id: 'ui-warehouse', name: 'UI Warehouse', by: 'MoreCode', description: 'Search 58+ reusable UI shells, layouts and component primitives', kind: 'http', url: 'https://ui-warehouse-ef4632.morline.space/mcp', auth: 'oauth', category: 'Developer' },
   { id: 'github', name: 'GitHub', by: 'GitHub', description: 'Repos, issues, pull requests and code search', domain: 'github.com', kind: 'http', url: 'https://api.githubcopilot.com/mcp/', auth: 'token', tokenLabel: 'Personal access token', tokenHint: 'Create one in GitHub, under Settings, Developer settings.', category: 'Developer' },
   { id: 'linear', name: 'Linear', by: 'Linear', description: 'Find, create and update issues and projects', domain: 'linear.app', kind: 'http', url: 'https://mcp.linear.app/mcp', auth: 'token', tokenLabel: 'API key', tokenHint: 'Linear, Settings, Security & access, API keys.', category: 'Developer' },
   { id: 'stripe', name: 'Stripe', by: 'Stripe', description: 'Customers, payments, invoices and subscriptions', domain: 'stripe.com', kind: 'http', url: 'https://mcp.stripe.com', auth: 'token', tokenLabel: 'Restricted API key', tokenHint: 'Use a restricted key that only has the access you want.', category: 'Data' },

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/features/auth/auth-store'
+import { useWorkspace } from '@/features/workspace/workspace-store'
 
 export type RoutineCadence = 'hourly' | 'daily' | 'weekly'
 export interface Routine {
@@ -16,17 +17,21 @@ export interface Routine {
   projectId?: string | null
   /** true: when it is due it opens its own chat and runs by itself. false (default): the person is told and starts it. */
   auto?: boolean
-  /** The chat the most recent run happened in, so it can be opened from the routine. */
+  /** Kept so older saved routines still load. Every enabled routine now starts by itself. */
   lastChatId?: string
+  /** The routine's one chat. Every run happens here, so the whole history is in one place. */
+  chatId?: string
 }
 
 interface RoutineApi {
   routines: Routine[]
-  add: (routine: Omit<Routine, 'id' | 'enabled' | 'nextRunAt'>) => void
+  add: (routine: Omit<Routine, 'id' | 'enabled' | 'nextRunAt' | 'chatId'>) => string
   update: (id: string, patch: Partial<Pick<Routine, 'title' | 'prompt' | 'cadence' | 'time' | 'weekday' | 'projectId' | 'auto'>>) => void
   toggle: (id: string) => void
   remove: (id: string) => void
   markRun: (id: string, at?: number, chatId?: string) => void
+  /** Not this time: move on to the next scheduled time without running. */
+  skip: (id: string) => void
 }
 
 const Ctx = createContext<RoutineApi | null>(null)
@@ -56,6 +61,7 @@ function load(key: string): Routine[] {
 
 export function RoutinesProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const { account } = useAuth()
+  const ws = useWorkspace()
   const key = `morecode:routines:v1:${account?.id ?? 'guest'}`
   const [routines, setRoutines] = useState<Routine[]>(() => load(key))
 
@@ -70,31 +76,51 @@ export function RoutinesProvider({ children }: { children: React.ReactNode }): R
     }
   }, [key, routines])
 
+  // every routine has exactly one chat: make it for new routines, and for older ones that never had one
+  useEffect(() => {
+    const need = routines.filter((r) => !r.chatId || !ws.chats.some((c) => c.id === r.chatId))
+    if (!need.length) return
+    const made = new Map(need.map((r) => [r.id, ws.createRoutineChat(r.id, r.title, r.projectId ?? null)]))
+    setRoutines((items) => items.map((r) => (made.has(r.id) ? { ...r, chatId: made.get(r.id) } : r)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routines, ws.chats])
+
   const api = useMemo<RoutineApi>(() => ({
     routines,
     add: (input) => {
-      const item: Routine = { ...input, id: crypto.randomUUID(), enabled: true, nextRunAt: 0 }
+      const id = crypto.randomUUID()
+      const item: Routine = { ...input, id, enabled: true, nextRunAt: 0, chatId: ws.createRoutineChat(id, input.title, input.projectId ?? null) }
       item.nextRunAt = nextRoutineTime(item)
       setRoutines((items) => [item, ...items])
+      return id
     },
-    update: (id, patch) => setRoutines((items) => items.map((item) => {
-      if (item.id !== id) return item
-      const next = { ...item, ...patch }
-      return { ...next, nextRunAt: item.enabled ? nextRoutineTime(next) : item.nextRunAt }
-    })),
+    update: (id, patch) => {
+      const current = routines.find((r) => r.id === id)
+      if (current?.chatId) ws.patchChat(current.chatId, { title: patch.title, projectId: patch.projectId })
+      setRoutines((items) => items.map((item) => {
+        if (item.id !== id) return item
+        const next = { ...item, ...patch }
+        return { ...next, nextRunAt: item.enabled ? nextRoutineTime(next) : item.nextRunAt }
+      }))
+    },
     toggle: (id) => setRoutines((items) => items.map((item) => item.id !== id ? item : {
       ...item,
       enabled: !item.enabled,
       nextRunAt: item.enabled ? item.nextRunAt : nextRoutineTime(item)
     })),
-    remove: (id) => setRoutines((items) => items.filter((item) => item.id !== id)),
+    remove: (id) => {
+      const current = routines.find((r) => r.id === id)
+      if (current?.chatId) ws.removeRoutineChat(current.chatId)
+      setRoutines((items) => items.filter((item) => item.id !== id))
+    },
+    skip: (id) => setRoutines((items) => items.map((item) => item.id !== id ? item : { ...item, nextRunAt: nextRoutineTime(item) })),
     markRun: (id, at = Date.now(), chatId) => setRoutines((items) => items.map((item) => item.id !== id ? item : {
       ...item,
       lastRunAt: at,
       lastChatId: chatId ?? item.lastChatId,
       nextRunAt: nextRoutineTime(item, at)
     }))
-  }), [routines])
+  }), [routines, ws])
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>
 }

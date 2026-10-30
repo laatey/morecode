@@ -1,4 +1,5 @@
 import type { FileDiff } from '@/components/diff-view'
+import type { SkillDraft } from '../../../../shared/skill-draft'
 
 export type Step = string | { text: string; icon?: string | null }
 
@@ -27,6 +28,13 @@ export interface PermissionRequest {
   command: string
   /** Why the AI wants to do it. */
   reason?: string
+  /** Details when an MCP connector tool requests permission. */
+  connector?: {
+    id: string
+    name: string
+    tool: string
+    input?: Record<string, unknown>
+  }
 }
 
 export type ErrorKind = 'rate_limit' | 'offline' | 'failed' | 'interrupted'
@@ -38,6 +46,7 @@ export interface TodoItem {
 
 /** One thing the agent did. Add a new `kind` here + a renderer in tool-rows.tsx. */
 export type ToolBlock =
+  | { kind: 'skill-draft'; id: string; draft: SkillDraft; status: ToolStatus }
   | {
       kind: 'edit'
       id: string
@@ -75,8 +84,20 @@ export type ToolBlock =
       output?: string
       status: ToolStatus
       ms?: number
+      authError?: boolean
     }
   | { kind: 'read'; id: string; paths: string[]; status: ToolStatus; error?: string }
+  | {
+      /** A skill file the agent read on demand. */
+      kind: 'skill'
+      id: string
+      skillId: string
+      skillName: string
+      path?: string
+      content?: string
+      status: ToolStatus
+      error?: string
+    }
   | ({ kind: 'permission'; state: PermissionState } & PermissionRequest)
   | {
       /** The agent's reasoning. `text` grows while it thinks; `durationMs` is set when it finishes. */

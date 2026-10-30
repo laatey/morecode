@@ -251,11 +251,6 @@ function PaletteBody(): React.JSX.Element {
             </Command.Group>
           ))}
         </Command.List>
-        <div className="flex items-center gap-3 border-t border-white/[0.07] px-3 py-1.5 text-[11px] text-[#77776f]">
-          <span className="flex items-center gap-1.5"><KeyChip>↑</KeyChip><KeyChip>↓</KeyChip> to move</span>
-          <span className="flex items-center gap-1.5"><KeyChip>Enter</KeyChip> to run</span>
-          <span className="ml-auto flex items-center gap-1.5"><KeyChip>Esc</KeyChip> to close</span>
-        </div>
       </Command>
     </Dialog.Content>
   )
