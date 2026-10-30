@@ -195,7 +195,9 @@ const api = {
   browser: {
     /** Tell the main process which <webview> is the Browser tab, so the AI can drive it. */
     register: (webContentsId: number): void => ipcRenderer.send('browser:register', webContentsId),
-    onAgent: (cb: (e: { id: number; active: boolean }) => void): (() => void) => listen('browser:agent', cb)
+    onAgent: (cb: (e: { id: number; active: boolean }) => void): (() => void) => listen('browser:agent', cb),
+    /** The AI needs a Browser tab and none is open. */
+    onOpen: (cb: () => void): (() => void) => listen('browser:open', cb)
   },
   background: {
     /** Is the window showing, and does it have focus? Routines wait politely while the person is using the app. */

@@ -105,8 +105,17 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
         // not attached yet
       }
     }
+    // the page may already be past dom-ready when this runs (restored page, remount), so register now and keep trying briefly
+    register()
+    let tries = 0
+    const retry = window.setInterval(() => {
+      register()
+      if (contentsId.current !== null || ++tries > 40) window.clearInterval(retry)
+    }, 250)
     const off = [
       on('dom-ready', register),
+      on('did-attach', register),
+      on('did-stop-loading', register),
       on('focus', register),
       on('did-start-loading', () => setLoading(true)),
       on('did-stop-loading', () => {
@@ -143,7 +152,10 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
         setError({ url: e.validatedURL ?? '', message: e.errorDescription ?? 'The page did not load.' })
       })
     ]
-    return () => off.forEach((f) => f())
+    return () => {
+      window.clearInterval(retry)
+      off.forEach((f) => f())
+    }
   }, [opened, tabId, setAutoTitle])
 
   // blue glow while the AI is using this browser

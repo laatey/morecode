@@ -840,11 +840,27 @@ export function AiAssistant(): React.JSX.Element {
           {!atBottom && messages.length > 0 && (
             <button
               type="button"
-              aria-label="Scroll to latest"
+              aria-label={running ? 'AI is working. Scroll to latest' : 'Scroll to latest'}
               onClick={() => scrollToEnd()}
-              className="absolute bottom-full left-1/2 z-20 mb-3 grid h-8 w-8 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-white/[0.12] bg-[#2b2b2a] text-muted-foreground shadow-md transition-colors hover:text-foreground"
+              className={`absolute bottom-full left-1/2 z-20 mb-3 grid -translate-x-1/2 cursor-pointer place-items-center rounded-full border bg-[#2b2b2a] shadow-md transition-colors ${
+                running
+                  ? 'h-8 w-8 border-white/[0.12] text-muted-foreground hover:text-foreground'
+                  : 'h-8 w-8 border-white/[0.12] text-muted-foreground hover:text-foreground'
+              }`}
             >
-              <ArrowDown className="h-4 w-4" />
+              {running ? (
+                <span className="flex items-center gap-[3px]">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="h-[4px] w-[4px] animate-bounce rounded-full bg-current"
+                      style={{ animationDelay: `${i * 150}ms`, animationDuration: '1s' }}
+                    />
+                  ))}
+                </span>
+              ) : (
+                <ArrowDown className="h-4 w-4" />
+              )}
             </button>
           )}
           {slashOpen && (

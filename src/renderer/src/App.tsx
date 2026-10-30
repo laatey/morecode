@@ -288,6 +288,18 @@ function AppShell(): React.JSX.Element {
   }, [openProject, ws])
 
   const { openTab, closeTab, tabs, paneTabs, layout } = useRightPanel()
+
+  // the AI asked for a Browser tab and none is open
+  const hasBrowserTab = tabs.some((t) => t.kind === 'browser')
+  const hasBrowserRef = React.useRef(hasBrowserTab)
+  hasBrowserRef.current = hasBrowserTab
+  useEffect(
+    () =>
+      window.api?.browser?.onOpen?.(() => {
+        if (!hasBrowserRef.current) openTab('browser')
+      }),
+    [openTab]
+  )
   const visibleTabIds = paneTabs.slice(0, getLayout(layout).panes)
   const rightVisible = !rightCollapsed || overlay === 'right'
   const docsOpen =

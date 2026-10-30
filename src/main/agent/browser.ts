@@ -1,4 +1,4 @@
-import { app, ipcMain, webContents, type WebContents } from 'electron'
+import { app, BrowserWindow, ipcMain, webContents, type WebContents } from 'electron'
 import { chromium, type Browser, type Frame, type Locator, type Page } from 'playwright-core'
 import type { ToolDef } from './anthropic'
 import type { ToolContext, ToolResult } from './tools'
@@ -57,12 +57,49 @@ const glow = (on: boolean): void => {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-function activeTab(): WebContents {
-  const wc = activeId !== null ? tabs.get(activeId) : undefined
-  if (!wc || wc.isDestroyed()) {
-    throw new Error('There is no Browser tab open. Ask the person to open the Browser tab (and load any page), then try again.')
+/** Find a live <webview> even if the Browser tab never registered itself (missed dom-ready, restored page, etc.). */
+function discoverTab(): WebContents | null {
+  const live = webContents.getAllWebContents().filter((w) => !w.isDestroyed() && w.getType() === 'webview')
+  if (!live.length) return null
+  const wc = live.find((w) => w.id === activeId) ?? live[live.length - 1]
+  if (wc.hostWebContents && !wc.hostWebContents.isDestroyed()) host = wc.hostWebContents
+  tabs.set(wc.id, wc)
+  wc.once('destroyed', () => {
+    tabs.delete(wc.id)
+    if (activeId === wc.id) activeId = [...tabs.keys()].pop() ?? null
+    if (cached?.id === wc.id) cached = null
+  })
+  if (activeId !== wc.id) {
+    activeId = wc.id
+    refs = new Map()
   }
   return wc
+}
+
+/** The Browser tab's webview. If it is not open, asks the app to open it and waits for it. */
+async function activeTab(): Promise<WebContents> {
+  const find = (): WebContents | null => {
+    const reg = activeId !== null ? tabs.get(activeId) : undefined
+    if (reg && !reg.isDestroyed()) return reg
+    return discoverTab()
+  }
+  let wc = find()
+  if (wc) return wc
+  const win = host && !host.isDestroyed() ? host : (BrowserWindow.getAllWindows()[0]?.webContents ?? null)
+  if (win && !win.isDestroyed()) {
+    host = win
+    win.send('browser:open')
+    for (let i = 0; i < 40 && !wc; i++) {
+      await sleep(150)
+      wc = find()
+    }
+    if (wc) {
+      // let the blank webview finish attaching before Playwright looks for it
+      await sleep(400)
+      return wc
+    }
+  }
+  throw new Error('Could not open the Browser tab automatically. Ask the person to open the Browser tab, then try again.')
 }
 
 /* ---------- Playwright connection ---------- */
@@ -105,7 +142,7 @@ const targetOfContents = async (wc: WebContents): Promise<string | null> => {
 
 /** The Playwright page for the active Browser tab. */
 async function currentPage(): Promise<Page> {
-  const wc = activeTab()
+  const wc = await activeTab()
   if (cached && cached.id === wc.id && !cached.page.isClosed()) return cached.page
   const b = await connect()
   const pages = b.contexts().flatMap((c) => c.pages())

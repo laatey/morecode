@@ -356,11 +356,11 @@ export function FeatureBanner({
         <p className="mt-1 max-w-[460px] text-[12.5px] leading-[18px] text-white/65">
           {description}
         </p>
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onAction}
-            className="inline-flex h-7 cursor-pointer items-center rounded-[6px] bg-[#ececea] px-3 text-[12px] font-medium text-[#1a1a19] transition-colors hover:bg-white"
+            className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-[6px] bg-[#ececea] px-3 text-[12px] font-medium text-[#1a1a19] transition-colors hover:bg-white"
           >
             {actionLabel}
           </button>
@@ -368,7 +368,7 @@ export function FeatureBanner({
             <button
               type="button"
               onClick={onSecondary}
-              className="inline-flex h-7 cursor-pointer items-center rounded-[6px] px-2.5 text-[12px] font-medium text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
+              className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-[6px] px-2.5 text-[12px] font-medium text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               {secondaryLabel}
             </button>

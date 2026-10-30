@@ -114,7 +114,23 @@ export const Puzzle = make(H.PuzzleIcon)
 export const RefreshCw = make(H.RefreshIcon)
 export const Rocket = make(H.Rocket01Icon)
 export const RotateCcw = make(H.RotateLeft01Icon)
-export const RotateCw = make(H.RotateRight01Icon)
+export const RotateCw: IconComponent = ({ size = 24, strokeWidth = 1.6, color = 'currentColor', className }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5" />
+    <path d="M20 3.5v5h-5" />
+  </svg>
+)
 export const Rows2 = make(H.LayoutBottomIcon)
 export const ScanSearch = make(H.SearchVisualIcon)
 export const Search = make(H.Search01Icon)

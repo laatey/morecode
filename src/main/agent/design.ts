@@ -60,7 +60,7 @@ export const DESIGN_GUIDE = `Design rules for this request (you are building UI;
 4. Check your work visually. Code that compiles is not finished UI.
 - Start the dev server (run_in_background), open the page with browser_navigate, and take browser_screenshot at desktop width; also check a narrow width if the page is user-facing.
 - Look critically: alignment, spacing consistency, contrast, awkward wrapping, clipped text, empty areas, anything that looks default or unfinished. Fix it and screenshot again. Do at least one improve-and-recheck pass before you say it is done.
-- If the browser tab is not open, ask the person to open it rather than skipping the check.
+- If the browser tab is not open, the browser tools open it themselves; do not skip the check.
 
 5. Stay in scope.
 - Only restyle what the person asked about. Do not rewrite working logic, rename things, or change behaviour to make styling easier.`
