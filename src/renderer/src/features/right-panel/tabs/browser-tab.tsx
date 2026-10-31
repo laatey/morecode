@@ -20,7 +20,7 @@ import { IconButton } from '@/components/layout/icon-button'
 import { cn } from '@/lib/utils'
 import { useRightPanel } from '../store'
 import type { TabContentProps } from '../types'
-import { rememberPage, savedPage, useBookmarks } from './browser-state'
+import { consumeBlankRequest, rememberPage, savedPage, useBookmarks } from './browser-state'
 import { TabButton } from './tab-kit'
 
 const LOCAL = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i
@@ -55,7 +55,7 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
   const view = useRef<WebviewTag | null>(null)
   const address = useRef<HTMLInputElement>(null)
   // reopen the page this tab was on before the app was closed
-  const [start] = useState(() => savedPage(tabId))
+  const [start] = useState(() => savedPage(tabId) || (consumeBlankRequest() ? 'about:blank' : ''))
   const [src, setSrc] = useState(start)
   const [url, setUrl] = useState(start)
   const [text, setText] = useState(start)
@@ -67,6 +67,16 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
   const [error, setError] = useState<{ url: string; message: string } | null>(null)
   const [agentActive, setAgentActive] = useState(false)
   const contentsId = useRef<number | null>(null)
+
+  // the AI asked for a browser: give an empty tab a blank page so a webview exists
+  useEffect(() => {
+    const start = (): void => {
+      consumeBlankRequest()
+      setSrc((cur) => cur || 'about:blank')
+    }
+    window.addEventListener('morecode:browser-blank', start)
+    return () => window.removeEventListener('morecode:browser-blank', start)
+  }, [])
 
   const go = useCallback((raw: string): void => {
     const next = toUrl(raw)
@@ -162,7 +172,20 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
   useEffect(
     () =>
       window.api.browser.onAgent((e) => {
-        if (e.id === contentsId.current) setAgentActive(e.active)
+        let mine = contentsId.current
+        if (mine !== e.id) {
+          // the page may have been given a new id since this tab last registered; ask it again
+          try {
+            const now = (view.current as unknown as { getWebContentsId?: () => number } | null)?.getWebContentsId?.()
+            if (typeof now === 'number') {
+              mine = now
+              contentsId.current = now
+            }
+          } catch {
+            // not attached yet
+          }
+        }
+        if (e.id === mine) setAgentActive(e.active)
       }),
     []
   )

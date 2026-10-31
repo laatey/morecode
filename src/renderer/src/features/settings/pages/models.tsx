@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/auth-store'
 import { AuthError } from '@/features/auth/auth-service'
@@ -162,6 +162,7 @@ export function ModelsPage(): React.JSX.Element {
   const { account, update, service } = useAuth()
   const current = MODELS.find((m) => m.id === settings.model)
   const source = sourceOf(settings.model)
+  const scopeSite = useRef<'cn' | 'ai'>(settings.modelScopeSite)
 
   return (
     <Page
@@ -223,6 +224,24 @@ export function ModelsPage(): React.JSX.Element {
           save={({ key }) => set({ openRouterKey: key })}
           remove={() => set({ openRouterKey: '' })}
           savedMessage="OpenRouter key saved"
+        />
+        <ProviderRow
+          title="ModelScope"
+          description="Free open models: GLM, Nex, DeepSeek and CompassJudger. A token from modelscope.cn or modelscope.ai works."
+          connected={Boolean(settings.modelScopeKey)}
+          summary={settings.modelScopeKey ? mask(settings.modelScopeKey) : ''}
+          connectLabel="Add key"
+          keyLabel="ModelScope access token"
+          keyPlaceholder="Access token from modelscope.cn"
+          test={({ key }) =>
+            window.api.agent.testProvider({ provider: 'modelscope', key }).then((r) => {
+              must(r)
+              scopeSite.current = r.site ?? 'cn' // the key works on whichever site accepted it
+            })
+          }
+          save={({ key }) => set({ modelScopeKey: key, modelScopeSite: scopeSite.current })}
+          remove={() => set({ modelScopeKey: '' })}
+          savedMessage="ModelScope key saved"
         />
         <ProviderRow
           title="AI gateway"

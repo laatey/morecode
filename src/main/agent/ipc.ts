@@ -5,13 +5,17 @@ import { authorize } from '../mcp/oauth'
 import { disconnect, disconnectAll, testConnector } from '../mcp/manager'
 import type { McpConfig } from '../mcp/client'
 import { ApiFailure, looksDropped } from './anthropic'
+import { modelScopeUrl, usesOpenAIFormat, type ModelScopeSite } from './openai-format'
 import { dropJob, getJob, listJobSnapshots, onJobsChange, stopAllJobs, stopJob } from './background'
 import { runAgent, type RunInput, type SkillInput, type Style } from './run'
 import { keepEdit, revertEdit, type Decision } from './tools'
+import { cleanAnswers, type QuestionAnswer, type QuestionItem } from '../../shared/question'
 
 interface Live {
   abort: AbortController
   waiting: Map<string, (d: Decision) => void>
+  /** Questions on screen, with what was asked so the answers can be checked. */
+  questions: Map<string, { items: QuestionItem[]; resolve: (a: QuestionAnswer[] | null) => void }>
   sender: WebContents
 }
 const runs = new Map<string, Live>()
@@ -20,6 +24,19 @@ type Payload = Omit<RunInput, 'cwd'>
 
 // Keep in step with the model ids in the app (renderer/features/ai-assistant/models.ts).
 const MODELS = /^(claude-[a-z0-9.-]+|anthropic\/claude-sonnet-5|openrouter\/free)$/i
+// The only ModelScope models offered. Keep in step with MODELSCOPE_MODELS in renderer/features/ai-assistant/models.ts.
+const MODELSCOPE_ALLOWED = new Set([
+  'zai-org/GLM-5.2',
+  'nex-agi/Nex-N2.5-mini',
+  'nex-agi/Nex-N2.5-Pro',
+  'deepseek-ai/DeepSeek-V4-Pro-0813',
+  'deepseek-ai/DeepSeek-V4.1-Flash-1017',
+  'opencompass/CompassJudger-1-32B-Instruct'
+])
+// A model tried when a ModelScope key is checked: the lightest of the six.
+const MODELSCOPE_PROBE = 'nex-agi/Nex-N2.5-mini'
+const modelOk = (model: string, baseUrl?: string): boolean =>
+  usesOpenAIFormat(baseUrl) ? MODELSCOPE_ALLOWED.has(model) : MODELS.test(model)
 
 function valid(p: unknown): p is Payload {
   const x = p as Payload
@@ -29,7 +46,7 @@ function valid(p: unknown): p is Payload {
     typeof x.apiKey === 'string' &&
     x.apiKey.length > 8 &&
     typeof x.model === 'string' &&
-    MODELS.test(x.model) &&
+    modelOk(x.model, x.baseUrl) &&
     typeof x.prompt === 'string' &&
     (x.chatId === undefined || (typeof x.chatId === 'string' && x.chatId.length < 80)) &&
     (x.projectPath === undefined || typeof x.projectPath === 'string') &&
@@ -45,8 +62,14 @@ function valid(p: unknown): p is Payload {
           ([k, v]) => /^x-morecode-[a-z-]+$/.test(k) && typeof v === 'string' && v.length < 80
         ))) &&
     (x.connectors === undefined || (Array.isArray(x.connectors) && x.connectors.length < 30 && x.connectors.every(goodConfig))) &&
-    (x.skills === undefined || (Array.isArray(x.skills) && x.skills.length < 100 && x.skills.every(goodSkill)))
+    (x.skills === undefined || (Array.isArray(x.skills) && x.skills.length < 100 && x.skills.every(goodSkill))) &&
+    (x.routines === undefined || (Array.isArray(x.routines) && x.routines.length < 100 && x.routines.every(goodRoutine)))
   )
+}
+
+function goodRoutine(r: unknown): boolean {
+  const x = r as NonNullable<Payload['routines']>[number]
+  return !!x && typeof x.title === 'string' && typeof x.cadence === 'string' && typeof x.time === 'string' && typeof x.enabled === 'boolean'
 }
 
 function goodSkill(s: unknown): s is SkillInput {
@@ -77,20 +100,25 @@ function goodConfig(c: unknown): c is McpConfig {
   )
 }
 
-export type CheckResult = { ok: boolean; message?: string }
+export type CheckResult = { ok: boolean; message?: string; site?: ModelScopeSite }
 
 type ProviderCheck =
-  | { provider: 'anthropic' | 'openrouter'; key: string }
+  | { provider: 'anthropic' | 'openrouter' | 'modelscope'; key: string }
   | { provider: 'gateway'; key: string; endpoint: string }
 
-const PROVIDER_NAME = { anthropic: 'API', openrouter: 'OpenRouter', gateway: 'gateway' } as const
+const PROVIDER_NAME = {
+  anthropic: 'API',
+  openrouter: 'OpenRouter',
+  modelscope: 'ModelScope',
+  gateway: 'gateway'
+} as const
 
 function shape(c: unknown): ProviderCheck | null {
   const x = c as Partial<ProviderCheck> | null
   if (!x || typeof x.key !== 'string') return null
   const key = x.key.trim()
   if (key.length < 20 || key.length > 300) return null
-  if (x.provider === 'anthropic' || x.provider === 'openrouter')
+  if (x.provider === 'anthropic' || x.provider === 'openrouter' || x.provider === 'modelscope')
     return { provider: x.provider, key }
   if (
     x.provider === 'gateway' &&
@@ -107,6 +135,7 @@ async function checkProvider(raw: unknown): Promise<CheckResult> {
   const c = shape(raw)
   if (!c) return { ok: false, message: 'That does not look like a valid key.' }
   const name = PROVIDER_NAME[c.provider]
+  if (c.provider === 'modelscope') return checkModelScope(c.key)
   const message = JSON.stringify({
     model: c.provider === 'openrouter' ? 'openrouter/free' : 'claude-haiku-5-5',
     max_tokens: 1,
@@ -151,11 +180,65 @@ async function checkProvider(raw: unknown): Promise<CheckResult> {
   }
 }
 
+/** What ModelScope said when it refused a request, in a few words, so a refusal can be explained. */
+async function reasonOf(res: Response): Promise<string> {
+  try {
+    // the provider's error body: read field by field
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as Record<string, any>
+    const m = body?.error?.message ?? body?.errors?.message ?? body?.message ?? ''
+    return typeof m === 'string' ? m.replace(/\s+/g, ' ').slice(0, 160) : ''
+  } catch {
+    return ''
+  }
+}
+
+type SiteVerdict = { verdict: 'ok' | 'refused' | 'unreachable'; status?: number; reason?: string }
+
+/**
+ * One site's verdict on a key, proved with one tiny real request, which costs one of the day's free calls. Only a refusal (401 or 403) is "refused": a busy or
+ * unknown-model answer still means the key works. A refusal keeps what ModelScope said, since it can mean the
+ * account is not activated for the free API rather than that the key is wrong.
+ */
+async function tryModelScope(key: string, site: ModelScopeSite): Promise<SiteVerdict> {
+  try {
+    const res = await fetch(`${modelScopeUrl(site)}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: MODELSCOPE_PROBE, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+      signal: AbortSignal.timeout(20_000)
+    })
+    return res.status === 401 || res.status === 403
+      ? { verdict: 'refused', status: res.status, reason: await reasonOf(res) }
+      : { verdict: 'ok' }
+  } catch {
+    return { verdict: 'unreachable' }
+  }
+}
+
+/** A token made on modelscope.cn or on modelscope.ai: try both sites and report which one accepted it. */
+async function checkModelScope(key: string): Promise<CheckResult> {
+  const said: string[] = []
+  let unreachable = false
+  for (const site of ['cn', 'ai'] as const) {
+    const r = await tryModelScope(key, site)
+    if (r.verdict === 'ok') return { ok: true, site }
+    if (r.verdict === 'unreachable') unreachable = true
+    else said.push(`modelscope.${site} answered ${r.status}${r.reason ? `: ${r.reason}` : ''}`)
+  }
+  if (!said.length)
+    return { ok: false, message: 'Could not reach ModelScope to check the key. Check your connection.' }
+  return {
+    ok: false,
+    message: `ModelScope refused that key (${said.join('; ')}).${unreachable ? ' One site could not be reached.' : ''}`
+  }
+}
+
 export function registerAgentIpc(): void {
   ipcMain.handle('agent:start', (event, payload: unknown): boolean => {
     if (!valid(payload) || runs.has(payload.runId)) return false
     const sender = event.sender
-    const live: Live = { abort: new AbortController(), waiting: new Map(), sender }
+    const live: Live = { abort: new AbortController(), waiting: new Map(), questions: new Map(), sender }
     runs.set(payload.runId, live)
     const send = (msg: Record<string, unknown>): void => {
       if (!sender.isDestroyed()) sender.send('agent:event', { runId: payload.runId, ...msg })
@@ -184,6 +267,12 @@ export function registerAgentIpc(): void {
             live.waiting.set(req.id, resolve)
             live.abort.signal.addEventListener('abort', () => resolve('deny'), { once: true })
             send({ kind: 'ask', req })
+          }),
+        askQuestion: (id, items) =>
+          new Promise<QuestionAnswer[] | null>((resolve) => {
+            live.questions.set(id, { items, resolve })
+            live.abort.signal.addEventListener('abort', () => resolve(null), { once: true })
+            send({ kind: 'question', id, items })
           })
       }
     )
@@ -216,6 +305,14 @@ export function registerAgentIpc(): void {
       live!.waiting.delete(id)
       resolve(decision)
     }
+  })
+
+  ipcMain.on('agent:answer', (_e, runId: string, id: string, answers: unknown) => {
+    const live = runs.get(runId)
+    const q = live?.questions.get(id)
+    if (!live || !q) return
+    live.questions.delete(id)
+    q.resolve(cleanAnswers(answers, q.items))
   })
 
   ipcMain.on('agent:abort', (_e, runId: string) => runs.get(runId)?.abort.abort())

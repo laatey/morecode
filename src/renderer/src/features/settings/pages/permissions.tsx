@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { X } from '@/components/icons'
 import { Btn, Group, Page, Pick, Row, TextInput } from '../kit'
-import { useSettings, type Rule, type Settings } from '../settings-store'
+import { useSettings, isTrusted, TRUST_KEYS, type Rule, type Settings } from '../settings-store'
 
 const RULE_OPTIONS: { value: Rule; label: string }[] = [
   { value: 'ask', label: 'Ask me' },
@@ -13,7 +13,10 @@ const ROWS: { key: keyof Settings['rules']; title: string; description: string }
   { key: 'commands', title: 'Run commands', description: 'Things like running tests or starting your app.' },
   { key: 'install', title: 'Install packages', description: 'Add new libraries to your project.' },
   { key: 'remove', title: 'Delete files', description: 'Remove files or folders from your project.' },
-  { key: 'network', title: 'Use the internet', description: 'Look things up or download files.' }
+  { key: 'network', title: 'Use the internet', description: 'Download files or call web services from commands.' },
+  { key: 'web', title: 'Search the web', description: 'Look things up and read web pages while it works.' },
+  { key: 'browse', title: 'Browse in the Browser tab', description: 'Open websites to look at or test them.' },
+  { key: 'git', title: 'Commit and push with git', description: 'Save commits, switch branches, push, open pull requests.' }
 ]
 
 export function PermissionsPage(): React.JSX.Element {
@@ -26,11 +29,11 @@ export function PermissionsPage(): React.JSX.Element {
   }
 
   const r = settings.rules
-  const trusted = settings.autoAccept && r.commands === 'allow' && r.install === 'allow' && r.network === 'allow'
+  const trusted = isTrusted(settings)
   const setTrusted = (on: boolean): void =>
     set({
       autoAccept: on,
-      rules: { ...r, commands: on ? 'allow' : 'ask', install: on ? 'allow' : 'ask', network: on ? 'allow' : 'ask' }
+      rules: TRUST_KEYS.reduce((acc, k) => ({ ...acc, [k]: on ? 'allow' : 'ask' }), { ...r })
     })
 
   return (
@@ -38,7 +41,7 @@ export function PermissionsPage(): React.JSX.Element {
       <Group title="Trust">
         <Row
           title="Trust the AI"
-          description="Edits, commands, installs and internet access run without asking. Deleting files still asks. Turn it off to choose each one below."
+          description="Edits, commands, installs, web, browsing and git run without asking. Deleting files still asks. Turn it off to choose each one below."
         >
           <Pick
             value={trusted ? 'trusted' : 'careful'}

@@ -9,6 +9,7 @@ export const SECRET_NAMES = {
   sessions: 'morecode:sessions:v1',
   keys: 'morecode:keys:v1',
   openRouter: 'morecode:openrouter-key',
+  modelScope: 'morecode:modelscope-key',
   gateway: 'morecode:gateway-key',
   connectors: 'morecode:connector-secrets:v1'
 } as const

@@ -62,6 +62,7 @@ export function ErrorCard({ part, agentId }: { part: ErrorPart; agentId: string 
     !fallback.locked &&
     !fallback.needsSetup
   const onFree = sourceOf(model) === 'openrouter'
+  const onScope = sourceOf(model) === 'modelscope'
 
   const title =
     part.kind === 'rate_limit'
@@ -74,7 +75,9 @@ export function ErrorCard({ part, agentId }: { part: ErrorPart; agentId: string 
   const detail =
     part.kind === 'rate_limit'
       ? wait > 0
-        ? `Try again in ${wait}s.${onFree ? ' Free models share one limit between everyone.' : canSwitch ? ' Or switch to a lighter model.' : ''}`
+        ? `Try again in ${wait}s.${onFree ? ' Free models share one limit between everyone.' : onScope ? ' Or pick another ModelScope model.' : canSwitch ? ' Or switch to a lighter model.' : ''}`
+        : onScope
+          ? 'ModelScope limits free calls for each model every day. Pick another ModelScope model, or try again later.'
         : onFree
           ? 'You can try again now. If this keeps happening, free models are busy: add your own key in Settings.'
           : 'You can try again now.'

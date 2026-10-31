@@ -4,6 +4,7 @@ import '@vscode/codicons/dist/codicon.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { ErrorBoundary } from './components/error-boundary'
 import { SECRET_NAMES, loadSecrets } from './lib/secrets'
 
 // Keys and sign-in sessions are read from the computer's encrypted store first, so nothing flashes signed-out.
@@ -14,7 +15,9 @@ void loadSecrets(Object.values(SECRET_NAMES), {
 }).then(() =>
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary label="MoreCode" reload>
+        <App />
+      </ErrorBoundary>
     </StrictMode>
   )
 )

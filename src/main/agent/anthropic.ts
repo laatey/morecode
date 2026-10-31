@@ -68,7 +68,7 @@ export class ApiFailure extends Error {
   }
 }
 
-async function explain(res: Response): Promise<ApiFailure> {
+export async function explain(res: Response): Promise<ApiFailure> {
   let detail = ''
   try {
     const body = (await res.json()) as { error?: { message?: string } }
@@ -93,7 +93,7 @@ async function explain(res: Response): Promise<ApiFailure> {
 }
 
 /** Parse "event: x\ndata: {...}\n\n" frames from a byte stream. */
-async function* frames(body: ReadableStream<Uint8Array>): AsyncGenerator<{ event: string; data: string }> {
+export async function* frames(body: ReadableStream<Uint8Array>): AsyncGenerator<{ event: string; data: string }> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''

@@ -2,8 +2,7 @@ import React from 'react'
 import { cn } from '@/lib/utils'
 
 /**
- * The MoreCode mark. This is the single source for the logo inside the app. The same artwork is
- * shown in the app. It is the original Fable mark, without a surrounding tile.
+ * The MoreCode mark. This is the single source for the logo inside the app.
  */
 export function LogoMark({
   size = 28,
@@ -14,17 +13,16 @@ export function LogoMark({
 }): React.JSX.Element {
   return (
     <svg
-      viewBox="0 0 1024 1024"
+      viewBox="0 0 512 512"
       width={size}
       height={size}
       role="img"
       aria-label="MoreCode"
-      className={cn('shrink-0 text-white', className)}
+      className={cn('shrink-0', className)}
     >
-      <path
-        d="M286 224 H739 V362 H410 V547 H489 V442 H738 V581 H493 V800 H286 Z"
-        fill="currentColor"
-      />
+      <rect x="60" y="180" width="230" height="230" rx="64" fill="#FFB020" />
+      <rect x="141" y="141" width="230" height="230" rx="64" fill="#FF5A1F" />
+      <rect x="222" y="102" width="230" height="230" rx="64" fill="#2F5BFF" />
     </svg>
   )
 }

@@ -1,14 +1,15 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, Close, Plus, Stop } from 'fluid-icons/react'
-import { AppWindow, AtSign, ChevronDown, File as FileIcon, Folder, Grid2x2, Image as ImageIcon, Mic, MoreHorizontal, RefreshCw, ThumbsDown, ThumbsUp } from '@/components/icons'
+import { AppWindow, AtSign, ChevronDown, File as FileIcon, Folder, GitBranch, Globe, Grid2x2, Image as ImageIcon, Mic, MoreHorizontal, Package, Pencil, RefreshCw, Search as SearchIcon, ShieldCheck, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp } from '@/components/icons'
+import { QuestionPanel } from './question-panel'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { ActionMenu } from '@/components/action-menu'
+import { ActionMenu, type ActionMenuItem } from '@/components/action-menu'
 import { cn } from '@/lib/utils'
 import { isMac } from '@/lib/platform'
 import { CommandPanel } from './panels/panel-shell'
-import { useSettings } from '@/features/settings/settings-store'
+import { isTrusted, TRUST_KEYS, useSettings, type Settings } from '@/features/settings/settings-store'
 import { useWorkspace } from '@/features/workspace/workspace-store'
 import { AttachmentChip, folderFrom, pathFor, readDrop } from './attachments'
 import { useChatContext } from './chat-context'
@@ -23,7 +24,7 @@ import { toDataUrl } from './image-utils'
 import { MentionMenu } from './mention-menu'
 import { CopyButton, IconAction } from './message-actions'
 import { ATTACH_ONLY, Markdown } from './message-parts'
-import { modelName } from './models'
+import { isModelScope, modelName } from './models'
 import { useModelChoices } from './use-model-choices'
 import { SlashMenu } from './slash-menu'
 import {
@@ -317,7 +318,9 @@ export function AiAssistant(): React.JSX.Element {
     model,
     setModel,
     autoAccept,
-    setAutoAccept
+    setAutoAccept,
+    question,
+    answerQuestion
   } = useChatContext()
   const { choices: modelChoices, choose: chooseModel } = useModelChoices(setModel)
   const [input, setInput] = useState('')
@@ -362,7 +365,7 @@ export function AiAssistant(): React.JSX.Element {
     addAttachments: (items: Attachment[]) => void
   } | null>(null)
 
-  const { settings, openSettings } = useSettings()
+  const { settings, set: setSettings, openSettings } = useSettings()
   const ws = useWorkspace()
   const group = ws.groups.find((g) => g.id === ws.active.projectId)
   const folder = group?.name ?? ''
@@ -756,6 +759,54 @@ export function AiAssistant(): React.JSX.Element {
     setQueue((l) => l.map((x) => (x.id === id ? { ...x, raw, q: r.q, shown: r.shown } : x)))
   }
 
+  const setRule = (key: keyof Settings['rules'], on: boolean): void =>
+    setSettings({ rules: { ...settings.rules, [key]: on ? 'allow' : 'ask' } })
+  const trusted = isTrusted(settings)
+  const permissionItems: ActionMenuItem[] = (() => {
+    const row = (id: string, icon: React.ReactNode, label: string, on: boolean, flip: (on: boolean) => void, separatorBefore = false): ActionMenuItem => ({
+      id,
+      icon,
+      label,
+      separatorBefore,
+      keepOpen: true,
+      right: (
+        <span className="pointer-events-none flex items-center">
+          <Toggle label={`${label} without asking`} checked={on} onChange={() => undefined} />
+        </span>
+      ),
+      onClick: () => flip(!on)
+    })
+    const r = settings.rules
+    return [
+      row('trust', <ShieldCheck className="h-3.5 w-3.5" />, 'Trust the AI', trusted, (on) =>
+        setSettings({
+          autoAccept: on,
+          rules: TRUST_KEYS.reduce((acc, k) => ({ ...acc, [k]: on ? 'allow' : 'ask' }), { ...r })
+        })
+      ),
+      row('edits', <Pencil className="h-3.5 w-3.5" />, 'Edit files', autoAccept, (on) => setAutoAccept(on), true),
+      row('commands', <TerminalIcon className="h-3.5 w-3.5" />, 'Run commands', r.commands === 'allow', (on) => setRule('commands', on)),
+      row('install', <Package className="h-3.5 w-3.5" />, 'Install packages', r.install === 'allow', (on) => setRule('install', on)),
+      row('web', <SearchIcon className="h-3.5 w-3.5" />, 'Search the web', r.web === 'allow', (on) => setRule('web', on)),
+      row('browse', <Globe className="h-3.5 w-3.5" />, 'Browse sites', r.browse === 'allow', (on) => setRule('browse', on)),
+      row('git', <GitBranch className="h-3.5 w-3.5" />, 'Commit and push', r.git === 'allow', (on) => setRule('git', on)),
+      {
+        id: 'more',
+        icon: <MoreHorizontal className="h-3.5 w-3.5" />,
+        label: 'All permission settings',
+        separatorBefore: true,
+        onClick: () => openSettings('permissions')
+      }
+    ]
+  })()
+  const permLevel = (() => {
+    if (trusted) return { label: 'Trusted', tone: true }
+    // web searching starts switched on, so it does not count as the person loosening things
+    const n = [autoAccept, ...TRUST_KEYS.filter((k) => k !== 'web').map((k) => settings.rules[k] === 'allow')].filter(Boolean).length
+    if (n === 0) return { label: 'Ask first', tone: false }
+    if (n === 1 && autoAccept) return { label: 'Auto-accept edits', tone: true }
+    return { label: `${n} automatic`, tone: true }
+  })()
   const revealLabel = isMac ? 'Reveal in Finder' : 'Show in file explorer'
   // a brand-new chat: heading, message box and suggestions sit together in the middle of the page
   const empty = messages.length === 0
@@ -907,14 +958,12 @@ export function AiAssistant(): React.JSX.Element {
             <MentionMenu files={mentionList} index={pickIndex} onHover={setPickIndex} onPick={pickMention} />
           )}
 
+          {question && <QuestionPanel key={question.id} request={question} onAnswer={(a) => answerQuestion(question.id, a)} />}
           {queue.length > 0 && (
             <QueueBar
               items={queue.map((x) => ({ id: x.id, raw: x.raw }))}
               running={running}
-              stackIndex={
-                (totals.files > 0 ? 1 : 0) +
-                (bgJobs.length > 0 || activeHelpers.length > 0 ? 1 : 0)
-              }
+              stackIndex={(totals.files > 0 ? 1 : 0) + (bgJobs.length > 0 || activeHelpers.length > 0 ? 1 : 0)}
               onSendNow={sendQueuedNow}
               onEdit={editQueued}
               onDelete={(id) => setQueue((l) => l.filter((x) => x.id !== id))}
@@ -1094,6 +1143,67 @@ export function AiAssistant(): React.JSX.Element {
                     }
                   },
                   {
+                    id: 'skills',
+                    icon: React.createElement(skillIcon(), { className: 'h-3.5 w-3.5' }),
+                    label: 'Skills',
+                    submenu: [
+                      ...skills.all
+                        .filter((sk) => skills.isInstalled(sk.id))
+                        .slice(0, 8)
+                        .map((sk) => ({
+                          id: `skill-${sk.id}`,
+                          icon: React.createElement(skillIcon(sk.icon), { className: 'h-3.5 w-3.5' }),
+                          label: sk.name,
+                          keepOpen: true,
+                          right: (
+                            <span className="pointer-events-none flex items-center">
+                              <Toggle
+                                label={`${sk.name} on or off`}
+                                checked={skills.isEnabled(sk.id)}
+                                onChange={() => undefined}
+                              />
+                            </span>
+                          ),
+                          onClick: () => skills.setEnabled(sk.id, !skills.isEnabled(sk.id))
+                        })),
+                      {
+                        id: 'create-skill',
+                        icon: <Sparkles className="h-3.5 w-3.5" />,
+                        label: 'Create a skill',
+                        separatorBefore: skills.all.some((sk) => skills.isInstalled(sk.id)),
+                        onClick: () => {
+                          setInput('Create a skill that ')
+                          nextCaret.current = 'Create a skill that '.length
+                          setTimeout(() => field.current?.focus(), 0)
+                        }
+                      },
+                      {
+                        id: 'browse-skills',
+                        icon: <Grid2x2 className="h-3.5 w-3.5" />,
+                        label: 'Browse skills',
+                        onClick: () => {
+                          window.dispatchEvent(
+                            new CustomEvent('app:open-customize', {
+                              detail: { tab: 'skills', sub: 'discover' }
+                            })
+                          )
+                        }
+                      },
+                      {
+                        id: 'manage-skills',
+                        icon: <MoreHorizontal className="h-3.5 w-3.5" />,
+                        label: 'Manage skills',
+                        onClick: () => {
+                          window.dispatchEvent(
+                            new CustomEvent('app:open-customize', {
+                              detail: { tab: 'skills', sub: 'yours' }
+                            })
+                          )
+                        }
+                      }
+                    ]
+                  },
+                  {
                     id: 'connectors',
                     icon: <Grid2x2 className="h-3.5 w-3.5" />,
                     label: 'Connectors',
@@ -1180,16 +1290,24 @@ export function AiAssistant(): React.JSX.Element {
 
           <div className="flex select-none items-center justify-between px-1.5 pt-1.5 pb-0.5 text-xs text-muted-foreground">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setAutoAccept((v) => !v)}
-                className={cn(
-                  'cursor-pointer transition-colors hover:text-foreground text-[11.5px]',
-                  autoAccept && 'text-[#d6d6d3]'
-                )}
-              >
-                Auto-accept edits {autoAccept ? 'on' : 'off'}
-              </button>
+              <ActionMenu
+                side="top"
+                align="start"
+                items={permissionItems}
+                trigger={
+                  <button
+                    type="button"
+                    aria-label="What the AI may do without asking"
+                    className={cn(
+                      'flex cursor-pointer items-center gap-1.5 text-[11.5px] transition-colors hover:text-foreground',
+                      permLevel.tone && 'text-[#d6d6d3]'
+                    )}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5 stroke-[1.8]" />
+                    {permLevel.label}
+                  </button>
+                }
+              />
               <ActionMenu
                 side="top"
                 align="start"
@@ -1250,13 +1368,42 @@ export function AiAssistant(): React.JSX.Element {
               align="end"
               compact
               contentClassName="w-[min(280px,calc(100vw-32px))] min-w-0"
-              items={modelChoices.map((c) => ({
-                id: c.model.id,
-                label: c.model.name,
-                description: c.locked ? `${c.model.description} · Upgrade to use` : c.model.description,
-                checked: c.model.id === model,
-                onClick: () => chooseModel(c)
-              }))}
+              items={[
+                ...modelChoices
+                  .filter((c) => c.model.source !== 'modelscope')
+                  .map((c) => ({
+                    id: c.model.id,
+                    label: c.model.name,
+                    description: c.locked ? `${c.model.description} · Upgrade to use` : c.model.description,
+                    checked: c.model.id === model,
+                    onClick: () => chooseModel(c)
+                  })),
+                {
+                  // expands like Connectors in the plus menu: the fixed ModelScope models, each with its details
+                  id: 'modelscope',
+                  label: 'ModelScope',
+                  description: isModelScope(model) ? modelName(model) : 'Free open models, with your key',
+                  submenu: [
+                    ...modelChoices
+                      .filter((c) => c.model.source === 'modelscope')
+                      .map((c) => ({
+                        id: c.model.id,
+                        label: c.model.name,
+                        description: c.needsSetup ? `${c.model.description} · Needs a key` : c.model.description,
+                        checked: c.model.id === model,
+                        onClick: () => {
+                          if (chooseModel(c) && c.needsSetup) openSettings('models')
+                        }
+                      })),
+                    {
+                      id: 'modelscope-key',
+                      label: settings.modelScopeKey ? 'ModelScope settings' : 'Add your ModelScope key',
+                      separatorBefore: true,
+                      onClick: () => openSettings('models')
+                    }
+                  ]
+                }
+              ]}
               trigger={
                 <button
                   type="button"

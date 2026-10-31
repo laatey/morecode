@@ -18,6 +18,7 @@ import { mockAgent } from './agent/mock-agent'
 import { makeRealRunner, type RealConfig } from './agent/real-agent'
 import { useConnectors } from '@/features/connectors/connectors-store'
 import { useSkills } from '@/features/skills/skills-store'
+import { useRoutines } from '@/features/routines/routines-store'
 import { getSkillBundle } from '@/features/skills/skills-data'
 import { toast } from 'sonner'
 import { routeFor } from './ai-route'
@@ -79,6 +80,7 @@ export function ChatProvider({
           set({ allowedCommands: [...settings.allowedCommands, command] })
         }
       },
+      allowAction: (action) => set({ rules: { ...settings.rules, [action]: 'allow' } }),
       notify: (title, body) => notify('permission', title, body)
     }
   })
@@ -109,6 +111,11 @@ export function ChatProvider({
       })),
     [activeSkills]
   )
+  const { routines } = useRoutines()
+  const routinesForRun = useCallback(
+    () => routines.map((r) => ({ title: r.title, cadence: r.cadence, time: r.time, enabled: r.enabled })),
+    [routines]
+  )
   const config = useMemo<RealConfig>(() => {
     const projectPath = groups.find((group) => group.id === active.projectId)?.folder
     return {
@@ -122,6 +129,7 @@ export function ChatProvider({
       style: account?.profile?.experience ?? 'some',
       connectors: connectorsForRun,
       skills: skillsForRun,
+      routines: routinesForRun,
       onUsage: (u) => {
         recordUsage(account?.id ?? 'guest', {
           model: u.model,
@@ -136,7 +144,7 @@ export function ChatProvider({
         if (route.kind === 'subscription') refreshAccount()
       }
     }
-  }, [route, account, active.id, active.projectId, groups, refreshAccount, connectorsForRun, skillsForRun])
+  }, [route, account, active.id, active.projectId, groups, refreshAccount, connectorsForRun, skillsForRun, routinesForRun])
   const runner = useMemo<AgentRunner>(
     () =>
       typeof window !== 'undefined' && window.api?.agent

@@ -1,5 +1,6 @@
 import type { AgentEvent, AgentRunner, ToolBlock } from '../types'
 import { AgentError } from './errors'
+import { fromModelScopeId, isModelScope } from '../models'
 
 type Api = Window['api']['agent']
 type Message = Parameters<Parameters<Api['onEvent']>[0]>[0]
@@ -24,6 +25,8 @@ export interface RealConfig {
   connectors?: () => NonNullable<Parameters<Window['api']['agent']['start']>[0]['connectors']>
   /** The skills switched on, with their bundle files, read when a request starts. */
   skills?: () => NonNullable<Parameters<Window['api']['agent']['start']>[0]['skills']>
+  /** The routines already scheduled, so the AI does not propose a repeat. */
+  routines?: () => NonNullable<Parameters<Window['api']['agent']['start']>[0]['routines']>
 }
 
 /**
@@ -55,6 +58,10 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
       if (m.runId !== runId) return
       if (m.kind === 'ask') {
         void req.askPermission({ ...m.req }).then((decision) => api.decide(runId, m.req.id, decision))
+      } else if (m.kind === 'question') {
+        // the questions appear above the message box; the answer goes straight back to the waiting AI
+        const asked = req.askQuestion ? req.askQuestion({ id: m.id, items: m.items }) : Promise.resolve(null)
+        void asked.then((answers) => api.answer(runId, m.id, answers))
       } else push(m)
     })
     const onAbort = (): void => {
@@ -68,7 +75,8 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
       const started = await api.start({
         runId,
         apiKey: cfg.apiKey,
-        model: req.model,
+        // ModelScope knows a model by its own name; the prefix is only how this app tells providers apart
+        model: isModelScope(req.model) ? fromModelScopeId(req.model) : req.model,
         baseUrl: cfg.baseUrl,
         projectPath: cfg.projectPath,
         chatId: cfg.chatId,
@@ -81,7 +89,8 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         noTools: req.noTools,
         style: cfg.style,
         connectors: cfg.connectors?.(),
-        skills: cfg.skills?.()
+        skills: cfg.skills?.(),
+        routines: cfg.routines?.()
       })
       if (!started) throw new AgentError('failed', 'Could not start the AI. Please try again.')
 

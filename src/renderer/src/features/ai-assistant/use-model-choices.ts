@@ -26,29 +26,29 @@ export function useModelChoices(setModel: (id: string) => void): {
   const { account, service, openPlanDialog } = useAuth()
   const { settings } = useSettings()
 
-  const choices = useMemo<ModelChoice[]>(
-    () =>
-      MODELS.map((model) => {
-        const route = routeFor({
-          model: model.id,
-          settings,
-          account,
-          hosted: service.hosted ?? null
-        })
-        return {
-          model,
-          locked: route.blocked !== null,
-          needsSetup: route.kind !== 'subscription' && route.missing !== null,
-          group:
-            model.source !== 'claude'
+  const choices = useMemo<ModelChoice[]>(() => {
+    return MODELS.map((model) => {
+      const route = routeFor({
+        model: model.id,
+        settings,
+        account,
+        hosted: service.hosted ?? null
+      })
+      return {
+        model,
+        locked: route.blocked !== null,
+        needsSetup: route.kind !== 'subscription' && route.missing !== null,
+        group:
+          model.source === 'modelscope'
+            ? 'ModelScope'
+            : model.source !== 'claude'
               ? 'Your own providers'
               : route.kind === 'own-key'
                 ? 'Your API key'
                 : 'Your plan'
-        }
-      }),
-    [settings, account, service.hosted]
-  )
+      }
+    })
+  }, [settings, account, service.hosted])
 
   const choose = useCallback(
     (choice: ModelChoice): boolean => {

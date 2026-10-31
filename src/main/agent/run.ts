@@ -2,11 +2,15 @@ import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import { ApiFailure, streamMessage, type ApiMessage, type ContentBlock } from './anthropic'
+import { slimBrowserResults } from './history'
+import { usesOpenAIFormat } from './openai-format'
+import { streamOpenAI } from './openai-compat'
 import { openRuntime, type McpRuntime } from '../mcp/manager'
 import type { McpConfig } from '../mcp/client'
 import { BROWSER_TOOL_DEFS } from './browser'
 import { DESIGN_POINTER, designSection } from './design'
 import { executeTool, projectTree, TOOL_DEFS, type Decision, type PermissionRequest, type SkillData } from './tools'
+import type { QuestionAnswer, QuestionItem } from '../../shared/question'
 
 export type SkillInput = SkillData
 
@@ -51,6 +55,8 @@ export interface RunInput {
   connectors?: McpConfig[]
   /** Skills the person switched on, so the AI knows their names/descriptions and can read their files with read_skill. */
   skills?: SkillInput[]
+  /** The person's routines, so the AI can tell them what is already scheduled and not repeat it. */
+  routines?: { title: string; cadence: string; time: string; enabled: boolean }[]
   runId: string
   /** Extra headers for the MoreCode server (never sent to anyone else). */
   headers?: Record<string, string>
@@ -59,6 +65,8 @@ export interface RunInput {
 export interface RunIo {
   emit: (e: OutEvent) => void
   ask: (req: PermissionRequest) => Promise<Decision>
+  /** Put questions on screen and wait for the answers (null when the person skips). */
+  askQuestion?: (id: string, items: QuestionItem[]) => Promise<QuestionAnswer[] | null>
   signal: AbortSignal
   fetchImpl?: typeof fetch
 }
@@ -107,6 +115,10 @@ How to work:
 - Servers and watchers never finish, so start them with run_command and run_in_background: true. Then carry on, and use command_output (with wait_seconds, or until set to text like "ready" or "Local:") to see when it is up and to read errors. If a normal command is still running when its timeout ends it is not stopped: it becomes a background job, so use command_output to wait for the rest instead of running it again. Stop servers you started with stop_command when you are done with them.
 - To look at or test a web page (such as the dev server you started), use the browser_* tools (browser_navigate, browser_snapshot, browser_screenshot, browser_click, browser_type, browser_select, browser_press, browser_scroll, browser_wait_for, browser_back, browser_tabs). They drive the person's Browser tab; if it is not open the tools open it for you, so just call browser_navigate directly and never ask the person to open the tab first (only ask if a tool explicitly fails to open it). Refs like e12 change on every snapshot, so always use the newest one. Use browser_screenshot when how something looks matters (layout, colours, spacing), not just what it says.
 ${DESIGN_POINTER}
+- web_search finds things on the internet and web_fetch reads one page. Use them for anything that may have changed or that you are unsure of (library versions, API details, error messages, documentation), not for things in the project. Search, then fetch the best result before relying on it, and say which page you used.
+- When a choice changes what you build and you cannot sensibly decide or look it up yourself, call ask_user with 1 to 3 short questions (2 to 4 options each, your recommendation first, ending in “(Recommended)”) instead of guessing or writing questions in your reply. Do not ask what you can decide, and do not ask for permission to run commands; that is handled for you.
+- For git use git_status, git_diff and git_log to look, and git_commit, git_branch, git_push and git_pull_request only when the person asked or it is plainly part of the task (they ask first). Check git_status before committing, write imperative messages under 72 characters, and never use run_command for a git action that has its own tool.
+- If the person wants something done again on a schedule, call draft_routine; it only proposes, they press Save. Say plainly that it is not scheduled until they do.
 - Only a tool call changes anything. Never type tool activity as text (for example "[Edited file]"), and never say you created or changed something unless a tool result confirmed it.
 - Use paths relative to the project root (src/main.js), with no leading slash.
 - Keep todo_write up to date: mark each task completed as soon as it is done, so the list is true if the person says "continue".
@@ -146,7 +158,8 @@ async function streamWithRetry(
   let spoke = false
   for (let attempt = 0; ; attempt++) {
     try {
-      return await streamMessage(args, {
+      const stream = usesOpenAIFormat(args.baseUrl) ? streamOpenAI : streamMessage
+      return await stream(args, {
         text: (delta) => {
           spoke = true
           io.emit({ type: 'text', delta })
@@ -205,9 +218,14 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
           })
           .join('\n')}\nIf a skill is relevant to the person's task, call read_skill with its id (and an optional file path from its files list, such as "skills/analyze/SKILL.md") to read its instructions before proceeding.`
       : ''
+  const routinesSection =
+    !input.noTools && input.routines?.length
+      ? `\n\nThe person's routines already scheduled:\n${input.routines.slice(0, 30).map((r) => `- ${r.title} (${r.cadence}${r.cadence === 'hourly' ? '' : ` at ${r.time}`}${r.enabled ? '' : ', paused'})`).join('\n')}\nDo not draft a routine that repeats one of these.`
+      : ''
   const system =
     buildSystem(input.cwd, input.style, hasProject, input.progress ?? '') +
     skillsSection +
+    routinesSection +
     designSection({ prompt: input.prompt, images: input.images, history: input.history }) +
     (mcp ? `\n\nConnected connectors: ${mcp.names.join(', ')}. Their tools start with mcp__. Use them when the task needs that service's data or actions, and say which one you used. When a connector tool saves a file (such as a screenshot), pass a path inside the working folder (${input.cwd}) unless the person asked for another place.` : '')
   const baseTools = activeSkills.length > 0 ? TOOL_DEFS : TOOL_DEFS.filter((t) => t.name !== 'read_skill')
@@ -288,6 +306,7 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
     runId: input.runId,
     emit: (tool: Record<string, unknown>) => io.emit({ type: 'tool', tool }),
     ask: io.ask,
+    askQuestion: io.askQuestion,
     delegate,
     mcp,
     skills: activeSkills,
@@ -303,7 +322,7 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
         baseUrl: input.baseUrl,
         model: input.model,
         system,
-        messages,
+        messages: slimBrowserResults(messages),
         tools,
         signal: io.signal,
         headers: input.headers,

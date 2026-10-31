@@ -12,8 +12,11 @@ import type {
   ErrorKind,
   Msg,
   Part,
+  PermissionAction,
   PermissionRequest,
   PermissionState,
+  QuestionAnswer,
+  QuestionRequest,
   ToolBlock
 } from './types'
 
@@ -205,11 +208,19 @@ const mapTool = (all: Msg[], id: string, fn: (t: ToolBlock) => ToolBlock): Msg[]
         }
   )
 
+/** The setting that governs each kind of action. */
+export const ruleKey = (action: PermissionAction): keyof Settings['rules'] => (action === 'command' ? 'commands' : action)
+
+/** Kinds of action where "Always allow" means "stop asking about this kind", not "allow this exact text". */
+const WHOLE_KIND: PermissionAction[] = ['browse', 'web', 'git']
+
 /** What the person's settings say about risky actions, read fresh whenever the agent asks. */
 export interface Policy {
   rules: Settings['rules']
   allowed: string[]
   remember: (command: string) => void
+  /** "Always allow" for a whole kind of action (browsing, searching, git): switches its rule to allow. */
+  allowAction: (action: keyof Settings['rules']) => void
   notify: (title: string, body?: string) => void
 }
 
@@ -238,7 +249,11 @@ export function useChat(
   totals: ChatTotals
   reviewOne: (toolId: string, to: 'accepted' | 'discarded') => void
   approvePlan: (toolId: string) => void
+  markRoutine: (toolId: string, savedId: string | undefined) => void
   decide: (toolId: string, decision: Decision) => void
+  /** Questions the AI is waiting on, shown above the message box. */
+  question: QuestionRequest | null
+  answerQuestion: (id: string, answers: QuestionAnswer[] | null) => void
   send: (
     prompt: string,
     images: string[],
@@ -264,6 +279,8 @@ export function useChat(
   const [messages, setMessages] = useState<Msg[]>(initial)
   const [owner, setOwner] = useState(initialOwner)
   const [running, setRunning] = useState(false)
+  const [question, setQuestion] = useState<QuestionRequest | null>(null)
+  const questionWaiting = useRef<{ id: string; resolve: (a: QuestionAnswer[] | null) => void } | null>(null)
   const controller = useRef<AbortController | null>(null)
   const latest = useRef<Msg[]>(initial)
   const waiting = useRef(new Map<string, (d: Decision) => void>())
@@ -318,7 +335,7 @@ export function useChat(
 
       const askPermission = (req: PermissionRequest): Promise<Decision> => {
         const policy = getPolicy?.()
-        const rule = policy?.rules[req.action === 'command' ? 'commands' : req.action] ?? 'ask'
+        const rule = policy?.rules[ruleKey(req.action)] ?? 'ask'
         const show = (state: PermissionState): void =>
           patch((m) => applyEvent(m, { type: 'tool', tool: { kind: 'permission', state, ...req } }, autoAccept))
         if (rule === 'block') {
@@ -341,6 +358,22 @@ export function useChat(
         })
       }
 
+      const askQuestion = (req: QuestionRequest): Promise<QuestionAnswer[] | null> =>
+        new Promise((resolve) => {
+          questionWaiting.current = { id: req.id, resolve }
+          setQuestion(req)
+          getPolicy?.().notify('MoreCode has a question', req.items[0]?.question)
+          ctl.signal.addEventListener(
+            'abort',
+            () => {
+              if (questionWaiting.current?.id === req.id) questionWaiting.current = null
+              setQuestion((q) => (q?.id === req.id ? null : q))
+              resolve(null)
+            },
+            { once: true }
+          )
+        })
+
       void (async () => {
         let failed = false
         try {
@@ -352,7 +385,8 @@ export function useChat(
             history: toHistory(base),
             progress: progressOf(base),
             signal: ctl.signal,
-            askPermission
+            askPermission,
+            askQuestion
           })) {
             if (e.type === 'tool' && e.tool.kind === 'edit' && e.tool.status === 'done') onEdit?.(e.tool)
             patch((m) => applyEvent(m, e, autoAccept))
@@ -383,6 +417,9 @@ export function useChat(
               if (t.kind === 'permission' && t.state === 'pending') {
                 return { type: 'tool', tool: { ...t, state: 'denied' } }
               }
+              if (t.kind === 'question' && t.state === 'pending') {
+                return { type: 'tool', tool: { ...t, state: 'skipped' } }
+              }
               if ('status' in t && t.status === 'running') {
                 return { type: 'tool', tool: { ...t, status: stopped || failed ? 'error' : 'done' } as ToolBlock }
               }
@@ -390,6 +427,8 @@ export function useChat(
             })
           }))
           controller.current = null
+          questionWaiting.current = null
+          setQuestion(null)
           setRunning(false)
         }
       })()
@@ -547,6 +586,11 @@ export function useChat(
   const acceptAll = useCallback(() => review('accepted'), [review])
   const discardAll = useCallback(() => review('discarded'), [review])
 
+  /** Remember which saved routine a draft in the chat became (or clear it after an undo). */
+  const markRoutine = useCallback((toolId: string, savedId: string | undefined) => {
+    setMessages((all) => mapTool(all, toolId, (t) => (t.kind === 'routine-draft' ? { ...t, savedId } : t)))
+  }, [])
+
   const approvePlan = useCallback((toolId: string) => {
     setMessages((all) => mapTool(all, toolId, (t) => (t.kind === 'plan' ? { ...t, state: 'approved' } : t)))
   }, [])
@@ -563,7 +607,8 @@ export function useChat(
           if (m.role !== 'agent') continue
           for (const p of m.parts) {
             if (p.type === 'tool' && p.tool.id === toolId && p.tool.kind === 'permission') {
-              getPolicy?.().remember(p.tool.command)
+              if (WHOLE_KIND.includes(p.tool.action)) getPolicy?.().allowAction(ruleKey(p.tool.action))
+              else getPolicy?.().remember(p.tool.command)
             }
           }
         }
@@ -573,6 +618,15 @@ export function useChat(
     },
     [getPolicy]
   )
+
+  /** The person answered (or skipped, with null) the question above the message box. */
+  const answerQuestion = useCallback((id: string, answers: QuestionAnswer[] | null) => {
+    const w = questionWaiting.current
+    if (!w || w.id !== id) return
+    questionWaiting.current = null
+    setQuestion(null)
+    w.resolve(answers)
+  }, [])
 
   const rate = useCallback((agentId: string, value: 'up' | 'down') => {
     setMessages((all) =>
@@ -616,7 +670,10 @@ export function useChat(
     totals,
     reviewOne,
     approvePlan,
+    markRoutine,
     decide,
+    question,
+    answerQuestion,
     send,
     retry,
     edit,

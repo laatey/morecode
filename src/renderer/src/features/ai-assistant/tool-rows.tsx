@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { toast } from 'sonner'
 import { SkillDraftReview } from '@/features/skills/skill-draft-review'
-import { Check, ChevronRight, Circle, CircleDot, ClipboardList, X } from '@/components/icons'
+import { Check, Circle, CircleDot, ClipboardList } from '@/components/icons'
 import { DiffView } from '@/components/diff-view'
 import { Tip } from '@/components/tooltip'
 import { Button } from '@/components/ui/button'
@@ -12,60 +12,12 @@ import { useRightPanel } from '@/features/right-panel/store'
 import { useChatContext } from './chat-context'
 import { PermissionCard } from './permission-card'
 import { ThinkingBlock } from './thinking-block'
-import type { TodoItem, ToolBlock, ToolStatus } from './types'
-
-function Spinner(): React.JSX.Element {
-  return (
-    <span className="h-3 w-3 shrink-0 animate-spin rounded-full border border-dashed border-muted-foreground" />
-  )
-}
-
-function Stats({ added, removed }: { added: number; removed: number }): React.JSX.Element {
-  return (
-    <span className="text-[12px] tabular-nums">
-      {added > 0 && <span className="text-[var(--diff-add)]">+{added}</span>}
-      {added > 0 && removed > 0 && ' '}
-      {removed > 0 && <span className="text-[var(--diff-del)]">-{removed}</span>}
-    </span>
-  )
-}
-
-function Row({
-  expandable,
-  open,
-  onToggle,
-  status,
-  children
-}: {
-  expandable: boolean
-  open: boolean
-  onToggle: () => void
-  status?: ToolStatus
-  children: React.ReactNode
-}): React.JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={expandable ? onToggle : undefined}
-      className={cn(
-        'group flex min-h-6 min-w-0 w-full items-center gap-2 rounded-[4px] px-1 py-0.5 text-left text-[12.5px] text-[#c9c9c6] [overflow-wrap:normal]',
-        expandable ? 'cursor-pointer hover:bg-white/[0.04]' : 'cursor-default'
-      )}
-    >
-      {status === 'running' && <Spinner />}
-      {status === 'error' && <X className="h-3 w-3 shrink-0 text-[var(--diff-del)]" />}
-      {children}
-      {expandable && (
-        <ChevronRight
-          className={cn(
-            'h-3 w-3 shrink-0 text-muted-foreground/60 transition-transform',
-            open && 'rotate-90'
-          )}
-        />
-      )}
-    </button>
-  )
-}
+import { Row, Spinner, Stats } from './row-parts'
+import { GitRow } from './git-row'
+import { WebRow } from './web-row'
+import { QuestionRow } from './question-row'
+import { RoutineDraftCard } from './routine-draft-card'
+import type { TodoItem, ToolBlock } from './types'
 
 const todoIcon: Record<TodoItem['status'], React.ReactNode> = {
   done: <Check className="h-3 w-3 text-[var(--diff-add)]" />,
@@ -164,7 +116,7 @@ function McpAuthCard({
   }
 
   return (
-    <div className="my-2 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] p-3 text-[12.5px]">
+    <div className="my-1.5 rounded-[10px] border border-white/[0.08] p-3 text-[12.5px]">
       <div className="flex items-start gap-2.5">
         <ConnectorLogo
           id={c?.catalogId ?? connectorId}
@@ -176,11 +128,18 @@ function McpAuthCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-medium text-[#ededeb]">{connectorName}</span>
-            <span className="rounded-[4px] bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300">
+            <span
+              className={cn(
+                'rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium',
+                reconnected
+                  ? 'bg-[var(--diff-add)]/15 text-[var(--diff-add)]'
+                  : 'bg-white/[0.06] text-muted-foreground'
+              )}
+            >
               {reconnected ? 'Connected' : 'Sign-in expired'}
             </span>
           </div>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#b4b4b0]">
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
             {reconnected
               ? `Reconnected to ${connectorName}. You can continue chatting or ask the AI to try again.`
               : `Your sign-in for ${connectorName} expired or was rejected. Reconnect to allow the AI to use its tools.`}
@@ -205,11 +164,10 @@ function McpAuthCard({
           </Button>
           {!reconnected && (
             <Button
-              variant="secondary"
               size="xs"
               disabled={signingIn}
               onClick={handleSignIn}
-              className="gap-1.5 border-amber-500/30 text-amber-200 hover:bg-amber-500/15"
+              className="gap-1.5"
             >
               {signingIn ? (
                 <>
@@ -224,7 +182,7 @@ function McpAuthCard({
         </div>
       </div>
       {showError && error && (
-        <pre className="slim-scroll mt-2 max-h-[140px] overflow-auto whitespace-pre-wrap break-words rounded bg-black/40 p-2 font-mono text-[11px] leading-4 text-amber-200/80">
+        <pre className="slim-scroll mt-2 max-h-[140px] overflow-auto whitespace-pre-wrap break-words rounded-[6px] border border-white/[0.08] bg-black/30 p-2 font-mono text-[11px] leading-4 text-[#cfcfcc]">
           {error}
         </pre>
       )}
@@ -293,6 +251,10 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
   if (tool.kind === 'permission') return <PermissionCard tool={tool} />
   if (tool.kind === 'mcp') return <McpRow tool={tool} />
   if (tool.kind === 'skill-draft') return <SkillDraftReview draft={tool.draft} />
+  if (tool.kind === 'routine-draft') return <RoutineDraftCard tool={tool} />
+  if (tool.kind === 'git') return <GitRow tool={tool} />
+  if (tool.kind === 'web') return <WebRow tool={tool} />
+  if (tool.kind === 'question') return <QuestionRow tool={tool} />
 
   if (tool.kind === 'read') {
     const names = tool.paths.map((p) => p.split('/').pop() ?? p)

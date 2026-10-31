@@ -486,6 +486,7 @@ function DetailView({ id, onBack }: { id: string; onBack: () => void }): React.J
 export function CustomizePage(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>(() => pick(TAB_KEY, ['skills', 'connectors'], 'connectors'))
   const [view, setView] = useState<View>({ name: 'list' })
+  const [skillsTab, setSkillsTab] = useState<'mine' | 'discover'>('mine')
   const change = (t: Tab): void => {
     setTab(t)
     keep(TAB_KEY, t)
@@ -500,7 +501,8 @@ export function CustomizePage(): React.JSX.Element {
       if (typeof detail === 'string') {
         change((detail === 'connectors' ? 'connectors' : 'skills') as Tab)
       } else if (detail && typeof detail === 'object') {
-        if (detail.sub) keep(SUB_KEY, detail.sub)
+        if (detail.tab === 'skills') setSkillsTab(detail.sub === 'discover' ? 'discover' : 'mine')
+        else if (detail.sub) keep(SUB_KEY, detail.sub)
         change(detail.tab ?? 'connectors')
         if (detail.view === 'connect') setView({ name: 'connect' })
       }
@@ -521,7 +523,7 @@ export function CustomizePage(): React.JSX.Element {
         <Tabs value={tab} onChange={change} options={[{ value: 'skills', label: 'Skills' }, { value: 'connectors', label: 'Connectors' }]} />
         {tab === 'skills' ? (
           <div className="pt-4">
-            <SkillsPanel initialTab="mine" onClose={() => undefined} embedded />
+            <SkillsPanel key={skillsTab} initialTab={skillsTab} onClose={() => undefined} embedded />
           </div>
         ) : (
           <ConnectorsTab view={view} setView={setView} />

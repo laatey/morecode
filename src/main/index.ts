@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, Menu } from 'electron'
+import { app, shell, BrowserWindow, Menu, powerMonitor } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { buildAppMenu, registerMenuIpc } from './menu'
@@ -64,6 +64,25 @@ function createWindow(): void {
   attachBackground(mainWindow)
   trackWindowState(mainWindow)
 
+  // If the page process dies (memory, GPU reset after sleep) the window would stay blank for good. Reload it,
+  // but give up after 3 tries in a minute so a page that crashes on load cannot loop forever.
+  const reloads: number[] = []
+  const recover = (why: string): void => {
+    if (mainWindow.isDestroyed()) return
+    const now = Date.now()
+    while (reloads.length && now - reloads[0] > 60_000) reloads.shift()
+    if (reloads.length >= 3) return
+    reloads.push(now)
+    console.error(`MoreCode window reloaded: ${why}`)
+    mainWindow.webContents.reload()
+  }
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    if (details.reason !== 'clean-exit') recover(`page process ${details.reason}`)
+  })
+  mainWindow.webContents.on('did-fail-load', (_e, code, description, _url, isMainFrame) => {
+    if (isMainFrame && code !== -3) recover(`load failed: ${description}`) // -3 is a load the app itself cancelled
+  })
+
   // Only hand http(s) links to the OS; deny everything else.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
@@ -83,6 +102,9 @@ function createWindow(): void {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+// Windows can stop painting a window that sat covered or idle for a while (Chromium's occlusion tracking); this keeps it painting
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 
 // the AI's browser control connects to the Browser tab through a local-only debugging port (set before the app is ready)
 enableBrowserDebugging()
@@ -141,6 +163,11 @@ app.whenReady().then(() => {
   registerMenuIpc(menu)
 
   createWindow()
+
+  // after sleep or a locked screen, ask every window to paint again
+  const repaint = (): void => BrowserWindow.getAllWindows().forEach((w) => !w.isDestroyed() && w.webContents.invalidate())
+  powerMonitor.on('resume', repaint)
+  powerMonitor.on('unlock-screen', repaint)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

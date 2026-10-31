@@ -4,6 +4,8 @@ interface Props {
   /** Changing this clears a caught error (for example, switching to another tab). */
   resetKey?: string
   label?: string
+  /** The whole app: the button reloads the window, since there is nothing smaller to reset. */
+  reload?: boolean
   children: React.ReactNode
 }
 
@@ -29,14 +31,14 @@ export class ErrorBoundary extends React.Component<Props, { failed: boolean }> {
   render(): React.ReactNode {
     if (!this.state.failed) return this.props.children
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+      <div className={`flex ${this.props.reload ? 'h-screen' : 'h-full'} flex-col items-center justify-center gap-2 p-6 text-center`}>
         <p className="text-[13px] text-[#ececea]">{this.props.label ?? 'This panel'} ran into a problem.</p>
         <button
           type="button"
-          onClick={() => this.setState({ failed: false })}
+          onClick={() => (this.props.reload ? window.location.reload() : this.setState({ failed: false }))}
           className="cursor-pointer rounded-[10px] border border-[#3b82f6]/60 bg-[#1d4ed8] px-3 py-1 text-[12px] text-white shadow-sm hover:bg-[#2563eb]"
         >
-          Try again
+          {this.props.reload ? 'Reload' : 'Try again'}
         </button>
       </div>
     )

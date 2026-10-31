@@ -78,6 +78,21 @@ export interface AgentStart {
   headers?: Record<string, string>
   connectors?: McpConfig[]
   skills?: SkillInput[]
+  routines?: { title: string; cadence: string; time: string; enabled: boolean }[]
+}
+export interface QuestionOption {
+  label: string
+  description?: string
+}
+export interface QuestionItem {
+  header?: string
+  question: string
+  options: QuestionOption[]
+  multi?: boolean
+}
+export interface QuestionAnswer {
+  question: string
+  answer: string
 }
 export interface McpConfig {
   id: string
@@ -136,7 +151,7 @@ export type AgentMessage = { runId: string } & (
       kind: 'ask'
       req: {
         id: string
-        action: 'command' | 'install' | 'remove' | 'network'
+        action: 'command' | 'install' | 'remove' | 'network' | 'browse' | 'web' | 'git'
         title: string
         command: string
         reason?: string
@@ -148,6 +163,7 @@ export type AgentMessage = { runId: string } & (
         }
       }
     }
+  | { kind: 'question'; id: string; items: QuestionItem[] }
   | { kind: 'done' }
   | {
       kind: 'error'
@@ -179,6 +195,8 @@ const api = {
     abort: (runId: string): void => ipcRenderer.send('agent:abort', runId),
     decide: (runId: string, id: string, decision: 'once' | 'always' | 'deny'): void =>
       ipcRenderer.send('agent:permission', runId, id, decision),
+    answer: (runId: string, id: string, answers: QuestionAnswer[] | null): void =>
+      ipcRenderer.send('agent:answer', runId, id, answers),
     revert: (id: string): Promise<boolean> => ipcRenderer.invoke('agent:revert', id),
     keep: (id: string): void => ipcRenderer.send('agent:keep', id),
     jobs: (): Promise<BgJob[]> => ipcRenderer.invoke('agent:jobs'),
@@ -187,9 +205,10 @@ const api = {
     onJobs: (cb: (jobs: BgJob[]) => void): (() => void) => listen('agent:jobs', cb),
     testProvider: (
       check:
-        | { provider: 'anthropic' | 'openrouter'; key: string }
+        | { provider: 'anthropic' | 'openrouter' | 'modelscope'; key: string }
         | { provider: 'gateway'; key: string; endpoint: string }
-    ): Promise<{ ok: boolean; message?: string }> => ipcRenderer.invoke('agent:test-provider', check),
+    ): Promise<{ ok: boolean; message?: string; site?: 'cn' | 'ai' }> =>
+      ipcRenderer.invoke('agent:test-provider', check),
     onEvent: (cb: (m: AgentMessage) => void): (() => void) => listen('agent:event', cb)
   },
   browser: {

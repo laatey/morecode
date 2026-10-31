@@ -1,5 +1,10 @@
 import type { FileDiff } from '@/components/diff-view'
 import type { SkillDraft } from '../../../../shared/skill-draft'
+import type { RoutineDraft } from '../../../../shared/routine-draft'
+import type { GitView } from '../../../../shared/git-view'
+import type { QuestionAnswer, QuestionItem } from '../../../../shared/question'
+
+export type { QuestionAnswer, QuestionItem, GitView }
 
 export type Step = string | { text: string; icon?: string | null }
 
@@ -14,7 +19,7 @@ export interface Attachment {
   path?: string
 }
 
-export type PermissionAction = 'command' | 'install' | 'remove' | 'network'
+export type PermissionAction = 'command' | 'install' | 'remove' | 'network' | 'browse' | 'web' | 'git'
 export type PermissionState = 'pending' | 'allowed' | 'always' | 'denied' | 'blocked'
 export type Decision = 'once' | 'always' | 'deny'
 
@@ -37,6 +42,12 @@ export interface PermissionRequest {
   }
 }
 
+/** Questions the AI put to the person. The screen shows them above the message box while `state` is pending. */
+export interface QuestionRequest {
+  id: string
+  items: QuestionItem[]
+}
+
 export type ErrorKind = 'rate_limit' | 'offline' | 'failed' | 'interrupted'
 
 export interface TodoItem {
@@ -47,6 +58,32 @@ export interface TodoItem {
 /** One thing the agent did. Add a new `kind` here + a renderer in tool-rows.tsx. */
 export type ToolBlock =
   | { kind: 'skill-draft'; id: string; draft: SkillDraft; status: ToolStatus }
+  | { kind: 'routine-draft'; id: string; draft: RoutineDraft; status: ToolStatus; /** The saved routine this draft became. */ savedId?: string }
+  | {
+      /** A web search or a page the AI read. */
+      kind: 'web'
+      id: string
+      op: 'search' | 'fetch'
+      query?: string
+      url?: string
+      title?: string
+      results?: { title: string; url: string; snippet: string }[]
+      excerpt?: string
+      chars?: number
+      clipped?: boolean
+      status: ToolStatus
+      error?: string
+    }
+  | { kind: 'question'; id: string; items: QuestionItem[]; state: 'pending' | 'answered' | 'skipped'; answers?: QuestionAnswer[] }
+  | {
+      /** One git action: looking at status, a diff or the log, or committing, branching, pushing, opening a pull request. */
+      kind: 'git'
+      id: string
+      op: string
+      status: ToolStatus
+      view?: GitView
+      error?: string
+    }
   | {
       kind: 'edit'
       id: string
@@ -157,6 +194,8 @@ export interface AgentRequest {
   noTools?: boolean
   /** Ask the person before doing something risky. Resolves once they (or their settings) decide. */
   askPermission: (req: PermissionRequest) => Promise<Decision>
+  /** Put questions above the message box and wait. Resolves null when the person skips. */
+  askQuestion?: (req: QuestionRequest) => Promise<QuestionAnswer[] | null>
 }
 
 export type AgentRunner = (req: AgentRequest) => AsyncGenerator<AgentEvent>

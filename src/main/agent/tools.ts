@@ -8,6 +8,10 @@ import { runBrowserTool } from './browser'
 import { designGuide } from './design'
 import { validateSkillDraft } from '../../shared/skill-draft'
 import { dropJob, getJob, listJobs, markDetached, seconds, startJob, stopJob, takeNew, waitForJob, type Job } from './background'
+import { GIT_TOOL_DEFS, GIT_TOOLS, GIT_WRITES, gitCommandText, runGit, type GitToolName } from './git-tools'
+import { isLocalUrl, normalizeUrl, webFetch, webSearch } from './web'
+import { validateRoutineDraft } from '../../shared/routine-draft'
+import { SKIPPED_FOR_MODEL, answersForModel, validateQuestions, type QuestionAnswer, type QuestionItem } from '../../shared/question'
 
 /**
  * The things the AI is allowed to do. Reading is free anywhere on the computer; the file-edit
@@ -16,7 +20,7 @@ import { dropJob, getJob, listJobs, markDetached, seconds, startJob, stopJob, ta
  */
 
 export type Decision = 'once' | 'always' | 'deny'
-export type PermissionAction = 'command' | 'install' | 'remove' | 'network'
+export type PermissionAction = 'command' | 'install' | 'remove' | 'network' | 'browse' | 'web' | 'git'
 
 export interface PermissionRequest {
   id: string
@@ -54,6 +58,8 @@ export interface ToolContext {
   mcp?: McpRuntime | null
   /** Skills the person has switched on, so the AI can read their SKILL.md or bundle files on demand. */
   skills?: SkillData[]
+  /** Put questions to the person and wait. Resolves null when they skip. Not offered to helpers. */
+  askQuestion?: (id: string, items: QuestionItem[]) => Promise<QuestionAnswer[] | null>
 }
 
 export interface ToolResult {
@@ -165,7 +171,10 @@ const TITLE: Record<PermissionAction, string> = {
   command: 'Run a command',
   install: 'Install packages',
   remove: 'Delete files',
-  network: 'Use the internet'
+  network: 'Use the internet',
+  browse: 'Open a web page',
+  web: 'Search the web',
+  git: 'Use git'
 }
 
 /* ---------- the tools ---------- */
@@ -611,6 +620,92 @@ export function projectTree(cwd: string, limit = 80): string {
   return out.length ? out.join('\n') + (out.length >= limit ? '\n…' : '') : '(empty folder)'
 }
 
+/* ---------- the web ---------- */
+
+async function webSearchTool(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
+  const query = str(i.query, 'query').trim()
+  if (!query) throw new Error('The search needs some words.')
+  const d = await ctx.ask({ id: `perm-${id}`, action: 'web', title: TITLE.web, command: query, reason: 'The AI wants to look this up.' })
+  if (d === 'deny') {
+    ctx.emit({ kind: 'web', id, op: 'search', query, status: 'error', error: 'Not allowed.' })
+    return { content: 'The person did not allow web searches. Do not try another way; work from what you know and say so.', isError: true }
+  }
+  ctx.emit({ kind: 'web', id, op: 'search', query, status: 'running' })
+  try {
+    const max = Math.min(10, Math.max(1, Math.floor(Number(i.max_results) || 6)))
+    const hits = await webSearch(query, ctx.signal, fetch, max)
+    ctx.emit({ kind: 'web', id, op: 'search', query, status: 'done', results: hits })
+    if (!hits.length) return { content: `No results for “${query}”. Try different words.` }
+    return { content: hits.map((h, n) => `${n + 1}. ${h.title}\n   ${h.url}${h.snippet ? `\n   ${h.snippet}` : ''}`).join('\n') + '\n\nUse web_fetch on the most relevant address to read it.' }
+  } catch (err) {
+    const message = (err as Error).message
+    ctx.emit({ kind: 'web', id, op: 'search', query, status: 'error', error: message })
+    return { content: message, isError: true }
+  }
+}
+
+async function webFetchTool(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
+  const url = normalizeUrl(str(i.url, 'url'))
+  if (!isLocalUrl(url)) {
+    const d = await ctx.ask({ id: `perm-${id}`, action: 'web', title: 'Read a web page', command: url, reason: 'The AI wants to read this page.' })
+    if (d === 'deny') {
+      ctx.emit({ kind: 'web', id, op: 'fetch', url, status: 'error', error: 'Not allowed.' })
+      return { content: 'The person did not allow reading that page. Do not try another way; explain what you needed.', isError: true }
+    }
+  }
+  ctx.emit({ kind: 'web', id, op: 'fetch', url, status: 'running' })
+  try {
+    const page = await webFetch(url, ctx.signal, Number(i.max_chars) || 20_000)
+    ctx.emit({ kind: 'web', id, op: 'fetch', url: page.url, title: page.title, status: 'done', excerpt: page.text.slice(0, 700), chars: page.text.length, clipped: page.clipped })
+    const head = `${page.title ? `${page.title}\n` : ''}${page.url}\n\n`
+    return { content: `${head}${page.text || '(the page has no readable text)'}${page.clipped ? '\n\n[The page continues; ask for more with a larger max_chars or a more specific address.]' : ''}` }
+  } catch (err) {
+    const message = (err as Error).message
+    ctx.emit({ kind: 'web', id, op: 'fetch', url, status: 'error', error: message })
+    return { content: message, isError: true }
+  }
+}
+
+/* ---------- questions and routines ---------- */
+
+async function askUser(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
+  if (!ctx.askQuestion) throw new Error('Questions are not available here. Ask in plain text instead.')
+  const items = validateQuestions(i)
+  ctx.emit({ kind: 'question', id, items, state: 'pending' })
+  const answers = await ctx.askQuestion(id, items)
+  if (!answers) {
+    ctx.emit({ kind: 'question', id, items, state: 'skipped' })
+    return { content: SKIPPED_FOR_MODEL }
+  }
+  ctx.emit({ kind: 'question', id, items, state: 'answered', answers })
+  return { content: answersForModel(answers) }
+}
+
+/* ---------- git ---------- */
+
+async function gitTool(ctx: ToolContext, name: GitToolName, id: string, input: Input): Promise<ToolResult> {
+  const op = name.slice(4)
+  if (GIT_WRITES.has(name)) {
+    const { title, command } = gitCommandText(name, input)
+    const reason = typeof input.reason === 'string' ? input.reason : undefined
+    const d = await ctx.ask({ id: `perm-${id}`, action: 'git', title, command, reason })
+    if (d === 'deny') {
+      ctx.emit({ kind: 'git', id, op, status: 'error', error: 'Not allowed.' })
+      return { content: 'The person did not allow this git action. Do not try another way; explain what you needed and ask how to proceed.', isError: true }
+    }
+  }
+  ctx.emit({ kind: 'git', id, op, status: 'running' })
+  try {
+    const r = await runGit(name, ctx.cwd, input)
+    ctx.emit({ kind: 'git', id, op, status: 'done', view: r.view })
+    return { content: r.text }
+  } catch (err) {
+    const message = (err as Error).message
+    ctx.emit({ kind: 'git', id, op, status: 'error', error: message })
+    return { content: message, isError: true }
+  }
+}
+
 /* ---------- registry ---------- */
 
 export const TOOL_DEFS: ToolDef[] = [
@@ -764,6 +859,70 @@ export const TOOL_DEFS: ToolDef[] = [
     }
   },
   {
+    name: 'web_search',
+    description:
+      'Search the web. Use it for anything that may have changed or that you are not sure of: library versions and APIs, error messages, documentation, current facts. Do not use it for things that are in the project (use search and read_file). Returns titles, addresses and snippets; follow up with web_fetch on the best result before relying on it.',
+    input_schema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'A few specific words, like a search box.' }, max_results: { type: 'integer', description: 'Default 6, at most 10.' } },
+      required: ['query']
+    }
+  },
+  {
+    name: 'web_fetch',
+    description: 'Read one web page (or a JSON or text address) as plain text. Use an address from web_search, from the person, or from the project. Also works for the dev server at localhost. Long pages are cut; raise max_chars (at most 40000) only if you need more.',
+    input_schema: {
+      type: 'object',
+      properties: { url: { type: 'string' }, max_chars: { type: 'integer' } },
+      required: ['url']
+    }
+  },
+  {
+    name: 'ask_user',
+    description:
+      'Ask the person 1 to 3 short multiple-choice questions and wait for the answers. Use it when a choice changes what you build and you cannot sensibly decide or look it up yourself (a stack, a style, which of two approaches, what to name something). Keep it small: a question of at most 12 words, 2 to 4 options (3 is usual) with short labels, and a description only when the label alone is unclear (at most 6 words). Put the option you recommend first and end its label with “(Recommended)”. The person can always type their own answer instead. Do NOT use it for things you can decide, for yes/no confirmation of routine work, or to ask permission to run commands. Never write a list of questions in your reply when this tool fits.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        questions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              header: { type: 'string', description: 'One or two words naming the topic, for example “Stack”.' },
+              question: { type: 'string' },
+              options: {
+                type: 'array',
+                items: { type: 'object', properties: { label: { type: 'string' }, description: { type: 'string', description: 'Optional, at most 6 words.' } }, required: ['label'] }
+              },
+              multi_select: { type: 'boolean', description: 'Allow more than one answer.' }
+            },
+            required: ['question', 'options']
+          }
+        }
+      },
+      required: ['questions']
+    }
+  },
+  {
+    name: 'draft_routine',
+    description:
+      'When the person wants something to happen again on a schedule (“every morning check…”, “each Friday summarise…”), propose a routine. This only shows a draft in the chat; nothing is scheduled until the person presses Save. The prompt is what the AI is told each time it runs, so write it as a complete, self-contained instruction. Never claim it is saved.',
+    input_schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        title: { type: 'string', maxLength: 80 },
+        prompt: { type: 'string', maxLength: 4000, description: 'The full instruction for each run.' },
+        cadence: { type: 'string', enum: ['hourly', 'daily', 'weekly'] },
+        time: { type: 'string', description: '24-hour HH:MM, for example 09:00. Not needed for hourly.' },
+        weekday: { type: 'integer', description: 'Weekly only: 0 Sunday to 6 Saturday.' }
+      },
+      required: ['title', 'prompt', 'cadence']
+    }
+  },
+  ...GIT_TOOL_DEFS,
+  {
     name: 'design_guide',
     description:
       'Get the design rules for building or restyling UI so it looks crafted rather than generic, or the step-by-step process for copying a screenshot or mockup. Call it before visual work when the rules are not already in your instructions.',
@@ -829,6 +988,7 @@ export async function executeTool(name: string, id: string, input: Input, ctx: T
     }
     if (name.startsWith('mcp__')) return await callConnector(ctx, id, name, input)
     if (name.startsWith('browser_')) return await runBrowserTool(name, id, input, ctx)
+    if ((GIT_TOOLS as readonly string[]).includes(name)) return await gitTool(ctx, name as GitToolName, id, input)
     switch (name) {
       case 'list_dir':
         return listDir(ctx, id, input)
@@ -861,6 +1021,17 @@ export async function executeTool(name: string, id: string, input: Input, ctx: T
         if (ctx.skills?.some((skill) => skill.id === draft.id)) throw new Error('That enabled skill already exists. Choose a new skill id.')
         ctx.emit({ kind: 'skill-draft', id, draft, status: 'done' })
         return { content: `Drafted ${draft.name}. The draft is shown in chat for review. It is NOT saved or active; the user must choose Review skill, then Save skill.` }
+      }
+      case 'web_search':
+        return await webSearchTool(ctx, id, input)
+      case 'web_fetch':
+        return await webFetchTool(ctx, id, input)
+      case 'ask_user':
+        return await askUser(ctx, id, input)
+      case 'draft_routine': {
+        const draft = validateRoutineDraft(input)
+        ctx.emit({ kind: 'routine-draft', id, draft, status: 'done' })
+        return { content: `Drafted the routine “${draft.title}”. It is shown in the chat for review and is NOT scheduled; the person must press Save routine.` }
       }
       case 'design_guide':
         return { content: designGuide({ topic: typeof input.topic === 'string' ? input.topic : undefined }) }

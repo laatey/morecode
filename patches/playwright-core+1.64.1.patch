@@ -1,0 +1,13 @@
+diff --git a/node_modules/playwright-core/lib/coreBundle.js b/node_modules/playwright-core/lib/coreBundle.js
+index 6893f1c..37ddcd3 100644
+--- a/node_modules/playwright-core/lib/coreBundle.js
++++ b/node_modules/playwright-core/lib/coreBundle.js
+@@ -39856,7 +39856,7 @@ var init_crBrowser = __esm({
+         }
+         assert(!this._crPages.has(targetInfo.targetId), "Duplicate target " + targetInfo.targetId);
+         assert(!this._serviceWorkers.has(targetInfo.targetId), "Duplicate target " + targetInfo.targetId);
+-        if (targetInfo.type === "page" || treatOtherAsPage) {
++        if (targetInfo.type === "page" || targetInfo.type === "webview" || treatOtherAsPage) {
+           const opener = targetInfo.openerId ? this._crPages.get(targetInfo.openerId) || null : null;
+           const crPage = new CRPage(session, targetInfo.targetId, context, opener, { hasUIWindow: targetInfo.type === "page" });
+           this._crPages.set(targetInfo.targetId, crPage);

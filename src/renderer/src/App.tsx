@@ -1,3 +1,4 @@
+import { requestBlankPage } from '@/features/right-panel/tabs/browser-state'
 import React, { useEffect, useRef, useState } from 'react'
 import { CalendarClock, ChevronDown, Briefcase, CodeXml, FileText, MessagesCircle, Settings } from '@/components/icons'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable'
@@ -235,6 +236,14 @@ function AppShell(): React.JSX.Element {
     return () => window.removeEventListener('app:open-customize', open)
   }, [closeSettings])
   useEffect(() => {
+    const open = (): void => {
+      closeSettings()
+      setPage('routines')
+    }
+    window.addEventListener('app:open-routines', open)
+    return () => window.removeEventListener('app:open-routines', open)
+  }, [closeSettings])
+  useEffect(() => {
     try {
       localStorage.setItem('morecode:mode', mode)
     } catch {
@@ -296,6 +305,7 @@ function AppShell(): React.JSX.Element {
   useEffect(
     () =>
       window.api?.browser?.onOpen?.(() => {
+        requestBlankPage()
         if (!hasBrowserRef.current) openTab('browser')
       }),
     [openTab]

@@ -99,3 +99,15 @@ export function useBookmarks(): {
   )
   return { bookmarks, has, toggle, remove }
 }
+
+/** The AI needs a live webview: an empty Browser tab mounts none, so it is started on a blank page. */
+let wantBlank = false
+export const requestBlankPage = (): void => {
+  wantBlank = true
+  window.dispatchEvent(new Event('morecode:browser-blank'))
+}
+export const consumeBlankRequest = (): boolean => {
+  const v = wantBlank
+  wantBlank = false
+  return v
+}

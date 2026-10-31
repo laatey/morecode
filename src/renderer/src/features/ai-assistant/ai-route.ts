@@ -1,7 +1,7 @@
 import type { Account } from '@/features/auth/auth-service'
 import { planAllows } from '@/features/billing/plans'
 import type { Settings } from '@/features/settings/settings-store'
-import { sourceOf } from './models'
+import { fromModelScopeId, modelScopeBase, sourceOf } from './models'
 
 /**
  * How one message reaches an AI, decided in one place.
@@ -9,10 +9,10 @@ import { sourceOf } from './models'
  * Two kinds of people use the app and they must not be mixed up:
  *  - On the MoreCode subscription: the MoreCode server makes the request, under their plan. Messages are counted
  *    against the plan's daily limit and only the models the plan includes can be used.
- *  - Using their own provider (an Anthropic key, OpenRouter, their own gateway): the request goes straight to that
+ *  - Using their own provider (an Anthropic key, OpenRouter, ModelScope, their own gateway): the request goes straight to that
  *    provider with their key. MoreCode neither counts these messages nor limits them.
  */
-export type RouteKind = 'subscription' | 'own-key' | 'gateway' | 'openrouter'
+export type RouteKind = 'subscription' | 'own-key' | 'gateway' | 'openrouter' | 'modelscope'
 
 export interface AiRoute {
   kind: RouteKind
@@ -31,7 +31,7 @@ export interface AiRoute {
 
 export interface RouteInput {
   model: string
-  settings: Pick<Settings, 'morlineGatewayKey' | 'morlineGatewayUrl' | 'openRouterKey'>
+  settings: Pick<Settings, 'morlineGatewayKey' | 'morlineGatewayUrl' | 'openRouterKey' | 'modelScopeKey' | 'modelScopeSite'>
   account: Pick<Account, 'apiKey' | 'plan'> | null
   /** The MoreCode server, when this build is connected to one. */
   hosted: { url: string; token: () => string | null } | null
@@ -66,6 +66,21 @@ export function routeFor({ model, settings, account, hosted }: RouteInput): AiRo
       missing: settings.openRouterKey
         ? null
         : 'Add your OpenRouter key in Settings, under Models, to use this model.'
+    }
+  }
+
+  if (source === 'modelscope') {
+    return {
+      kind: 'modelscope',
+      apiKey: settings.modelScopeKey || null,
+      baseUrl: modelScopeBase(settings.modelScopeSite),
+      metered: false,
+      // ModelScope knows the model by its own name, without the prefix this app saves it under
+      model: fromModelScopeId(model),
+      blocked: null,
+      missing: settings.modelScopeKey
+        ? null
+        : 'Add your ModelScope key in Settings, under Models, to use this model.'
     }
   }
 

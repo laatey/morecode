@@ -57,6 +57,15 @@ const glow = (on: boolean): void => {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+/** Give the Browser tab's page the keyboard focus, so typed text goes there and not into the app's own message box. */
+const focusTab = (wc: WebContents): void => {
+  try {
+    if (!wc.isDestroyed()) wc.focus()
+  } catch {
+    // a tab that cannot take focus just keeps what it had
+  }
+}
+
 /** Find a live <webview> even if the Browser tab never registered itself (missed dom-ready, restored page, etc.). */
 function discoverTab(): WebContents | null {
   const live = webContents.getAllWebContents().filter((w) => !w.isDestroyed() && w.getType() === 'webview')
@@ -76,8 +85,15 @@ function discoverTab(): WebContents | null {
   return wc
 }
 
-/** The Browser tab's webview. If it is not open, asks the app to open it and waits for it. */
+/** The Browser tab's webview, with the glow switched on for it (the tab is only known for certain once it is found). */
 async function activeTab(): Promise<WebContents> {
+  const wc = await resolveTab()
+  glow(true)
+  return wc
+}
+
+/** The Browser tab's webview. If it is not open, asks the app to open it and waits for it. */
+async function resolveTab(): Promise<WebContents> {
   const find = (): WebContents | null => {
     const reg = activeId !== null ? tabs.get(activeId) : undefined
     if (reg && !reg.isDestroyed()) return reg
@@ -89,7 +105,7 @@ async function activeTab(): Promise<WebContents> {
   if (win && !win.isDestroyed()) {
     host = win
     win.send('browser:open')
-    for (let i = 0; i < 40 && !wc; i++) {
+    for (let i = 0; i < 60 && !wc; i++) {
       await sleep(150)
       wc = find()
     }
@@ -140,24 +156,48 @@ const targetOfContents = async (wc: WebContents): Promise<string | null> => {
   }
 }
 
-/** The Playwright page for the active Browser tab. */
+/** A blank tab is "about:blank" to one side and an empty string to the other. */
+const sameUrl = (a: string, b: string): boolean => {
+  const blank = (u: string): boolean => u === '' || u === 'about:blank'
+  return a === b || (blank(a) && blank(b))
+}
+
+/**
+ * The Playwright page for the active Browser tab. Playwright needs a patched copy to see <webview> tabs at all
+ * (patches/playwright-core+*.patch, applied by npm install), so a missing page after install is explained here.
+ */
 async function currentPage(): Promise<Page> {
   const wc = await activeTab()
   if (cached && cached.id === wc.id && !cached.page.isClosed()) return cached.page
   const b = await connect()
-  const pages = b.contexts().flatMap((c) => c.pages())
   const url = wc.getURL()
-  let match = pages.filter((p) => p.url() === url)
-  if (match.length > 1) {
-    const want = await targetOfContents(wc)
-    if (want) {
-      const hit: Page[] = []
-      for (const p of match) if ((await targetOfPage(p)) === want) hit.push(p)
-      if (hit.length) match = hit
+  let match: Page[] = []
+  // a page that is still attaching may need a moment
+  for (let attempt = 0; attempt < 8 && !match.length; attempt++) {
+    if (attempt) await sleep(250)
+    const pages = b.contexts().flatMap((c) => c.pages())
+    match = pages.filter((p) => sameUrl(p.url(), url))
+    if (match.length > 1) {
+      const want = await targetOfContents(wc)
+      if (want) {
+        const hit: Page[] = []
+        for (const p of match) if ((await targetOfPage(p)) === want) hit.push(p)
+        if (hit.length) match = hit
+      }
+    }
+    if (!match.length) {
+      // the address may have just changed; the one page that is not the app's own window is the tab
+      const own = process.env['ELECTRON_RENDERER_URL']
+      const others = pages.filter((p) => !p.url().startsWith('file://') && !(own && p.url().startsWith(own)))
+      if (others.length === 1) match = others
     }
   }
   if (!match.length) {
-    throw new Error('Playwright could not find the Browser tab’s page. Load a page in the Browser tab first, and make sure it has finished opening.')
+    const seen = b.contexts().flatMap((c) => c.pages().map((p) => p.url() || '(blank)'))
+    throw new Error(
+      `Playwright could not find the Browser tab’s page (the tab is at ${url || 'about:blank'}; Playwright can see ${seen.length ? seen.join(', ') : 'no pages'}). ` +
+        'If Playwright sees no pages, run npm install again so the Playwright patch is applied, then restart the app.'
+    )
   }
   cached = { id: wc.id, page: match[0] }
   refs = new Map()
@@ -271,7 +311,7 @@ async function navigate(ctx: ToolContext, id: string, i: Input): Promise<string>
   if (!url) throw new Error('“url” is required.')
   if (!/^https?:\/\//i.test(url)) url = /^(localhost|127\.0\.0\.1)/i.test(url) ? `http://${url}` : `https://${url}`
   if (!local(url)) {
-    const d = await ctx.ask({ id: `perm-${id}`, action: 'network', title: 'Open a web page in the Browser tab', command: url, reason: 'The AI wants to browse to this page.' })
+    const d = await ctx.ask({ id: `perm-${id}`, action: 'browse', title: 'Open a web page in the Browser tab', command: url, reason: 'The AI wants to browse to this page.' })
     if (d === 'deny') throw new Error('The person did not allow opening this page. Do not try another way; explain what you needed and ask how to proceed.')
   }
   const page = await currentPage()
@@ -293,6 +333,9 @@ async function click(page: Page, i: Input): Promise<string> {
 async function type(page: Page, i: Input): Promise<string> {
   const loc = locate(i)
   const text = typeof i.text === 'string' ? i.text : ''
+  // Typing goes to whatever has the keyboard focus. If the app's own message box has it, the text lands there
+  // instead of in the page, so give the Browser tab the focus first.
+  focusTab(await activeTab())
   try {
     await loc.fill(text, { timeout: ACTION_TIMEOUT })
   } catch {
@@ -301,6 +344,23 @@ async function type(page: Page, i: Input): Promise<string> {
     await page.keyboard.press('ControlOrMeta+A')
     if (text) await page.keyboard.insertText(text)
     else await page.keyboard.press('Backspace')
+  }
+  // Some forms ignore a filled value until they see the page's own input events. If the field does not hold
+  // the text, set it the way a keyboard would, so the site notices.
+  const landed = await loc.inputValue({ timeout: 1000 }).catch(() => null)
+  if (landed !== null && landed !== text) {
+    await loc
+      .evaluate((el: unknown, v: unknown) => {
+        // runs inside the page
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const node = el as any
+        const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(node), 'value')?.set
+        setter?.call(node, v)
+        const Ev = node.ownerDocument.defaultView.Event
+        node.dispatchEvent(new Ev('input', { bubbles: true }))
+        node.dispatchEvent(new Ev('change', { bubbles: true }))
+      }, text)
+      .catch(() => undefined)
   }
   if (i.submit === true) await page.keyboard.press('Enter')
   await settle(page)
@@ -319,6 +379,7 @@ async function selectOption(page: Page, i: Input): Promise<string> {
 async function press(page: Page, i: Input): Promise<string> {
   const key = typeof i.key === 'string' ? i.key.trim() : ''
   if (!key) throw new Error('“key” is required, for example Enter, Tab, Escape or Control+A.')
+  focusTab(await activeTab())
   await page.keyboard.press(key)
   await settle(page)
   return snapshot(page)

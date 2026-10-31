@@ -12,7 +12,10 @@ const QUESTION: Record<Permission['action'], string> = {
   command: 'Run this command?',
   install: 'Install packages?',
   remove: 'Delete files?',
-  network: 'Use the internet?'
+  network: 'Use the internet?',
+  browse: 'Open this page?',
+  web: 'Use the web?',
+  git: 'Make this git change?'
 }
 
 const RESULT: Record<Exclude<Permission['state'], 'pending'>, string> = {
@@ -151,7 +154,7 @@ export function PermissionCard({ tool }: { tool: Permission }): React.JSX.Elemen
         {tool.reason && <span className="min-w-0 truncate text-[#77776f]">{tool.reason}</span>}
       </div>
       <pre className="mt-2 overflow-x-auto rounded-md bg-black/25 px-2.5 py-1.5 font-mono text-[11.5px] leading-5 text-[#cfcfcc]">
-        <span className="select-none text-[#77776f]">$ </span>
+        {tool.action !== 'browse' && tool.action !== 'web' && <span className="select-none text-[#77776f]">$ </span>}
         {tool.command}
       </pre>
       <div className="mt-2 flex items-center justify-end gap-1.5">
