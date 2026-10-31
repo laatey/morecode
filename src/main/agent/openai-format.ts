@@ -9,13 +9,15 @@ export const MODELSCOPE_URL = 'https://api-inference.modelscope.cn'
 /** ModelScope's international site. A token made on one site is not always accepted on the other. */
 export const MODELSCOPE_INTL_URL = 'https://api-inference.modelscope.ai'
 export type ModelScopeSite = 'cn' | 'ai'
+/** Groq's OpenAI-compatible API (the app adds /v1/chat/completions). */
+export const GROQ_URL = 'https://api.groq.com/openai'
 export const modelScopeUrl = (site: ModelScopeSite): string =>
   site === 'ai' ? MODELSCOPE_INTL_URL : MODELSCOPE_URL
 
 /** True for providers reached through chat completions instead of the Anthropic messages API. */
 export const usesOpenAIFormat = (baseUrl?: string): boolean => {
   const base = baseUrl?.replace(/\/$/, '')
-  return base === MODELSCOPE_URL || base === MODELSCOPE_INTL_URL
+  return base === MODELSCOPE_URL || base === MODELSCOPE_INTL_URL || base === GROQ_URL
 }
 
 export type OpenAIPart =

@@ -226,6 +226,19 @@ export function ModelsPage(): React.JSX.Element {
           savedMessage="OpenRouter key saved"
         />
         <ProviderRow
+          title="Groq"
+          description="Very fast free models: Llama and GPT-OSS. Get a key at console.groq.com."
+          connected={Boolean(settings.groqKey)}
+          summary={settings.groqKey ? mask(settings.groqKey) : ''}
+          connectLabel="Add key"
+          keyLabel="Groq API key"
+          keyPlaceholder="gsk_…"
+          test={({ key }) => window.api.agent.testProvider({ provider: 'groq', key }).then(must)}
+          save={({ key }) => set({ groqKey: key })}
+          remove={() => set({ groqKey: '' })}
+          savedMessage="Groq key saved"
+        />
+        <ProviderRow
           title="ModelScope"
           description="Free open models: GLM, Nex, DeepSeek and CompassJudger. A token from modelscope.cn or modelscope.ai works."
           connected={Boolean(settings.modelScopeKey)}

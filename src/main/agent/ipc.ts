@@ -5,7 +5,7 @@ import { authorize } from '../mcp/oauth'
 import { disconnect, disconnectAll, testConnector } from '../mcp/manager'
 import type { McpConfig } from '../mcp/client'
 import { ApiFailure, looksDropped } from './anthropic'
-import { modelScopeUrl, usesOpenAIFormat, type ModelScopeSite } from './openai-format'
+import { GROQ_URL, modelScopeUrl, usesOpenAIFormat, type ModelScopeSite } from './openai-format'
 import { dropJob, getJob, listJobSnapshots, onJobsChange, stopAllJobs, stopJob } from './background'
 import { runAgent, type RunInput, type SkillInput, type Style } from './run'
 import { keepEdit, revertEdit, type Decision } from './tools'
@@ -33,10 +33,19 @@ const MODELSCOPE_ALLOWED = new Set([
   'deepseek-ai/DeepSeek-V4.1-Flash-1017',
   'opencompass/CompassJudger-1-32B-Instruct'
 ])
+// The only Groq models offered. Keep in step with GROQ_MODELS in renderer/features/ai-assistant/models.ts.
+const GROQ_ALLOWED = new Set([
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b'
+])
 // A model tried when a ModelScope key is checked: the lightest of the six.
 const MODELSCOPE_PROBE = 'nex-agi/Nex-N2.5-mini'
 const modelOk = (model: string, baseUrl?: string): boolean =>
-  usesOpenAIFormat(baseUrl) ? MODELSCOPE_ALLOWED.has(model) : MODELS.test(model)
+  baseUrl?.replace(/\/$/, '') === GROQ_URL
+    ? GROQ_ALLOWED.has(model)
+    : usesOpenAIFormat(baseUrl)
+      ? MODELSCOPE_ALLOWED.has(model)
+      : MODELS.test(model)
 
 function valid(p: unknown): p is Payload {
   const x = p as Payload
@@ -103,13 +112,14 @@ function goodConfig(c: unknown): c is McpConfig {
 export type CheckResult = { ok: boolean; message?: string; site?: ModelScopeSite }
 
 type ProviderCheck =
-  | { provider: 'anthropic' | 'openrouter' | 'modelscope'; key: string }
+  | { provider: 'anthropic' | 'openrouter' | 'modelscope' | 'groq'; key: string }
   | { provider: 'gateway'; key: string; endpoint: string }
 
 const PROVIDER_NAME = {
   anthropic: 'API',
   openrouter: 'OpenRouter',
   modelscope: 'ModelScope',
+  groq: 'Groq',
   gateway: 'gateway'
 } as const
 
@@ -118,7 +128,12 @@ function shape(c: unknown): ProviderCheck | null {
   if (!x || typeof x.key !== 'string') return null
   const key = x.key.trim()
   if (key.length < 20 || key.length > 300) return null
-  if (x.provider === 'anthropic' || x.provider === 'openrouter' || x.provider === 'modelscope')
+  if (
+    x.provider === 'anthropic' ||
+    x.provider === 'openrouter' ||
+    x.provider === 'modelscope' ||
+    x.provider === 'groq'
+  )
     return { provider: x.provider, key }
   if (
     x.provider === 'gateway' &&
@@ -136,6 +151,21 @@ async function checkProvider(raw: unknown): Promise<CheckResult> {
   if (!c) return { ok: false, message: 'That does not look like a valid key.' }
   const name = PROVIDER_NAME[c.provider]
   if (c.provider === 'modelscope') return checkModelScope(c.key)
+  if (c.provider === 'groq') {
+    // listing models costs nothing and proves the key
+    try {
+      const res = await fetch(`${GROQ_URL}/v1/models`, {
+        headers: { authorization: `Bearer ${c.key}` },
+        signal: AbortSignal.timeout(20_000)
+      })
+      if (res.ok || res.status === 429) return { ok: true }
+      if (res.status === 401 || res.status === 403)
+        return { ok: false, message: 'That Groq key was not accepted. Check it and try again.' }
+      return { ok: false, message: `Groq could not be checked right now (${res.status}).` }
+    } catch {
+      return { ok: false, message: 'Could not reach Groq to check the key. Check your connection.' }
+    }
+  }
   const message = JSON.stringify({
     model: c.provider === 'openrouter' ? 'openrouter/free' : 'claude-haiku-5-5',
     max_tokens: 1,

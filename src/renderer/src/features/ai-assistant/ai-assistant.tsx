@@ -24,7 +24,7 @@ import { toDataUrl } from './image-utils'
 import { MentionMenu } from './mention-menu'
 import { CopyButton, IconAction } from './message-actions'
 import { ATTACH_ONLY, Markdown } from './message-parts'
-import { isModelScope, modelName } from './models'
+import { isGroq, isModelScope, modelName } from './models'
 import { useModelChoices } from './use-model-choices'
 import { SlashMenu } from './slash-menu'
 import {
@@ -1370,7 +1370,7 @@ export function AiAssistant(): React.JSX.Element {
               contentClassName="w-[min(280px,calc(100vw-32px))] min-w-0"
               items={[
                 ...modelChoices
-                  .filter((c) => c.model.source !== 'modelscope')
+                  .filter((c) => c.model.source !== 'modelscope' && c.model.source !== 'groq')
                   .map((c) => ({
                     id: c.model.id,
                     label: c.model.name,
@@ -1378,6 +1378,30 @@ export function AiAssistant(): React.JSX.Element {
                     checked: c.model.id === model,
                     onClick: () => chooseModel(c)
                   })),
+                {
+                  id: 'groq',
+                  label: 'Groq',
+                  description: isGroq(model) ? modelName(model) : 'Very fast free models, with your key',
+                  submenu: [
+                    ...modelChoices
+                      .filter((c) => c.model.source === 'groq')
+                      .map((c) => ({
+                        id: c.model.id,
+                        label: c.model.name,
+                        description: c.needsSetup ? `${c.model.description} · Needs a key` : c.model.description,
+                        checked: c.model.id === model,
+                        onClick: () => {
+                          if (chooseModel(c) && c.needsSetup) openSettings('models')
+                        }
+                      })),
+                    {
+                      id: 'groq-key',
+                      label: settings.groqKey ? 'Groq settings' : 'Add your Groq key',
+                      separatorBefore: true,
+                      onClick: () => openSettings('models')
+                    }
+                  ]
+                },
                 {
                   // expands like Connectors in the plus menu: the fixed ModelScope models, each with its details
                   id: 'modelscope',

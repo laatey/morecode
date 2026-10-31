@@ -205,7 +205,7 @@ const api = {
     onJobs: (cb: (jobs: BgJob[]) => void): (() => void) => listen('agent:jobs', cb),
     testProvider: (
       check:
-        | { provider: 'anthropic' | 'openrouter' | 'modelscope'; key: string }
+        | { provider: 'anthropic' | 'openrouter' | 'modelscope' | 'groq'; key: string }
         | { provider: 'gateway'; key: string; endpoint: string }
     ): Promise<{ ok: boolean; message?: string; site?: 'cn' | 'ai' }> =>
       ipcRenderer.invoke('agent:test-provider', check),

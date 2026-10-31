@@ -1,7 +1,7 @@
 import type { Account } from '@/features/auth/auth-service'
 import { planAllows } from '@/features/billing/plans'
 import type { Settings } from '@/features/settings/settings-store'
-import { fromModelScopeId, modelScopeBase, sourceOf } from './models'
+import { fromGroqId, fromModelScopeId, GROQ_BASE_URL, modelScopeBase, sourceOf } from './models'
 
 /**
  * How one message reaches an AI, decided in one place.
@@ -12,7 +12,7 @@ import { fromModelScopeId, modelScopeBase, sourceOf } from './models'
  *  - Using their own provider (an Anthropic key, OpenRouter, ModelScope, their own gateway): the request goes straight to that
  *    provider with their key. MoreCode neither counts these messages nor limits them.
  */
-export type RouteKind = 'subscription' | 'own-key' | 'gateway' | 'openrouter' | 'modelscope'
+export type RouteKind = 'subscription' | 'own-key' | 'gateway' | 'openrouter' | 'modelscope' | 'groq'
 
 export interface AiRoute {
   kind: RouteKind
@@ -31,7 +31,7 @@ export interface AiRoute {
 
 export interface RouteInput {
   model: string
-  settings: Pick<Settings, 'morlineGatewayKey' | 'morlineGatewayUrl' | 'openRouterKey' | 'modelScopeKey' | 'modelScopeSite'>
+  settings: Pick<Settings, 'morlineGatewayKey' | 'morlineGatewayUrl' | 'openRouterKey' | 'modelScopeKey' | 'modelScopeSite' | 'groqKey'>
   account: Pick<Account, 'apiKey' | 'plan'> | null
   /** The MoreCode server, when this build is connected to one. */
   hosted: { url: string; token: () => string | null } | null
@@ -66,6 +66,19 @@ export function routeFor({ model, settings, account, hosted }: RouteInput): AiRo
       missing: settings.openRouterKey
         ? null
         : 'Add your OpenRouter key in Settings, under Models, to use this model.'
+    }
+  }
+
+  if (source === 'groq') {
+    return {
+      kind: 'groq',
+      apiKey: settings.groqKey || null,
+      baseUrl: GROQ_BASE_URL,
+      metered: false,
+      // Groq knows the model by its own name, without the prefix this app saves it under
+      model: fromGroqId(model),
+      blocked: null,
+      missing: settings.groqKey ? null : 'Add your Groq key in Settings, under Models, to use this model.'
     }
   }
 

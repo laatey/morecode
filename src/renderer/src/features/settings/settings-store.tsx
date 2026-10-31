@@ -30,6 +30,8 @@ export interface Settings {
   modelScopeKey: string
   /** Which ModelScope site the key belongs to: modelscope.cn or the international modelscope.ai. */
   modelScopeSite: 'cn' | 'ai'
+  /** Personal Groq key (console.groq.com). */
+  groqKey: string
   autoAccept: boolean
   interfaceSize: InterfaceSize
   /** How wide the conversation and message box get. */
@@ -53,6 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   openRouterKey: '',
   modelScopeKey: '',
   modelScopeSite: 'cn',
+  groqKey: '',
   autoAccept: false,
   interfaceSize: 'default',
   contentWidth: 'default',
@@ -93,6 +96,7 @@ function load(): Settings {
         openRouterKey: secrets.get(SECRET_NAMES.openRouter) ?? saved.openRouterKey ?? '',
         modelScopeKey: secrets.get(SECRET_NAMES.modelScope) ?? saved.modelScopeKey ?? '',
         modelScopeSite: saved.modelScopeSite === 'ai' ? 'ai' : 'cn',
+        groqKey: secrets.get(SECRET_NAMES.groq) ?? saved.groqKey ?? '',
         morlineGatewayKey: secrets.get(SECRET_NAMES.gateway) ?? saved.morlineGatewayKey ?? ''
       }
     }
@@ -127,11 +131,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     }
     keep(SECRET_NAMES.openRouter, settings.openRouterKey)
     keep(SECRET_NAMES.modelScope, settings.modelScopeKey)
+    keep(SECRET_NAMES.groq, settings.groqKey)
     keep(SECRET_NAMES.gateway, settings.morlineGatewayKey)
     const plain: Partial<Settings> = { ...settings }
     if (secrets.secure) {
       delete plain.openRouterKey
       delete plain.modelScopeKey
+      delete plain.groqKey
       delete plain.morlineGatewayKey
     }
     try {

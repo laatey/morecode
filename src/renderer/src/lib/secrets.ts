@@ -10,6 +10,7 @@ export const SECRET_NAMES = {
   keys: 'morecode:keys:v1',
   openRouter: 'morecode:openrouter-key',
   modelScope: 'morecode:modelscope-key',
+  groq: 'morecode:groq-key',
   gateway: 'morecode:gateway-key',
   connectors: 'morecode:connector-secrets:v1'
 } as const

@@ -1,6 +1,6 @@
 import type { AgentEvent, AgentRunner, ToolBlock } from '../types'
 import { AgentError } from './errors'
-import { fromModelScopeId, isModelScope } from '../models'
+import { fromGroqId, fromModelScopeId, isGroq, isModelScope } from '../models'
 
 type Api = Window['api']['agent']
 type Message = Parameters<Parameters<Api['onEvent']>[0]>[0]
@@ -76,7 +76,11 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         runId,
         apiKey: cfg.apiKey,
         // ModelScope knows a model by its own name; the prefix is only how this app tells providers apart
-        model: isModelScope(req.model) ? fromModelScopeId(req.model) : req.model,
+        model: isModelScope(req.model)
+          ? fromModelScopeId(req.model)
+          : isGroq(req.model)
+            ? fromGroqId(req.model)
+            : req.model,
         baseUrl: cfg.baseUrl,
         projectPath: cfg.projectPath,
         chatId: cfg.chatId,

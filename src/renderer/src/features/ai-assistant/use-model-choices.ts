@@ -41,7 +41,9 @@ export function useModelChoices(setModel: (id: string) => void): {
         group:
           model.source === 'modelscope'
             ? 'ModelScope'
-            : model.source !== 'claude'
+            : model.source === 'groq'
+              ? 'Groq'
+              : model.source !== 'claude'
               ? 'Your own providers'
               : route.kind === 'own-key'
                 ? 'Your API key'

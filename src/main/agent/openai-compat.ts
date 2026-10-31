@@ -20,6 +20,7 @@ export async function streamOpenAI(
 ): Promise<StreamResult> {
   const doFetch = req.fetchImpl ?? fetch
   const base = (req.baseUrl ?? '').replace(/\/$/, '')
+  const who = base.includes('groq.com') ? 'Groq' : 'ModelScope'
 
   const send = (withUsage: boolean, model: string): Promise<Response> =>
     doFetch(`${base}/v1/chat/completions`, {
@@ -52,7 +53,7 @@ export async function streamOpenAI(
     }
   } catch (err) {
     if ((err as Error).name === 'AbortError') throw err
-    throw new ApiFailure('offline', 'Could not reach ModelScope. Check your internet connection.')
+    throw new ApiFailure('offline', `Could not reach ${who}. Check your internet connection.`)
   }
 
   if (!res.ok || !res.body) {
@@ -60,7 +61,7 @@ export async function streamOpenAI(
       const wait = Number(res.headers.get('retry-after'))
       throw new ApiFailure(
         'rate_limit',
-        "ModelScope's free limit for this model is used up for now. Try another ModelScope model, or try again later.",
+        `${who}'s free limit for this model is used up for now. Try another ${who} model, or try again later.`,
         429,
         Number.isFinite(wait) && wait > 0 ? wait : undefined
       )
@@ -68,14 +69,14 @@ export async function streamOpenAI(
     if (res.status === 401 || res.status === 403) {
       throw new ApiFailure(
         'failed',
-        'Your ModelScope key was not accepted. Check it in Settings, under Models.',
+        `Your ${who} key was not accepted. Check it in Settings, under Models.`,
         res.status
       )
     }
-    if (res.status === 404) {
+    if (res.status === 404 && who !== 'Groq') {
       throw new ApiFailure(
         'failed',
-        'ModelScope does not offer this model through its free API right now. Choose another one.',
+        `${who} does not offer this model through its free API right now. Choose another one.`,
         404
       )
     }
@@ -84,7 +85,7 @@ export async function streamOpenAI(
     if (/no provider supported|invalid model id|not (found|exist|supported)/i.test(failure.message)) {
       throw new ApiFailure(
         'failed',
-        `${failure.message.replace(/[.\s]+$/, '')}. Pick another from the ModelScope models in the model menu.`,
+        `${failure.message.replace(/[.\s]+$/, '')}. Pick another from the ${who} models in the model menu.`,
         failure.status
       )
     }
