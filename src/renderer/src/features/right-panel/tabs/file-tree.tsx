@@ -72,14 +72,14 @@ function Branch<T>({
               type="button"
               aria-expanded={!shut}
               onClick={() => toggle(n.path)}
-              className="flex w-full cursor-pointer items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left text-[12px] text-[#c9c9c6] transition-colors hover:bg-white/[0.05]"
+              className="flex w-full cursor-pointer items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left text-[12px] text-soft-foreground transition-colors hover:bg-foreground/[0.05]"
             >
               <ChevronRight strokeWidth={2.35} className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', !shut && 'rotate-90')} />
               <span className="min-w-0 flex-1 truncate">{n.name}</span>
-              <span className="shrink-0 text-[11px] tabular-nums text-[#77776f]">{countFiles(n)}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-faint-foreground">{countFiles(n)}</span>
             </button>
             {!shut && (
-              <div className="ml-[11px] space-y-1.5 border-l border-white/[0.07] pb-1 pl-2 pt-1">
+              <div className="ml-[11px] space-y-1.5 border-l border-border/50 pb-1 pl-2 pt-1">
                 <Branch nodes={n.children} render={render} closed={closed} toggle={toggle} />
               </div>
             )}

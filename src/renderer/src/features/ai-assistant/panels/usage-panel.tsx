@@ -23,12 +23,12 @@ function Limit({
   return (
     <div>
       <div className="mb-1.5 flex items-baseline gap-2 text-[12.5px]">
-        <span className="text-[#ececea]">{label}</span>
-        <span className="flex-1 text-right text-[11.5px] text-[#8d8d8a]">{resets}</span>
+        <span className="text-foreground">{label}</span>
+        <span className="flex-1 text-right text-[11.5px] text-muted-foreground">{resets}</span>
         <span
           className={cn(
             'w-9 text-right tabular-nums',
-            percent >= 90 ? 'text-[#f0746c]' : 'text-[#ececea] font-medium'
+            percent >= 90 ? 'text-destructive' : 'text-foreground font-medium'
           )}
         >
           {percent}%
@@ -46,7 +46,7 @@ export function UsagePanel({
   ctx: PanelContext
   onClose: () => void
 }): React.JSX.Element {
-  const { account, openPlanDialog, messagesLeft } = useAuth()
+  const { account, openPlanDialog, limitHit } = useAuth()
   useSyncExternalStore(subscribeUsage, getUsageVersion) // refresh while the AI works
   const u = getUsageSnapshot(account, modelName(ctx.model))
 
@@ -69,7 +69,7 @@ export function UsagePanel({
             type="button"
             aria-label="Copy summary"
             onClick={copy}
-            className="grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground"
+            className="grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground"
           >
             <Copy className="h-3.5 w-3.5" />
           </button>
@@ -77,20 +77,20 @@ export function UsagePanel({
       }
     >
       <div className="space-y-3.5">
-        {u.limitsNote && <p className="text-[12.5px] leading-5 text-[#8d8d8a]">{u.limitsNote}</p>}
+        {u.limitsNote && <p className="text-[12.5px] leading-5 text-muted-foreground">{u.limitsNote}</p>}
         {u.limits.map((l) => (
           <Limit key={l.id} label={l.label} resets={l.resets} percent={l.percent} />
         ))}
       </div>
 
       {account && (
-        <div className="mt-4 flex items-center justify-between rounded-[8px] border border-white/[0.07] bg-white/[0.035] px-3 py-2.5">
+        <div className="mt-4 flex items-center justify-between rounded-[8px] border border-border/50 bg-foreground/[0.035] px-3 py-2.5">
           <div className="text-[12.5px]">
-            <span className="text-[#ececea]">
+            <span className="text-foreground">
               {account.apiKey ? 'Your own API key' : `${getPlan(account.plan).name} plan`}
             </span>
-            <span className="ml-2 text-[11.5px] text-[#8d8d8a]">
-              {account.apiKey ? 'No daily limit' : `${messagesLeft} messages left today`}
+            <span className="ml-2 text-[11.5px] text-muted-foreground">
+              {account.apiKey ? 'No limit' : limitHit ? `${limitHit.kind === 'week' ? 'Weekly' : '5-hour'} limit reached` : 'Within your limits'}
             </span>
           </div>
           <button
@@ -99,7 +99,7 @@ export function UsagePanel({
               onClose()
               openPlanDialog('upgrade')
             }}
-            className="cursor-pointer rounded-[6px] bg-white/[0.07] px-2.5 py-1 text-[12px] text-[#ececea] transition-colors hover:bg-white/[0.12]"
+            className="cursor-pointer rounded-[6px] bg-foreground/[0.07] px-2.5 py-1 text-[12px] text-foreground transition-colors hover:bg-foreground/[0.12]"
           >
             {account.plan === 'free' ? 'Upgrade' : 'Change plan'}
           </button>
@@ -107,8 +107,8 @@ export function UsagePanel({
       )}
 
       <section className="mt-5">
-        <h3 className="mb-2 text-[12.5px] font-medium text-[#ececea]">This session</h3>
-        <dl className="grid grid-cols-3 gap-x-4 gap-y-1.5 border-y border-white/[0.07] py-2.5 text-[12px]">
+        <h3 className="mb-2 text-[12.5px] font-medium text-foreground">This session</h3>
+        <dl className="grid grid-cols-3 gap-x-4 gap-y-1.5 border-y border-border/50 py-2.5 text-[12px]">
           <Metric label="Requests" value={u.session.requests} />
           <Metric label="API" value={u.session.apiTime} />
           <Metric label="Active" value={u.session.activeTime} />
@@ -128,19 +128,19 @@ export function UsagePanel({
 
       <section className="mt-4">
         <div className="flex items-baseline justify-between">
-          <h3 className="text-[12.5px] font-medium text-[#ececea]">Breakdown</h3>
-          <span className="text-[11.5px] text-[#8d8d8a]">{u.session.modelName}</span>
+          <h3 className="text-[12.5px] font-medium text-foreground">Breakdown</h3>
+          <span className="text-[11.5px] text-muted-foreground">{u.session.modelName}</span>
         </div>
         <table className="mt-1 w-full text-[12px]">
           <tbody>
             {u.breakdown.map((b) => (
-              <tr key={b.label} className="border-b border-white/[0.06] last:border-b-0">
-                <td className="py-1.5 text-[#8d8d8a]">
+              <tr key={b.label} className="border-b border-border/50 last:border-b-0">
+                <td className="py-1.5 text-muted-foreground">
                   <Tip label={b.hint} side="left">
                     <span className="cursor-default">{b.label}</span>
                   </Tip>
                 </td>
-                <td className="py-1.5 text-right tabular-nums text-[#d6d6d3]">{b.value}</td>
+                <td className="py-1.5 text-right tabular-nums text-soft-foreground">{b.value}</td>
               </tr>
             ))}
           </tbody>
@@ -148,17 +148,17 @@ export function UsagePanel({
       </section>
 
       <section className="mt-5">
-        <h3 className="text-[12.5px] font-medium text-[#ececea]">What’s using your limits?</h3>
-        <p className="mt-1 text-[11.5px] leading-4 text-[#77776f]">This session · this computer only</p>
+        <h3 className="text-[12.5px] font-medium text-foreground">What’s using your limits?</h3>
+        <p className="mt-1 text-[11.5px] leading-4 text-faint-foreground">This session · this computer only</p>
         <ul className="mt-2 space-y-1.5">
           {u.drivers.length === 0 && (
-            <li className="text-[12.5px] text-[#8d8d8a]">Nothing yet. Send a message and this fills in.</li>
+            <li className="text-[12.5px] text-muted-foreground">Nothing yet. Send a message and this fills in.</li>
           )}
           {u.drivers.map((d) => (
             <li key={d.id} className="flex items-baseline gap-2.5 text-[12.5px]">
-              <span className="w-9 shrink-0 tabular-nums text-[#ececea]">{d.percent}%</span>
+              <span className="w-9 shrink-0 tabular-nums text-foreground">{d.percent}%</span>
               <Tip label={d.hint} side="top" align="start">
-                <span className="cursor-help text-[#c9c9c6] underline decoration-dotted decoration-white/30 underline-offset-[3px]">
+                <span className="cursor-help text-soft-foreground underline decoration-dotted decoration-foreground/30 underline-offset-[3px]">
                   {d.label}
                 </span>
               </Tip>
@@ -167,9 +167,9 @@ export function UsagePanel({
         </ul>
       </section>
 
-      <div className="mt-5 rounded-[8px] border border-white/[0.07] bg-white/[0.035] px-3 py-2.5">
-        <div className="text-[11.5px] font-medium text-[#ececea]">Tip</div>
-        <p className="mt-0.5 text-[12px] leading-[18px] text-[#8d8d8a]">{u.tip}</p>
+      <div className="mt-5 rounded-[8px] border border-border/50 bg-foreground/[0.035] px-3 py-2.5">
+        <div className="text-[11.5px] font-medium text-foreground">Tip</div>
+        <p className="mt-0.5 text-[12px] leading-[18px] text-muted-foreground">{u.tip}</p>
       </div>
     </PanelFrame>
   )
@@ -178,8 +178,8 @@ export function UsagePanel({
 function Metric({ label, value }: { label: string; value: React.ReactNode }): React.JSX.Element {
   return (
     <div className="flex items-baseline gap-1.5">
-      <dt className="text-[#8d8d8a]">{label}</dt>
-      <dd className="tabular-nums text-[#d6d6d3]">{value}</dd>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="tabular-nums text-soft-foreground">{value}</dd>
     </div>
   )
 }

@@ -14,7 +14,7 @@ export const percentOf = (n: number, total: number): number => (total ? (n / tot
 
 /** Bar colour follows how close the limit is: calm blue, amber, then red. */
 export const limitTone = (percent: number): string =>
-  percent >= 90 ? 'bg-[#e5584f]' : percent >= 75 ? 'bg-[#e5a54b]' : 'bg-[#3b8cff]'
+  percent >= 90 ? 'bg-destructive' : percent >= 75 ? 'bg-warning' : 'bg-primary'
 
 /**
  * Card used by every slash-command panel: dimmed backdrop, title row, close button.
@@ -51,7 +51,7 @@ export function PanelFrame({
 
   return (
     <div
-      className="absolute inset-0 z-40 flex items-center justify-center bg-black/45 p-3"
+      className="absolute inset-0 z-40 flex items-center justify-center bg-scrim/45 p-3"
       onMouseDown={onClose}
     >
       <div
@@ -59,17 +59,17 @@ export function PanelFrame({
         aria-label={title}
         onMouseDown={(e) => e.stopPropagation()}
         style={{ maxWidth: width, maxHeight }}
-        className="slim-scroll w-full overflow-y-auto rounded-[11px] border border-white/[0.1] bg-[#242423] shadow-[0_16px_48px_rgba(0,0,0,0.55)] animate-in fade-in-0 zoom-in-95 duration-150"
+        className="slim-scroll w-full overflow-y-auto rounded-[11px] border border-border bg-card shadow-[0_16px_48px_rgba(0,0,0,0.55)] animate-in fade-in-0 zoom-in-95 duration-150"
       >
         <div className="flex items-center justify-between px-4 pb-1 pt-3.5">
-          <span className="text-[13px] font-medium text-[#ececea]">{title}</span>
+          <span className="text-[13px] font-medium text-foreground">{title}</span>
           <span className="flex items-center gap-0.5">
             {actions}
             <button
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground"
+              className="grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -83,7 +83,7 @@ export function PanelFrame({
 
 export function Bar({
   percent,
-  tone = 'bg-[#3b8cff]',
+  tone = 'bg-primary',
   label
 }: {
   percent: number
@@ -98,7 +98,7 @@ export function Bar({
       aria-valuenow={Math.round(value)}
       aria-valuemin={0}
       aria-valuemax={100}
-      className="h-[6px] w-full overflow-hidden rounded-full bg-white/[0.08]"
+      className="h-[6px] w-full overflow-hidden rounded-full bg-foreground/[0.08]"
     >
       <div
         className={cn('h-full rounded-full transition-[width] duration-500', tone)}
@@ -119,9 +119,9 @@ export function StatCell({
   tone?: string
 }): React.JSX.Element {
   return (
-    <div className="rounded-[8px] border border-white/[0.07] bg-white/[0.035] px-3 py-2">
-      <div className="text-[11.5px] text-[#8d8d8a]">{label}</div>
-      <div className={cn('mt-0.5 text-[15px] font-medium tabular-nums text-[#ececea]', tone)}>
+    <div className="rounded-[8px] border border-border/50 bg-foreground/[0.035] px-3 py-2">
+      <div className="text-[11.5px] text-muted-foreground">{label}</div>
+      <div className={cn('mt-0.5 text-[15px] font-medium tabular-nums text-foreground', tone)}>
         {value}
       </div>
     </div>
@@ -150,8 +150,8 @@ export function MiniTabs<T extends string>({
           className={cn(
             'cursor-pointer rounded-[6px] px-2.5 py-1 text-[12px] transition-colors',
             o.value === value
-              ? 'bg-[#ececea] font-medium text-[#1a1a19]'
-              : 'text-[#9a9a95] hover:bg-[#30302e] hover:text-white'
+              ? 'bg-foreground font-medium text-background'
+              : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
           )}
         >
           {o.label}
@@ -184,7 +184,7 @@ export function FilterSelect<T extends string>({
       trigger={
         <button
           type="button"
-          className="flex cursor-pointer items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[12px] text-[#c9c9c6] transition-colors hover:bg-white/[0.06]"
+          className="flex cursor-pointer items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[12px] text-soft-foreground transition-colors hover:bg-foreground/[0.06]"
         >
           {current}
           <ChevronDown className="h-3 w-3 opacity-70" />
@@ -196,7 +196,7 @@ export function FilterSelect<T extends string>({
 
 export function KeyChip({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <kbd className="inline-flex min-w-[20px] items-center justify-center rounded-[4px] border border-white/[0.12] bg-white/[0.05] px-1.5 font-sans text-[11px] leading-[18px] text-[#c9c9c6]">
+    <kbd className="inline-flex min-w-[20px] items-center justify-center rounded-[4px] border border-border bg-foreground/[0.05] px-1.5 font-sans text-[11px] leading-[18px] text-soft-foreground">
       {children}
     </kbd>
   )

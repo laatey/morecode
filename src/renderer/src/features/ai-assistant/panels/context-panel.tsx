@@ -18,7 +18,7 @@ export function ContextPanel({
 }): React.JSX.Element {
   useSyncExternalStore(subscribeUsage, getUsageVersion) // refresh while the AI works
   const { account } = useAuth()
-  const { rows, buffer, used, free } = getContextRows()
+  const { rows, buffer, used, free } = getContextRows(ctx.chatId)
   const total = used
   const usedPercent = Math.round(percentOf(total, CONTEXT_WINDOW))
   const plan = getUsageSnapshot(account, modelName(ctx.model))
@@ -29,26 +29,26 @@ export function ContextPanel({
       id: 'buffer',
       label: 'Reserved for the reply',
       tokens: buffer,
-      color: 'bg-[#333332]',
+      color: 'bg-secondary',
       deferred: true
     },
-    { id: 'free', label: 'Free space', tokens: free, color: 'bg-[#2c2c2b]', deferred: true }
+    { id: 'free', label: 'Free space', tokens: free, color: 'bg-muted', deferred: true }
   ]
 
   return (
     <PanelFrame title="Context" onClose={onClose}>
       <div className="flex items-baseline justify-between text-[12.5px]">
-        <span className="text-[#8d8d8a]">Used</span>
-        <span className="tabular-nums text-[#ececea]">
+        <span className="text-muted-foreground">Used</span>
+        <span className="tabular-nums text-foreground">
           {fmtTokens(total)} / {fmtTokens(CONTEXT_WINDOW)}{' '}
-          <span className={cn('text-[#8d8d8a]', usedPercent >= 80 && 'text-[#e5a54b]')}>
+          <span className={cn('text-muted-foreground', usedPercent >= 80 && 'text-warning')}>
             ({usedPercent}%)
           </span>
         </span>
       </div>
 
       {/* One segmented bar; every segment explains itself on hover */}
-      <div className="mt-2 flex h-[7px] w-full overflow-hidden rounded-full bg-white/[0.07]">
+      <div className="mt-2 flex h-[7px] w-full overflow-hidden rounded-full bg-foreground/[0.07]">
         {rows
           .filter((r) => !r.deferred)
           .map((r) => (
@@ -69,7 +69,7 @@ export function ContextPanel({
           style={{
             width: `${percentOf(buffer, CONTEXT_WINDOW)}%`,
             backgroundImage:
-              'repeating-linear-gradient(135deg, rgba(255,255,255,0.18) 0 2px, transparent 2px 5px)'
+              'repeating-linear-gradient(135deg, color-mix(in oklab, var(--foreground) 18%, transparent) 0 2px, transparent 2px 5px)'
           }}
         />
       </div>
@@ -78,33 +78,33 @@ export function ContextPanel({
         {legend.map((r) => (
           <li key={r.id} className="flex items-center gap-2.5">
             <span className={cn('h-2.5 w-2.5 shrink-0 rounded-[3px]', r.color)} />
-            <span className={cn('flex-1', r.deferred ? 'text-[#8d8d8a]' : 'text-[#d6d6d3]')}>
+            <span className={cn('flex-1', r.deferred ? 'text-muted-foreground' : 'text-soft-foreground')}>
               {r.label}
             </span>
-            <span className="tabular-nums text-[#8d8d8a]">{fmtTokens(r.tokens)}</span>
-            <span className="w-12 text-right tabular-nums text-[#ececea]">
+            <span className="tabular-nums text-muted-foreground">{fmtTokens(r.tokens)}</span>
+            <span className="w-12 text-right tabular-nums text-foreground">
               {percentOf(r.tokens, CONTEXT_WINDOW).toFixed(1)}%
             </span>
           </li>
         ))}
       </ul>
 
-      <div className="mt-3 border-t border-white/[0.07] pt-3">
+      <div className="mt-3 border-t border-border/50 pt-3">
         <button
           type="button"
           onClick={() => ctx.openPanel('usage')}
-          className="group mb-2.5 flex w-full cursor-pointer items-center justify-between text-[12.5px] text-[#8d8d8a] transition-colors hover:text-[#d6d6d3]"
+          className="group mb-2.5 flex w-full cursor-pointer items-center justify-between text-[12.5px] text-muted-foreground transition-colors hover:text-soft-foreground"
         >
           Plan usage
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </button>
         <div className="space-y-3">
-          {plan.limitsNote && <p className="text-[12px] leading-5 text-[#8d8d8a]">{plan.limitsNote}</p>}
+          {plan.limitsNote && <p className="text-[12px] leading-5 text-muted-foreground">{plan.limitsNote}</p>}
           {plan.limits.map((l) => (
             <div key={l.id}>
               <div className="mb-1.5 flex items-baseline justify-between text-[12.5px]">
-                <span className="text-[#ececea]">{l.label}</span>
-                <span className="text-[11.5px] text-[#8d8d8a]">
+                <span className="text-foreground">{l.label}</span>
+                <span className="text-[11.5px] text-muted-foreground">
                   {l.percent}% · {l.resets.replace('Resets ', 'resets ')}
                 </span>
               </div>
@@ -115,8 +115,8 @@ export function ContextPanel({
       </div>
 
       {usedPercent >= 70 && (
-        <p className="mt-3.5 text-[11.5px] leading-4 text-[#8d8d8a]">
-          The conversation is getting long. Type <span className="text-[#d6d6d3]">/compact</span> to
+        <p className="mt-3.5 text-[11.5px] leading-4 text-muted-foreground">
+          The conversation is getting long. Type <span className="text-soft-foreground">/compact</span> to
           summarise it and free up space.
         </p>
       )}

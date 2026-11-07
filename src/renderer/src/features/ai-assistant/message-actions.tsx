@@ -29,9 +29,9 @@ export function IconAction({
         disabled={disabled}
         onClick={onClick}
         className={cn(
-          'grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] text-[#77776f] transition-colors',
-          'hover:bg-white/[0.07] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20',
-          'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#77776f]',
+          'grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] text-faint-foreground transition-colors',
+          'hover:bg-foreground/[0.07] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-strong',
+          'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-faint-foreground',
           active && 'text-foreground',
           className
         )}

@@ -1,3 +1,5 @@
+import { useSettings } from '@/features/settings/settings-store'
+import { themeIsDark } from '@/theme/themes'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { WebviewTag } from 'electron'
 import {
@@ -7,10 +9,12 @@ import {
   ExternalLink,
   Globe,
   Lock,
+  Moon,
   RotateCw,
   Search,
   SquareCode,
   Star,
+  Sun,
   TriangleAlert,
   X
 } from '@/components/icons'
@@ -67,6 +71,18 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
   const [error, setError] = useState<{ url: string; message: string } | null>(null)
   const [agentActive, setAgentActive] = useState(false)
   const contentsId = useRef<number | null>(null)
+  // null = leave the page alone (it follows the system theme); once toggled, the page is told dark or light
+  const [scheme, setScheme] = useState<'dark' | 'light' | null>(null)
+  const schemeRef = useRef(scheme)
+  schemeRef.current = scheme
+  // pages follow the app's theme (the native theme is set to it), so that is what an untouched toggle shows
+  const { activeThemeId } = useSettings()
+  const shownScheme = scheme ?? (themeIsDark(activeThemeId) ? 'dark' : 'light')
+
+  const applyScheme = useCallback((): void => {
+    if (contentsId.current !== null && schemeRef.current) window.api.browser.setColorScheme(contentsId.current, schemeRef.current)
+  }, [])
+  useEffect(applyScheme, [scheme, applyScheme])
 
   // the AI asked for a browser: give an empty tab a blank page so a webview exists
   useEffect(() => {
@@ -111,6 +127,7 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
       try {
         contentsId.current = el.getWebContentsId()
         window.api.browser.register(contentsId.current)
+        applyScheme()
       } catch {
         // not attached yet
       }
@@ -227,7 +244,7 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-[38px] shrink-0 items-center gap-1 border-b border-white/[0.07] px-2">
+      <div className="flex h-[38px] shrink-0 items-center gap-1 border-b border-border/50 px-2">
         <IconButton title="Back" disabled={!nav.back} onClick={() => view.current?.goBack()} className="disabled:opacity-35">
           <ArrowLeft className="h-3.5 w-3.5" />
         </IconButton>
@@ -251,9 +268,9 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
             address.current?.blur()
           }}
         >
-          <label className="flex h-[26px] items-center gap-1.5 rounded-[7px] bg-white/[0.06] px-2 text-[12px] transition-colors focus-within:bg-white/[0.09] focus-within:ring-1 focus-within:ring-[#3b82f6]/60">
+          <label className="flex h-[26px] items-center gap-1.5 rounded-[7px] bg-foreground/[0.06] px-2 text-[12px] transition-colors focus-within:bg-foreground/[0.09] focus-within:ring-1 focus-within:ring-primary/60">
             {secure ? (
-              <Lock className="h-3 w-3 shrink-0 text-[#5fd17a]" />
+              <Lock className="h-3 w-3 shrink-0 text-success" />
             ) : (
               <Search className="h-3 w-3 shrink-0 text-muted-foreground" />
             )}
@@ -265,21 +282,35 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
               spellCheck={false}
               aria-label="Address"
               placeholder="Search or type a web address"
-              className="min-w-0 flex-1 bg-transparent text-[#ececea] outline-none placeholder:text-muted-foreground"
+              className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
             />
             {opened && !secure && !isLocal && (
-              <span className="shrink-0 text-[10.5px] text-[#e8b365]">Not secure</span>
+              <span className="shrink-0 text-[10.5px] text-warning">Not secure</span>
             )}
           </label>
         </form>
 
+        <IconButton
+          title={
+            !opened
+              ? 'Open a page to try it in dark or light'
+              : `This page is showing its ${shownScheme} theme. Click to try ${shownScheme === 'dark' ? 'light' : 'dark'}. Only pages that support both themes will change.`
+          }
+          aria-pressed={scheme !== null}
+          disabled={!opened}
+          onClick={() => setScheme(shownScheme === 'dark' ? 'light' : 'dark')}
+          className={cn('relative disabled:opacity-35', scheme !== null && 'bg-foreground/[0.08] text-foreground')}
+        >
+          {shownScheme === 'dark' ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+          {scheme !== null && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
+        </IconButton>
         <IconButton
           title={starred ? 'Remove bookmark' : 'Bookmark this page'}
           disabled={!opened}
           onClick={() => toggle(url, pageTitle)}
           className="disabled:opacity-35"
         >
-          <Star className={cn('h-3.5 w-3.5', starred && 'fill-[#e8b365] text-[#e8b365]')} />
+          <Star className={cn('h-3.5 w-3.5', starred && 'fill-warning text-warning')} />
         </IconButton>
         <ActionMenu
           align="end"
@@ -292,7 +323,7 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
         />
       </div>
 
-      <div className="relative min-h-0 flex-1 bg-[#1f1f1e]">
+      <div className="relative min-h-0 flex-1 bg-inset">
         {agentActive && (
           <div
             aria-hidden
@@ -301,7 +332,7 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
         )}
         {loading && (
           <div className="absolute inset-x-0 top-0 z-10 h-[2px] overflow-hidden bg-transparent">
-            <div className="h-full w-1/3 animate-[load-slide_1.2s_ease-in-out_infinite] bg-[#3b82f6]" />
+            <div className="h-full w-1/3 animate-[load-slide_1.2s_ease-in-out_infinite] bg-primary" />
           </div>
         )}
 
@@ -316,32 +347,32 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
         ) : (
           <div className="flex h-full items-center justify-center p-6">
             <div className="w-full max-w-[320px]">
-              <span className="mb-3 grid h-10 w-10 place-items-center rounded-[10px] bg-white/[0.05] text-[#a8a8a6]">
+              <span className="mb-3 grid h-10 w-10 place-items-center rounded-[10px] bg-foreground/[0.05] text-muted-foreground">
                 <Globe className="h-[18px] w-[18px] stroke-[1.5]" />
               </span>
-              <h2 className="text-[13px] font-medium text-[#ececea]">Browse without leaving the app</h2>
+              <h2 className="text-[13px] font-medium text-foreground">Browse without leaving the app</h2>
               <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground">
                 Type an address above, or open the preview of something you are building.
               </p>
               {bookmarks.length > 0 && (
                 <div className="mt-3.5">
-                  <h3 className="mb-1 text-[12px] font-medium text-[#a8a8a6]">Bookmarks</h3>
+                  <h3 className="mb-1 text-[12px] font-medium text-muted-foreground">Bookmarks</h3>
                   <ul className="space-y-0.5">
                     {bookmarks.map((b) => (
-                      <li key={b.url} className="group flex items-center gap-1 rounded-[6px] hover:bg-white/[0.06]">
+                      <li key={b.url} className="group flex items-center gap-1 rounded-[6px] hover:bg-foreground/[0.06]">
                         <button
                           type="button"
                           onClick={() => go(b.url)}
                           className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-left"
                         >
                           <BookmarkIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[#ececea]">{b.title}</span>
+                          <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground">{b.title}</span>
                         </button>
                         <button
                           type="button"
                           aria-label={`Remove ${b.title}`}
                           onClick={() => remove(b.url)}
-                          className="mr-1 grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded-[4px] text-muted-foreground opacity-0 hover:bg-white/[0.08] hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                          className="mr-1 grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded-[4px] text-muted-foreground opacity-0 hover:bg-foreground/[0.08] hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -356,9 +387,9 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
                     key={q.url}
                     type="button"
                     onClick={() => go(q.url)}
-                    className="flex w-full cursor-pointer items-center justify-between rounded-[8px] border border-white/[0.08] px-3 py-2 text-left transition-colors hover:border-white/[0.16] hover:bg-white/[0.05]"
+                    className="flex w-full cursor-pointer items-center justify-between rounded-[8px] border border-border px-3 py-2 text-left transition-colors hover:border-border-strong hover:bg-foreground/[0.05]"
                   >
-                    <span className="text-[12.5px] text-[#ececea]">{q.label}</span>
+                    <span className="text-[12.5px] text-foreground">{q.label}</span>
                     <span className="font-mono text-[11.5px] text-muted-foreground">{q.hint}</span>
                   </button>
                 ))}
@@ -368,18 +399,18 @@ export function BrowserTab({ tabId }: TabContentProps): React.JSX.Element {
         )}
 
         {error && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#1f1f1e] p-6">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-inset p-6">
             <div className="max-w-[300px] text-center">
-              <span className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-[10px] bg-[#e5a54b]/15 text-[#e8b365]">
+              <span className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-[10px] bg-warning/15 text-warning">
                 <TriangleAlert className="h-[18px] w-[18px]" />
               </span>
-              <h2 className="text-[13px] font-medium text-[#ececea]">Can’t open this page</h2>
+              <h2 className="text-[13px] font-medium text-foreground">Can’t open this page</h2>
               <p className="mt-1 break-all text-[12px] leading-[18px] text-muted-foreground">
                 {LOCAL.test((error.url || url).replace(/^https?:\/\//i, ''))
                   ? 'Nothing is answering at this address. Make sure your app is running, then try again.'
                   : 'Check the address and your internet connection, then try again.'}
               </p>
-              <p className="mt-1 text-[11px] text-[#77776f]">{error.message}</p>
+              <p className="mt-1 text-[11px] text-faint-foreground">{error.message}</p>
               <div className="mt-3.5 flex justify-center gap-1.5">
                 <TabButton onClick={() => setError(null)}>Dismiss</TabButton>
                 <TabButton tone="primary" onClick={() => go(error.url || url)}>

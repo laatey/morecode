@@ -19,6 +19,8 @@ function OpenCustomize({ onClose }: { onClose: () => void }): null {
 }
 
 export interface PanelContext {
+  /** The chat these panels describe: context size is per chat. */
+  chatId: string
   model: string
   onModel: (id: string) => void
   totals: ChatTotals

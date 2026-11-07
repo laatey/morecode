@@ -55,7 +55,7 @@ export function ModelPanel({
           return (
             <React.Fragment key={m.id}>
               {row.group !== rows[i - 1]?.group && (
-                <div className="px-3 pb-1 pt-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#77776f]">
+                <div className="px-3 pb-1 pt-2.5 text-[10px] font-medium uppercase tracking-[0.1em] text-faint-foreground">
                   {row.group}
                 </div>
               )}
@@ -67,28 +67,28 @@ export function ModelPanel({
                 onClick={() => choose(i)}
                 className={cn(
                   'flex w-full cursor-pointer items-center gap-3 rounded-[8px] px-3 py-2 text-left transition-colors',
-                  i === index ? 'bg-white/[0.07]' : 'bg-transparent'
+                  i === index ? 'bg-foreground/[0.07]' : 'bg-transparent'
                 )}
               >
                 <span className={cn('min-w-0 flex-1', row.locked && 'opacity-60')}>
-                  <span className="block text-[13px] text-[#ececea]">{m.name}</span>
-                  <span className="block text-[12px] text-[#8d8d8a]">{m.description}</span>
+                  <span className="block text-[13px] text-foreground">{m.name}</span>
+                  <span className="block text-[12px] text-muted-foreground">{m.description}</span>
                 </span>
                 {row.locked && (
-                  <span className="flex shrink-0 items-center gap-1 text-[11.5px] text-[#8d8d8a]">
+                  <span className="flex shrink-0 items-center gap-1 text-[11.5px] text-muted-foreground">
                     <Lock className="h-3 w-3" /> Upgrade
                   </span>
                 )}
                 {!row.locked && row.needsSetup && (
-                  <span className="shrink-0 text-[11.5px] text-[#8d8d8a]">Needs a key</span>
+                  <span className="shrink-0 text-[11.5px] text-muted-foreground">Needs a key</span>
                 )}
-                {current && <Check className="h-4 w-4 shrink-0 text-[#5aa6ff]" />}
+                {current && <Check className="h-4 w-4 shrink-0 text-link" />}
               </button>
             </React.Fragment>
           )
         })}
       </div>
-      <div className="mt-3 flex items-center gap-1.5 border-t border-white/[0.07] pt-3 text-[11.5px] text-[#77776f]">
+      <div className="mt-3 flex items-center gap-1.5 border-t border-border/50 pt-3 text-[11.5px] text-faint-foreground">
         <KeyChip>↑</KeyChip>
         <KeyChip>↓</KeyChip> to move <KeyChip>↵</KeyChip> to choose. Applies to your next message.
       </div>

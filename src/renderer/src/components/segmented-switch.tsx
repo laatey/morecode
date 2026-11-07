@@ -6,6 +6,8 @@ export interface SegmentedSwitchOption<T extends string = string> {
   icon?: React.ReactNode
   label?: React.ReactNode
   title?: string
+  /** Optional width in px for this segment; falls back to itemWidth. */
+  width?: number
 }
 
 export interface SegmentedSwitchProps<T extends string = string> {
@@ -26,23 +28,25 @@ export function SegmentedSwitch<T extends string = string>({
   className = ''
 }: SegmentedSwitchProps<T>): React.JSX.Element {
   const activeIndex = options.findIndex((opt) => opt.value === value)
-  const totalWidth = options.length * itemWidth
+  const widths = options.map((o) => o.width ?? itemWidth)
+  const offsets = widths.map((_, i) => widths.slice(0, i).reduce((a, b) => a + b, 0))
+  const totalWidth = widths.reduce((a, b) => a + b, 0)
 
   return (
     <div
-      className={`relative inline-flex items-center app-no-drag rounded-[8px] bg-[#323230] p-0 overflow-hidden select-none shrink-0 ${className}`}
+      className={`relative inline-flex items-center app-no-drag rounded-[8px] bg-secondary p-0 overflow-hidden select-none shrink-0 ${className}`}
       style={{ width: `${totalWidth}px`, height: `${height}px` }}
     >
       {/* Smooth sliding thumb filling full height with crisp border */}
       <div
-        className="absolute inset-y-0 left-0 rounded-[7px] bg-[#50504c] border-[1.5px] border-white/40 shadow-xs transition-transform duration-200 ease-out pointer-events-none"
+        className="absolute inset-y-0 left-0 rounded-[7px] bg-border-strong border-[1.5px] border-foreground/40 shadow-xs transition-transform duration-200 ease-out pointer-events-none"
         style={{
-          width: `${itemWidth}px`,
-          transform: `translateX(${Math.max(0, activeIndex) * itemWidth}px)`
+          width: `${widths[Math.max(0, activeIndex)] ?? itemWidth}px`,
+          transform: `translateX(${offsets[Math.max(0, activeIndex)] ?? 0}px)`
         }}
       />
 
-      {options.map((option) => {
+      {options.map((option, i) => {
         const isActive = option.value === value
         const tipLabel = option.title || (typeof option.label === 'string' ? option.label : undefined)
         const btn = (
@@ -51,15 +55,15 @@ export function SegmentedSwitch<T extends string = string>({
             type="button"
             aria-label={tipLabel}
             onClick={() => onChange(option.value)}
-            style={{ width: `${itemWidth}px` }}
+            style={{ width: `${widths[i]}px` }}
             className="group relative z-10 h-full flex items-center justify-center bg-transparent cursor-pointer select-none focus:outline-none"
           >
             {option.icon ? (
               <span
                 className={`flex items-center justify-center transition-all duration-150 [&>svg]:transition-all [&>svg]:duration-150 ${
                   isActive
-                    ? 'text-white [&>svg]:stroke-[2.2]'
-                    : 'text-[#a8a8a4] group-hover:text-white group-hover:[&>svg]:stroke-[2.6]'
+                    ? 'text-foreground [&>svg]:stroke-[2.2]'
+                    : 'text-muted-foreground group-hover:text-foreground group-hover:[&>svg]:stroke-[2.6]'
                 }`}
               >
                 {option.icon}
@@ -67,8 +71,8 @@ export function SegmentedSwitch<T extends string = string>({
             ) : null}
             {option.label ? (
               <span
-                className={`text-xs transition-colors duration-150 ${
-                  isActive ? 'text-white font-medium' : 'text-[#a8a8a4] group-hover:text-white'
+                className={`whitespace-nowrap text-xs transition-colors duration-150 ${
+                  isActive ? 'text-foreground font-medium' : 'text-muted-foreground group-hover:text-foreground'
                 }`}
               >
                 {option.label}

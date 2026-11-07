@@ -88,9 +88,9 @@ test('fetch reads a page, refuses files and reports errors', async () => {
   assert.equal(page.title, 'T')
   assert.match(page.text, /Hello world/)
   assert.equal(page.clipped, false)
-  const pdf = async () => reply('%PDF', { headers: { 'content-type': 'application/pdf' } })
+  const png = async () => reply('PNG', { headers: { 'content-type': 'image/png' } })
   await assert.rejects(
-    () => webFetch('https://x.test/a.pdf', new AbortController().signal, 20000, pdf),
+    () => webFetch('https://x.test/a.png', new AbortController().signal, 20000, png),
     /not a page/
   )
   const gone = async () => new Response('no', { status: 404, statusText: 'Not Found' })
@@ -102,4 +102,18 @@ test('fetch reads a page, refuses files and reports errors', async () => {
   const cut = await webFetch('https://x.test/c', new AbortController().signal, 1000, big)
   assert.equal(cut.text.length, 1000)
   assert.equal(cut.clipped, true)
+})
+
+test('fetch converts PDF links, even when served as octet-stream, and attaches pages with no text', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { register } = await import('node:module')
+  register('./ts-resolve-hooks.mjs', import.meta.url)
+  const bytes = readFileSync(new URL('./fixtures/mixed.pdf', import.meta.url))
+  const served = (type) => async () => new Response(bytes, { headers: { 'content-type': type } })
+  const a = await webFetch('https://x.test/doc.pdf', new AbortController().signal, 20000, served('application/pdf'))
+  assert.match(a.text, /Hello Gershon/)
+  assert.equal(a.images.length, 1)
+  const b = await webFetch('https://x.test/doc.pdf?dl=1', new AbortController().signal, 20000, served('application/octet-stream'), { pages: '3' })
+  assert.match(b.text, /Third page text/)
+  assert.doesNotMatch(b.text, /Hello Gershon/)
 })

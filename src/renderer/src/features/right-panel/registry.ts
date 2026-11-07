@@ -8,7 +8,7 @@ import { disposeTerminal } from './terminal/terminal-store'
 import { forgetBrowser } from './tabs/browser-state'
 import { TaskTab } from './tabs/task-tab'
 import { PlanTab } from './tabs/plan-tab'
-import { FilePreviewTab } from './tabs/file-preview-tab'
+import { FilePreviewTab, forgetFileDraft, hasUnsavedDraft } from './tabs/file-preview-tab'
 
 /**
  * THE place to add a new right-panel tab:
@@ -22,7 +22,10 @@ export const TAB_DEFINITIONS: TabDefinition[] = [
     title: 'File',
     description: 'Preview a project file',
     icon: FileCode2,
-    component: FilePreviewTab
+    allowMultiple: true,
+    component: FilePreviewTab,
+    onClose: forgetFileDraft,
+    isDirty: hasUnsavedDraft
   },
   {
     kind: 'browser',

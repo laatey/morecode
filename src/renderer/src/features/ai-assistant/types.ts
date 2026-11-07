@@ -19,7 +19,7 @@ export interface Attachment {
   path?: string
 }
 
-export type PermissionAction = 'command' | 'install' | 'remove' | 'network' | 'browse' | 'web' | 'git'
+export type PermissionAction = 'command' | 'install' | 'remove' | 'network' | 'browse' | 'web' | 'git' | 'memory'
 export type PermissionState = 'pending' | 'allowed' | 'always' | 'denied' | 'blocked'
 export type Decision = 'once' | 'always' | 'deny'
 
@@ -124,6 +124,7 @@ export type ToolBlock =
       authError?: boolean
     }
   | { kind: 'read'; id: string; paths: string[]; status: ToolStatus; error?: string }
+  | { kind: 'memory'; id: string; op: 'search' | 'save' | 'forget'; text: string; scope?: 'global' | 'project'; status: ToolStatus; error?: string }
   | {
       /** A skill file the agent read on demand. */
       kind: 'skill'
@@ -143,6 +144,8 @@ export type ToolBlock =
       text: string
       status: ToolStatus
       durationMs?: number
+      /** When it started, so the row can count up while it thinks. */
+      startedAt?: number
     }
   | {
       /** A step-by-step plan waiting for the user's go-ahead. */
@@ -161,7 +164,15 @@ export type Part =
 
 export type Msg =
   | { id: string; role: 'user'; text: string; shown?: string; images?: string[]; attachments?: Attachment[] }
-  | { id: string; role: 'system'; text: string; /** A written summary of everything above this point, which replaces it for the AI. */ summary?: string }
+  | {
+      id: string
+      role: 'system'
+      text: string
+      /** A written summary of everything above this point, which replaces it for the AI. */
+      summary?: string
+      /** Set on a "Rewound here" line: the messages that were set aside, kept until the next message is sent so the rewind can be undone. */
+      rewind?: { hidden: Msg[] }
+    }
   | {
       id: string
       role: 'agent'
@@ -172,13 +183,18 @@ export type Msg =
       feedback?: 'up' | 'down'
       durationMs?: number
       tokens?: number
+      /** Estimated tokens written so far by the reply in progress; folded into tokens when it finishes. */
+      liveTokens?: number
+      /** Everything the model processed this reply, for the hover breakdown. */
+      usage?: { input: number; output: number; cacheRead: number; cacheWrite: number }
     }
 
 /** What an agent backend streams to the UI. A real backend only needs to emit these. */
 export type AgentEvent =
   | { type: 'tool'; tool: ToolBlock } // upsert by tool.id
   | { type: 'text'; delta: string }
-  | { type: 'usage'; tokens: number }
+  | { type: 'live'; tokens: number } // running estimate for the reply being written
+  | { type: 'usage'; tokens: number; detail?: { input: number; output: number; cacheRead: number; cacheWrite: number } }
 
 export interface AgentRequest {
   prompt: string

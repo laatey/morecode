@@ -117,7 +117,23 @@ function applyEvent(
     else parts.push({ type: 'text', text: e.delta })
     return { ...msg, parts }
   }
-  return { ...msg, tokens: (msg.tokens ?? 0) + e.tokens }
+  if (e.type === 'live') return { ...msg, liveTokens: e.tokens }
+  const d = e.detail
+  return {
+    ...msg,
+    liveTokens: 0,
+    tokens: (msg.tokens ?? 0) + e.tokens,
+    ...(d
+      ? {
+          usage: {
+            input: (msg.usage?.input ?? 0) + d.input,
+            output: (msg.usage?.output ?? 0) + d.output,
+            cacheRead: (msg.usage?.cacheRead ?? 0) + d.cacheRead,
+            cacheWrite: (msg.usage?.cacheWrite ?? 0) + d.cacheWrite
+          }
+        }
+      : {})
+  }
 }
 
 type AgentMsg = Extract<Msg, { role: 'agent' }>
@@ -212,7 +228,7 @@ const mapTool = (all: Msg[], id: string, fn: (t: ToolBlock) => ToolBlock): Msg[]
 export const ruleKey = (action: PermissionAction): keyof Settings['rules'] => (action === 'command' ? 'commands' : action)
 
 /** Kinds of action where "Always allow" means "stop asking about this kind", not "allow this exact text". */
-const WHOLE_KIND: PermissionAction[] = ['browse', 'web', 'git']
+const WHOLE_KIND: PermissionAction[] = ['browse', 'web', 'git', 'memory']
 
 /** What the person's settings say about risky actions, read fresh whenever the agent asks. */
 export interface Policy {
@@ -268,6 +284,8 @@ export function useChat(
   edit: (userId: string, text: string, model: string, autoAccept: boolean) => void
   /** Go back to before a message was sent. Returns the message so it can be put back in the box. */
   rewind: (userId: string) => Extract<Msg, { role: 'user' }> | null
+  /** Bring back what a "Rewound here" line set aside, including the file edits. Returns the names of files left alone because they changed since. */
+  undoRewind: (markerId: string) => Promise<{ skipped: string[] } | null>
   rate: (agentId: string, value: 'up' | 'down') => void
   acceptAll: () => void
   discardAll: () => void
@@ -300,6 +318,8 @@ export function useChat(
       shown?: string
     ) => {
       if (controller.current) return
+      // sending something new ends the chance to undo a rewind: the set-aside messages are let go
+      base = base.map((m) => (m.role === 'system' && m.rewind ? { id: m.id, role: 'system' as const, text: m.text } : m))
       const agentId = uid()
       const started = Date.now()
       const user: Msg = {
@@ -481,9 +501,39 @@ export function useChat(
     if (i < 0 || !u || u.role !== 'user') return null
     controller.current?.abort()
     undoEditsIn(all.slice(i), onEditReverted)
-    setMessages(all.slice(0, i))
+    // a marker stays where the rewind happened; what was set aside is kept in it so the rewind can be undone
+    const marker: Msg = {
+      id: uid(),
+      role: 'system',
+      text: `Rewound here · ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`,
+      rewind: { hidden: all.slice(i) }
+    }
+    setMessages([...all.slice(0, i), marker])
     return u
   }, [onEditReverted])
+
+  const undoRewind = useCallback(async (markerId: string) => {
+    if (controller.current) return null
+    const all = latest.current
+    const at = all.findIndex((m) => m.id === markerId)
+    const marker = all[at]
+    if (at < 0 || !marker || marker.role !== 'system' || !marker.rewind) return null
+    const hidden = marker.rewind.hidden
+    // put the file edits back in the order they were made; a file changed since is left as it is
+    const edits = hidden.flatMap((m) =>
+      m.role === 'agent'
+        ? m.parts.flatMap((p) => (p.type === 'tool' && p.tool.kind === 'edit' && p.tool.review !== 'discarded' ? [p.tool] : []))
+        : []
+    )
+    const skipped: string[] = []
+    for (const t of edits) {
+      const r = await agentApi()?.restore(t.id)
+      if (r === 'changed') skipped.push(t.path)
+    }
+    window.dispatchEvent(new Event('workspace:changed'))
+    setMessages([...all.slice(0, at), ...hidden, ...all.slice(at + 1)])
+    return { skipped }
+  }, [])
 
   const stop = useCallback(() => controller.current?.abort(), [])
   const load = useCallback((id: string, list: Msg[]) => {
@@ -678,6 +728,7 @@ export function useChat(
     retry,
     edit,
     rewind,
+    undoRewind,
     rate,
     acceptAll,
     discardAll,

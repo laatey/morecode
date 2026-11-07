@@ -31,7 +31,7 @@ export function QuestionRow({ tool }: { tool: Q }): React.JSX.Element {
           <CircleHelp className="h-3 w-3 shrink-0 text-muted-foreground" />
           <span className="min-w-0 truncate text-muted-foreground">{a.question}</span>
           <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-          <span className="min-w-0 truncate rounded-[4px] bg-white/[0.07] px-1.5 text-[12px] leading-[18px] text-[#ededeb]">
+          <span className="min-w-0 truncate rounded-[4px] bg-foreground/[0.07] px-1.5 text-[12px] leading-[18px] text-foreground">
             {a.answer}
           </span>
         </li>

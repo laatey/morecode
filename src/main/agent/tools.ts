@@ -1,15 +1,19 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { ToolDef } from './anthropic'
 import { diffFiles } from './diff'
+import { snapshots, baselines, revertEdit, keepEdit, restoreEdit } from './undo-store'
 import { resultText } from '../mcp/client'
 import type { McpRuntime } from '../mcp/manager'
 import { runBrowserTool } from './browser'
 import { designGuide } from './design'
 import { validateSkillDraft } from '../../shared/skill-draft'
+import { locateInSkills, materializeSkill, safeSkillId, skillDirNote } from './skill-files'
 import { dropJob, getJob, listJobs, markDetached, seconds, startJob, stopJob, takeNew, waitForJob, type Job } from './background'
 import { GIT_TOOL_DEFS, GIT_TOOLS, GIT_WRITES, gitCommandText, runGit, type GitToolName } from './git-tools'
 import { isLocalUrl, normalizeUrl, webFetch, webSearch } from './web'
+import { docKindFromName, legacyOfficeHint, readDocument } from './documents'
+import { addEntry, removeEntry, runSearch, type MemoryRuntime, type Scope } from './memory'
 import { validateRoutineDraft } from '../../shared/routine-draft'
 import { SKIPPED_FOR_MODEL, answersForModel, validateQuestions, type QuestionAnswer, type QuestionItem } from '../../shared/question'
 
@@ -20,7 +24,7 @@ import { SKIPPED_FOR_MODEL, answersForModel, validateQuestions, type QuestionAns
  */
 
 export type Decision = 'once' | 'always' | 'deny'
-export type PermissionAction = 'command' | 'install' | 'remove' | 'network' | 'browse' | 'web' | 'git'
+export type PermissionAction = 'command' | 'install' | 'remove' | 'network' | 'browse' | 'web' | 'git' | 'memory'
 
 export interface PermissionRequest {
   id: string
@@ -46,6 +50,8 @@ export interface SkillData {
 
 export interface ToolContext {
   cwd: string
+  /** Present only when memory is switched on for this chat. Without it the memory tools do not exist. */
+  memory?: MemoryRuntime
   /** Hand a read-only research job to a helper. Set by the run, which enforces the limits. */
   delegate?: (id: string, task: string) => Promise<string>
   /** How many edit_file attempts have failed per file in this run. */
@@ -58,6 +64,10 @@ export interface ToolContext {
   mcp?: McpRuntime | null
   /** Skills the person has switched on, so the AI can read their SKILL.md or bundle files on demand. */
   skills?: SkillData[]
+  /** Folder where enabled skills are unpacked when read, so their scripts can be run. Set by the main process. */
+  skillsDir?: string
+  /** Skills whose folder path the AI has already been given in this run, so the rules are not repeated on every read. */
+  skillDirsShown?: Set<string>
   /** Put questions to the person and wait. Resolves null when they skip. Not offered to helpers. */
   askQuestion?: (id: string, items: QuestionItem[]) => Promise<QuestionAnswer[] | null>
 }
@@ -119,44 +129,22 @@ const looksBinary = (buf: Buffer): boolean => buf.subarray(0, 8000).includes(0)
 const clip = (text: string, max = MAX_OUTPUT_CHARS): string =>
   text.length <= max ? text : `${text.slice(0, max / 2)}\n… [${text.length - max} characters left out] …\n${text.slice(-max / 2)}`
 
-/* ---------- undo ---------- */
+const MAX_LINE_CHARS = 800
+/** Command output for the model: a minified file is one enormous line, which is never useful to read in full. */
+const clipCommand = (text: string): string =>
+  clip(
+    text
+      .split('\n')
+      .map((line) =>
+        line.length > MAX_LINE_CHARS
+          ? `${line.slice(0, MAX_LINE_CHARS)} … [line cut: ${line.length} characters. This looks minified or generated: do not search it with findstr or grep. Pull out only the rules you need with one precise regex.]`
+          : line
+      )
+      .join('\n')
+  )
 
-interface Snapshot {
-  abs: string
-  /** null means the file did not exist before the AI created it. */
-  original: string | null
-}
-const snapshots = new Map<string, Snapshot>()
-/** What each file looked like before its first edit that is still waiting for review, to count the real net change. */
-const baselines = new Map<string, string | null>()
-const releaseBaseline = (abs: string): void => {
-  if (![...snapshots.values()].some((s) => s.abs === abs)) baselines.delete(abs)
-}
-
-/** Put a file back the way it was before one edit. Returns false if there is nothing to undo. */
-export function revertEdit(id: string): boolean {
-  const snap = snapshots.get(id)
-  if (!snap) return false
-  try {
-    if (snap.original === null) {
-      if (existsSync(snap.abs)) unlinkSync(snap.abs)
-    } else {
-      writeFileSync(snap.abs, snap.original)
-    }
-  } catch {
-    return false
-  }
-  snapshots.delete(id)
-  releaseBaseline(snap.abs)
-  return true
-}
-
-/** The person kept an edit; the undo copy is no longer needed. */
-export function keepEdit(id: string): void {
-  const snap = snapshots.get(id)
-  snapshots.delete(id)
-  if (snap) releaseBaseline(snap.abs)
-}
+/* ---------- undo (see undo-store.ts) ---------- */
+export { revertEdit, keepEdit, restoreEdit }
 
 /* ---------- classifying commands for the permission prompt ---------- */
 
@@ -174,7 +162,8 @@ const TITLE: Record<PermissionAction, string> = {
   network: 'Use the internet',
   browse: 'Open a web page',
   web: 'Search the web',
-  git: 'Use git'
+  git: 'Use git',
+  memory: 'Save to memory'
 }
 
 /* ---------- the tools ---------- */
@@ -185,14 +174,45 @@ const str = (v: unknown, name: string): string => {
   return v
 }
 
+/**
+ * The skills folder exists so the AI can run a skill's scripts, not so it can browse around it. Reading,
+ * listing and searching there goes through read_skill, which shows the person what was read.
+ */
+function keepOutOfSkills(ctx: ToolContext, abs: string, verb: string): void {
+  const hit = locateInSkills(ctx.skillsDir, abs)
+  if (!hit) return
+  const skill = (ctx.skills ?? []).find((s) => safeSkillId(s.id) === hit.folder)
+  const how = skill
+    ? `Use read_skill with skill “${skill.id}”${hit.file ? ` and path “${hit.file}”` : ''} instead.`
+    : 'That folder belongs to a skill that is not switched on. Use read_skill for skills that are.'
+  throw new Error(`The skills folder is only for running a skill's scripts, so it cannot be ${verb} directly. ${how}`)
+}
+
 async function readFile(ctx: ToolContext, id: string, i: Input): Promise<ToolResult> {
   const abs = resolveRead(ctx.cwd, str(i.path, 'path'))
+  keepOutOfSkills(ctx, abs, 'read')
   const shown = rel(ctx.cwd, abs)
   ctx.emit({ kind: 'read', id, paths: [shown], status: 'running' })
   if (!existsSync(abs)) throw new Error(`There is no file at ${shown}.`)
   const st = statSync(abs)
   if (st.isDirectory()) throw new Error(`${shown} is a folder. Use list_dir to see what is inside.`)
   const buf = readFileSync(abs)
+  const imageType = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }[
+    abs.split('.').pop()?.toLowerCase() ?? ''
+  ]
+  if (imageType) {
+    if (buf.length > 5_000_000) throw new Error(`${shown} is an image over 5 MB. Make a smaller or cropped copy first.`)
+    ctx.emit({ kind: 'read', id, paths: [shown], status: 'done' })
+    return { content: `${shown} (image, ${buf.length} bytes)`, images: [{ media_type: imageType, data: buf.toString('base64') }] }
+  }
+  const docKind = docKindFromName(abs)
+  if (docKind) {
+    const doc = await readDocument(buf, docKind, { pages: typeof i.pages === 'string' ? i.pages : undefined, render: i.render === true })
+    ctx.emit({ kind: 'read', id, paths: [shown], status: 'done' })
+    return { content: `${shown}\n${doc.text}`, images: doc.images.length ? doc.images : undefined }
+  }
+  const legacy = legacyOfficeHint(abs)
+  if (legacy) throw new Error(`${shown}: ${legacy}`)
   if (looksBinary(buf)) throw new Error(`${shown} is a binary file, so it cannot be read as text.`)
   const all = buf.subarray(0, MAX_READ_BYTES).toString('utf8').split('\n')
   const start = Math.max(1, Number(i.start_line) || 1)
@@ -208,6 +228,7 @@ async function readFile(ctx: ToolContext, id: string, i: Input): Promise<ToolRes
 
 function listDir(ctx: ToolContext, id: string, i: Input): ToolResult {
   const abs = resolveRead(ctx.cwd, typeof i.path === 'string' && i.path ? i.path : '.')
+  keepOutOfSkills(ctx, abs, 'listed')
   const shown = rel(ctx.cwd, abs)
   ctx.emit({ kind: 'read', id, paths: [shown === '.' ? 'project folder' : shown], status: 'running' })
   if (!existsSync(abs) || !statSync(abs).isDirectory()) throw new Error(`${shown} is not a folder.`)
@@ -223,6 +244,7 @@ function listDir(ctx: ToolContext, id: string, i: Input): ToolResult {
 function search(ctx: ToolContext, id: string, i: Input): ToolResult {
   const pattern = str(i.pattern, 'pattern')
   const base = resolveRead(ctx.cwd, typeof i.path === 'string' && i.path ? i.path : '.')
+  keepOutOfSkills(ctx, base, 'searched')
   ctx.emit({ kind: 'read', id, paths: [`“${pattern}”`], status: 'running' })
   let re: RegExp
   try {
@@ -355,7 +377,9 @@ function writeNewFile(ctx: ToolContext, id: string, i: Input): ToolResult {
   ctx.emit({ kind: 'edit', id, path: shown, added: 0, removed: 0, status: 'running' })
   if (existsSync(abs) && statSync(abs).isDirectory()) throw new Error(`${shown} is a folder.`)
   const before = existsSync(abs) ? readFileSync(abs, 'utf8') : null
-  return applyWrite(ctx, id, abs, before, str(i.content, 'content'))
+  const content = str(i.content, 'content')
+  // append: add to the end of the file, so a big file can be written in several smaller calls
+  return applyWrite(ctx, id, abs, before, i.append === true && before !== null ? before + content : content)
 }
 
 const jobStatus = (job: Job): string =>
@@ -383,7 +407,7 @@ async function runCommand(ctx: ToolContext, id: string, i: Input): Promise<ToolR
   // A command that has already ended: report it like a normal command.
   const finishExited = (): ToolResult => {
     const { text } = takeNew(job)
-    const out = clip(text.trim() || '(no output)')
+    const out = clipCommand(text.trim() || '(no output)')
     const ok = job.exitCode === 0 && !job.stopped
     ctx.emit({ kind: 'command', id, label, command, status: ok ? 'done' : 'error', output: out })
     dropJob(job.id)
@@ -395,7 +419,7 @@ async function runCommand(ctx: ToolContext, id: string, i: Input): Promise<ToolR
   const detach = (why: string): ToolResult => {
     markDetached(job)
     const { text } = takeNew(job)
-    const out = clip(text.trim() || '(no output yet)')
+    const out = clipCommand(text.trim() || '(no output yet)')
     const note = `[${why} It is job ${job.id}. Use command_output with id "${job.id}" to read new output or to wait for more (wait_seconds, until), and stop_command to end it.]`
     ctx.emit({ kind: 'command', id, label, command, status: 'done', output: `${out}\n${note}` })
     return { content: `${out}\n${note}` }
@@ -412,7 +436,7 @@ async function runCommand(ctx: ToolContext, id: string, i: Input): Promise<ToolR
   if (result === 'aborted') {
     await stopJob(job)
     const { text } = takeNew(job)
-    const out = clip(text.trim() || '(no output)')
+    const out = clipCommand(text.trim() || '(no output)')
     ctx.emit({ kind: 'command', id, label, command, status: 'error', output: out })
     dropJob(job.id)
     return { content: `${out}\n[stopped]`, isError: true }
@@ -444,7 +468,7 @@ async function commandOutput(ctx: ToolContext, id: string, i: Input): Promise<To
 
   const result = wait > 0 || until ? await waitForJob(job, wait || 30, until, ctx.signal) : 'timeout'
   const { text, skipped } = takeNew(job)
-  const out = clip(text.trim() || '(no new output)')
+  const out = clipCommand(text.trim() || '(no new output)')
   const head = skipped ? `[${skipped} characters of older output were dropped]\n` : ''
   const extra = result === 'matched' ? `; the output contains “${until}”` : result === 'timeout' && (wait > 0 || until) ? `; waited ${wait || 30}s` : ''
   ctx.emit({ kind: 'command', id, label, command: job.command, status: 'done', output: out })
@@ -457,7 +481,7 @@ async function stopCommand(ctx: ToolContext, id: string, i: Input): Promise<Tool
   ctx.emit({ kind: 'command', id, label, command: job.command, status: 'running' })
   await stopJob(job)
   const { text } = takeNew(job)
-  const out = clip(text.trim() || '(no new output)')
+  const out = clipCommand(text.trim() || '(no new output)')
   dropJob(job.id)
   ctx.emit({ kind: 'command', id, label, command: job.command, status: 'done', output: out })
   return { content: `${out}\n[${job.id}: ${jobStatus(job)}]` }
@@ -594,7 +618,20 @@ function readSkill(ctx: ToolContext, id: string, i: Input): ToolResult {
     status: 'done'
   })
 
-  return { content: clip(`${content}${fileListNote}`) }
+  // Unpack the skill so its scripts can be run. If the disk is not writable, the skill still works from memory.
+  let dirNote = ''
+  if (ctx.skillsDir) {
+    try {
+      const dir = materializeSkill(ctx.skillsDir, found)
+      const shown = (ctx.skillDirsShown ??= new Set<string>())
+      dirNote = shown.has(found.id) ? '' : `\n\n---\n${skillDirNote(dir)}`
+      shown.add(found.id)
+    } catch {
+      dirNote = ''
+    }
+  }
+
+  return { content: clip(`${content}${fileListNote}`) + dirNote }
 }
 
 /** A short listing of the project (two levels deep) so the AI knows what already exists. */
@@ -655,13 +692,51 @@ async function webFetchTool(ctx: ToolContext, id: string, i: Input): Promise<Too
   }
   ctx.emit({ kind: 'web', id, op: 'fetch', url, status: 'running' })
   try {
-    const page = await webFetch(url, ctx.signal, Number(i.max_chars) || 20_000)
+    const page = await webFetch(url, ctx.signal, Number(i.max_chars) || 20_000, fetch, { pages: typeof i.pages === 'string' ? i.pages : undefined, render: i.render === true })
     ctx.emit({ kind: 'web', id, op: 'fetch', url: page.url, title: page.title, status: 'done', excerpt: page.text.slice(0, 700), chars: page.text.length, clipped: page.clipped })
     const head = `${page.title ? `${page.title}\n` : ''}${page.url}\n\n`
-    return { content: `${head}${page.text || '(the page has no readable text)'}${page.clipped ? '\n\n[The page continues; ask for more with a larger max_chars or a more specific address.]' : ''}` }
+    return { content: `${head}${page.text || '(the page has no readable text)'}${page.clipped ? '\n\n[The page continues; ask for more with a larger max_chars or a more specific address.]' : ''}`, images: page.images?.length ? page.images : undefined }
   } catch (err) {
     const message = (err as Error).message
     ctx.emit({ kind: 'web', id, op: 'fetch', url, status: 'error', error: message })
+    return { content: message, isError: true }
+  }
+}
+
+/* ---------- memory ---------- */
+
+async function memoryTool(ctx: ToolContext, name: string, id: string, i: Input): Promise<ToolResult> {
+  const rt = ctx.memory
+  if (!rt) return { content: 'Memory is switched off for this chat. Carry on without it and do not mention it.', isError: true }
+  const op = name === 'memory_search' ? 'search' : name === 'memory_save' ? 'save' : 'forget'
+  const text = str(op === 'forget' ? (i.note ?? i.text) : op === 'search' ? i.query : i.text, op === 'search' ? 'query' : 'text')
+  const scope: Scope = i.scope === 'global' || !rt.projectPath ? 'global' : 'project'
+  ctx.emit({ kind: 'memory', id, op, text, scope, status: 'running' })
+  try {
+    if (op === 'search') {
+      const out = runSearch(rt, text)
+      ctx.emit({ kind: 'memory', id, op, text, status: 'done' })
+      return { content: out }
+    }
+    if (op === 'save') {
+      if (i.scope === 'project' && !rt.projectPath) throw new Error('This chat is not in a project, so there is nowhere to keep project notes. Save it with scope "global" only if it is a personal preference that applies everywhere.')
+      if (rt.mode === 'ask') {
+        const d = await ctx.ask({ id: `perm-${id}`, action: 'memory', title: scope === 'global' ? 'Remember this everywhere?' : 'Remember this for this project?', command: text, reason: 'The AI wants to save this for future chats.' })
+        if (d === 'deny') {
+          ctx.emit({ kind: 'memory', id, op, text, scope, status: 'error', error: 'Not saved.' })
+          return { content: 'The person chose not to save that. Do not save it, and do not ask again.', isError: true }
+        }
+      }
+      const { duplicate } = addEntry(rt.dir, scope, rt.projectPath, text, { chat: rt.chat })
+      ctx.emit({ kind: 'memory', id, op, text, scope, status: 'done' })
+      return { content: duplicate ? 'That was already in memory.' : `Saved to ${scope === 'global' ? 'global' : 'project'} memory.` }
+    }
+    const gone = removeEntry(rt.dir, 'project', rt.projectPath, text) ?? removeEntry(rt.dir, 'global', undefined, text)
+    ctx.emit({ kind: 'memory', id, op, text: gone?.text ?? text, status: gone ? 'done' : 'error', ...(gone ? {} : { error: 'No matching note.' }) })
+    return gone ? { content: `Forgot: ${gone.text}` } : { content: `No saved note matches “${text}”.`, isError: true }
+  } catch (err) {
+    const message = (err as Error).message
+    ctx.emit({ kind: 'memory', id, op, text, scope, status: 'error', error: message })
     return { content: message, isError: true }
   }
 }
@@ -716,13 +791,15 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'read_file',
-    description: 'Read a text file. Returns numbered lines. Always read a file before editing it.',
+    description: 'Read a file. Text files return numbered lines (always read a file before editing it). Images are shown to you. PDF, Word (.docx), Excel (.xlsx) and PowerPoint (.pptx) files are converted: you get the text of each page, sheet or slide, and PDF pages with little or no text (scans, drawings, diagrams) are attached as pictures so you can look at them. Use pages to read part of a long document.',
     input_schema: {
       type: 'object',
       properties: {
         path: { type: 'string' },
-        start_line: { type: 'integer', description: 'First line to return (1-based).' },
-        end_line: { type: 'integer', description: 'Last line to return.' }
+        start_line: { type: 'integer', description: 'First line to return (1-based). Text files only.' },
+        end_line: { type: 'integer', description: 'Last line to return. Text files only.' },
+        pages: { type: 'string', description: 'For PDF, Word, Excel and PowerPoint: which pages, sheets or slides, such as "3", "2-5" or "1,4-6". At most 20 PDF pages are returned per call; the result says how to continue.' },
+        render: { type: 'boolean', description: 'PDF only: also attach the chosen pages as pictures even when they have text. Use it to look at charts, tables or layout.' }
       },
       required: ['path']
     }
@@ -763,8 +840,8 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'write_file',
-    description: 'Create a new file, or replace a file completely with the given content. Missing folders are created. Use paths relative to the project root, with no leading slash.',
-    input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] }
+    description: 'Create a new file, or replace a file completely with the given content. Missing folders are created. Use paths relative to the project root, with no leading slash. For a very large file, write the first part, then call again with append set to true to add the next parts to the end.',
+    input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, append: { type: 'boolean', description: 'Add content to the end of the existing file instead of replacing it.' } }, required: ['path', 'content'] }
   },
   {
     name: 'run_command',
@@ -830,6 +907,28 @@ export const TOOL_DEFS: ToolDef[] = [
     }
   },
   {
+    name: 'memory_search',
+    description: 'Look up notes the person saved in earlier chats (their stack, conventions, preferences). Use it only when the task plausibly depends on their own setup or past choices, never for general questions. Results are defaults: if the request says otherwise, the request wins.',
+    input_schema: { type: 'object', properties: { query: { type: 'string', description: 'A few words, like a search box.' } }, required: ['query'] }
+  },
+  {
+    name: 'memory_save',
+    description: 'Save one short, durable fact or preference the person told you, for future chats. Not for details of one task, anything from a file or web page, or secrets. The person may be asked to approve it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'One fact, at most 300 characters, written plainly (for example "Uses pnpm, not npm").' },
+        scope: { type: 'string', enum: ['project', 'global'], description: 'project: about this codebase or its stack. global: a personal preference that applies everywhere (language, tone).' }
+      },
+      required: ['text', 'scope']
+    }
+  },
+  {
+    name: 'memory_forget',
+    description: 'Remove a saved note. Use it only when the person asks you to forget something.',
+    input_schema: { type: 'object', properties: { note: { type: 'string', description: 'The note, or a few words from it.' } }, required: ['note'] }
+  },
+  {
     name: 'read_skill',
     description:
       'Read the instructions or a specific bundle file (such as SKILL.md or a sub-skill file) from one of the person\'s enabled skills listed under "Available skills". When a skill matches the person\'s task, call read_skill before proceeding.',
@@ -870,17 +969,22 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'web_fetch',
-    description: 'Read one web page (or a JSON or text address) as plain text. Use an address from web_search, from the person, or from the project. Also works for the dev server at localhost. Long pages are cut; raise max_chars (at most 40000) only if you need more.',
+    description: 'Read one web page (or a JSON or text address) as plain text. Use an address from web_search, from the person, or from the project. Also works for the dev server at localhost, and for links to PDF, Word, Excel and PowerPoint files (converted the same way read_file does it; PDF pages with no text arrive as pictures). Long pages are cut; raise max_chars (at most 40000) only if you need more.',
     input_schema: {
       type: 'object',
-      properties: { url: { type: 'string' }, max_chars: { type: 'integer' } },
+      properties: {
+        url: { type: 'string' },
+        max_chars: { type: 'integer' },
+        pages: { type: 'string', description: 'For document links: which pages, sheets or slides, such as "3", "2-5" or "1,4-6".' },
+        render: { type: 'boolean', description: 'PDF links only: also attach the chosen pages as pictures.' }
+      },
       required: ['url']
     }
   },
   {
     name: 'ask_user',
     description:
-      'Ask the person 1 to 3 short multiple-choice questions and wait for the answers. Use it when a choice changes what you build and you cannot sensibly decide or look it up yourself (a stack, a style, which of two approaches, what to name something). Keep it small: a question of at most 12 words, 2 to 4 options (3 is usual) with short labels, and a description only when the label alone is unclear (at most 6 words). Put the option you recommend first and end its label with “(Recommended)”. The person can always type their own answer instead. Do NOT use it for things you can decide, for yes/no confirmation of routine work, or to ask permission to run commands. Never write a list of questions in your reply when this tool fits.',
+      'Ask the person 1 to 3 short multiple-choice questions and wait for the answers. Use it when a choice changes what you build and you cannot sensibly decide or look it up yourself (a stack, a style, which of two approaches, what to name something). Keep it small: a question of at most 12 words, 2 to 4 options (3 is usual) with short labels, and a description only when the label alone is unclear (at most 6 words). Put the option you recommend first and end its label with “(Recommended)”. A free-text row for the person’s own answer is always added, so never add an “Other”, “None” or “Something else” option yourself. Set multi_select to true when several options can sensibly apply together (features to include, platforms to support); otherwise the person picks one. Do NOT use it for things you can decide, for yes/no confirmation of routine work, or to ask permission to run commands. Never write a list of questions in your reply when this tool fits.',
     input_schema: {
       type: 'object',
       properties: {
@@ -889,7 +993,6 @@ export const TOOL_DEFS: ToolDef[] = [
           items: {
             type: 'object',
             properties: {
-              header: { type: 'string', description: 'One or two words naming the topic, for example “Stack”.' },
               question: { type: 'string' },
               options: {
                 type: 'array',
@@ -1014,6 +1117,10 @@ export async function executeTool(name: string, id: string, input: Input, ctx: T
         return todoWrite(ctx, input)
       case 'present_plan':
         return presentPlan(ctx, id, input)
+      case 'memory_search':
+      case 'memory_save':
+      case 'memory_forget':
+        return await memoryTool(ctx, name, id, input)
       case 'read_skill':
         return readSkill(ctx, id, input)
       case 'draft_skill': {

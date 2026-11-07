@@ -2,12 +2,15 @@ import { SECRET_NAMES, secrets } from '@/lib/secrets'
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { DEFAULT_MODEL } from '@/features/ai-assistant/models'
 import { SETTINGS_KEY } from '@/lib/storage-keys'
+import { cleanThemePrefs, DEFAULT_THEME_PREFS, type ThemePrefs } from '@/theme/prefs'
+import { useApplyTheme } from '@/theme/use-theme'
 
 export type SettingsTab =
   | 'general'
   | 'appearance'
   | 'models'
   | 'permissions'
+  | 'memory'
   | 'shortcuts'
   | 'notifications'
   | 'billing'
@@ -18,7 +21,7 @@ export type Rule = 'ask' | 'allow' | 'block'
 export type InterfaceSize = 'small' | 'default' | 'large'
 export type ContentWidth = 'narrow' | 'default' | 'wide'
 
-export interface Settings {
+export interface Settings extends ThemePrefs {
   sendWith: 'enter' | 'mod-enter'
   model: string
   /** Dedicated AI gateway address and its client key. */
@@ -37,8 +40,12 @@ export interface Settings {
   /** How wide the conversation and message box get. */
   contentWidth: ContentWidth
   reduceMotion: boolean
+  /** Stop the computer sleeping while the AI works. */
+  keepAwake: boolean
+  /** Also do it when running on battery power. */
+  keepAwakeOnBattery: boolean
   /** What the AI does with each kind of action. Editing files follows `autoAccept`. */
-  rules: { commands: Rule; install: Rule; remove: Rule; network: Rule; browse: Rule; web: Rule; git: Rule }
+  rules: { commands: Rule; install: Rule; remove: Rule; network: Rule; browse: Rule; web: Rule; git: Rule; /** Memory: allow = save on its own, ask = approve each save, block = memory is off everywhere. */ memory: Rule }
   /** Commands the person chose to always allow. */
   allowedCommands: string[]
   /** Only the shortcuts that were changed from their defaults. */
@@ -48,6 +55,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  ...DEFAULT_THEME_PREFS,
   sendWith: 'enter',
   model: DEFAULT_MODEL,
   morlineGatewayUrl: '',
@@ -60,7 +68,9 @@ export const DEFAULT_SETTINGS: Settings = {
   interfaceSize: 'default',
   contentWidth: 'default',
   reduceMotion: false,
-  rules: { commands: 'ask', install: 'ask', remove: 'ask', network: 'ask', browse: 'ask', web: 'allow', git: 'ask' },
+  keepAwake: true,
+  keepAwakeOnBattery: false,
+  rules: { commands: 'ask', install: 'ask', remove: 'ask', network: 'ask', browse: 'ask', web: 'allow', git: 'ask', memory: 'ask' },
   allowedCommands: [],
   shortcuts: {},
   notify: { finished: true, permission: true, sound: false },
@@ -74,9 +84,9 @@ export const isTrusted = (s: Pick<Settings, 'autoAccept' | 'rules'>): boolean =>
 
 export const ZOOM: Record<InterfaceSize, number> = { small: 0.92, default: 1, large: 1.12 }
 export const CONTENT_WIDTH: Record<ContentWidth, string> = {
-  narrow: '44rem',
-  default: '56rem',
-  wide: '72rem'
+  narrow: '40rem',
+  default: '48rem',
+  wide: '60rem'
 }
 
 function load(): Settings {
@@ -90,6 +100,7 @@ function load(): Settings {
       return {
         ...DEFAULT_SETTINGS,
         ...saved,
+        ...cleanThemePrefs(saved),
         rules: { ...DEFAULT_SETTINGS.rules, ...saved.rules },
         notify: { ...DEFAULT_SETTINGS.notify, ...saved.notify },
         // keys come from the encrypted store; a plain-text copy from an older version is used once, then moved
@@ -110,6 +121,8 @@ interface SettingsApi {
   settings: Settings
   set: (patch: Partial<Settings>) => void
   reset: () => void
+  /** The theme currently in effect (differs from `settings.theme` while following the system). */
+  activeThemeId: string
   open: boolean
   tab: SettingsTab
   openSettings: (tab?: SettingsTab) => void
@@ -123,6 +136,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   const [settings, setSettings] = useState<Settings>(load)
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<SettingsTab>('general')
+  const activeThemeId = useApplyTheme(settings)
 
   useEffect(() => {
     // keys go to the encrypted store when there is one, and are left out of the plain copy
@@ -157,6 +171,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   useEffect(() => {
     document.documentElement.dataset.motion = settings.reduceMotion ? 'reduced' : 'full'
   }, [settings.reduceMotion])
+  useEffect(() => {
+    window.api?.power?.set({ keepAwake: settings.keepAwake, onBattery: settings.keepAwakeOnBattery })
+  }, [settings.keepAwake, settings.keepAwakeOnBattery])
 
   const set = useCallback(
     (patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch })),
@@ -170,8 +187,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   const closeSettings = useCallback(() => setOpen(false), [])
 
   const value = useMemo<SettingsApi>(
-    () => ({ settings, set, reset, open, tab, openSettings, closeSettings, setTab }),
-    [settings, set, reset, open, tab, openSettings, closeSettings]
+    () => ({ settings, set, reset, activeThemeId, open, tab, openSettings, closeSettings, setTab }),
+    [settings, set, reset, activeThemeId, open, tab, openSettings, closeSettings]
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

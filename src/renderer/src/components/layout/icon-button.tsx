@@ -20,7 +20,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(f
       aria-label={props['aria-label'] ?? title}
       className={cn(
         'app-no-drag shrink-0 p-1.5 rounded-[5px] flex items-center justify-center cursor-pointer',
-        'text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.1]',
+        'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] active:bg-foreground/[0.1]',
         'transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
         className
       )}

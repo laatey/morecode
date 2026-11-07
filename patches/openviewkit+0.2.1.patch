@@ -1,0 +1,39 @@
+diff --git a/node_modules/openviewkit/dist/index.js b/node_modules/openviewkit/dist/index.js
+index 0000000..0000000 100644
+--- a/node_modules/openviewkit/dist/index.js
++++ b/node_modules/openviewkit/dist/index.js
+@@ -5259,9 +5259,33 @@
+ 		(async () => {
+ 			try {
+ 				const mermaid = (await import("mermaid")).default;
++				const cs = getComputedStyle(document.documentElement);
++				const tok = (n, d) => cs.getPropertyValue("--" + n).trim() || d;
++				const bgc = tok("background", "#1e1e1e"), fgc = tok("foreground", "#cccccc");
+ 				mermaid.initialize({
+ 					startOnLoad: false,
+-					theme: "dark",
++					theme: "base",
++					themeVariables: {
++						darkMode: false,
++						background: bgc,
++						fontFamily: "inherit",
++						primaryColor: tok("secondary", bgc),
++						primaryTextColor: fgc,
++						primaryBorderColor: tok("border-strong", fgc),
++						secondaryColor: tok("muted", bgc),
++						tertiaryColor: tok("card", bgc),
++						lineColor: tok("muted-foreground", fgc),
++						textColor: fgc,
++						mainBkg: tok("secondary", bgc),
++						nodeBorder: tok("border-strong", fgc),
++						clusterBkg: tok("card", bgc),
++						clusterBorder: tok("border", fgc),
++						titleColor: fgc,
++						edgeLabelBackground: bgc,
++						noteBkgColor: tok("accent", bgc),
++						noteTextColor: fgc,
++						noteBorderColor: tok("border-strong", fgc)
++					},
+ 					securityLevel: "strict"
+ 				});
+ 				const out = await mermaid.render(`vk-mmd-${++n}`, text);

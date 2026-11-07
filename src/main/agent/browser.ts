@@ -30,6 +30,7 @@ let cached: { id: number; page: Page } | null = null
 let refs = new Map<string, Frame>()
 
 export function registerBrowserIpc(): void {
+  registerColorSchemeIpc()
   ipcMain.on('browser:register', (event, id: unknown) => {
     if (typeof id !== 'number') return
     const wc = webContents.fromId(id)
@@ -48,6 +49,25 @@ export function registerBrowserIpc(): void {
       activeId = id
       refs = new Map()
     }
+  })
+}
+
+/** Make a Browser-tab page see prefers-color-scheme as dark or light (or the real system setting), so people can test both themes. */
+export function registerColorSchemeIpc(): void {
+  ipcMain.on('browser:color-scheme', (event, id: unknown, scheme: unknown) => {
+    if (typeof id !== 'number' || (scheme !== 'dark' && scheme !== 'light' && scheme !== 'auto')) return
+    const wc = webContents.fromId(id)
+    if (!wc || wc.isDestroyed() || wc.getType() !== 'webview' || wc.hostWebContents !== event.sender) return
+    void (async () => {
+      try {
+        if (!wc.debugger.isAttached()) wc.debugger.attach('1.3')
+        await wc.debugger.sendCommand('Emulation.setEmulatedMedia', {
+          features: [{ name: 'prefers-color-scheme', value: scheme === 'auto' ? '' : scheme }]
+        })
+      } catch {
+        // the page may be gone or another tool holds the debugger; the toggle just has no effect
+      }
+    })()
   })
 }
 
@@ -188,8 +208,19 @@ async function currentPage(): Promise<Page> {
     if (!match.length) {
       // the address may have just changed; the one page that is not the app's own window is the tab
       const own = process.env['ELECTRON_RENDERER_URL']
-      const others = pages.filter((p) => !p.url().startsWith('file://') && !(own && p.url().startsWith(own)))
+      const others = pages.filter(
+        (p) => !p.url().startsWith('file://') && !p.url().startsWith('devtools://') && !(own && p.url().startsWith(own))
+      )
       if (others.length === 1) match = others
+      else if (others.length > 1) {
+        // a tab whose page failed to load reports chrome-error://, not the address it was sent to: match by target id
+        const want = await targetOfContents(wc)
+        if (want) {
+          const hit: Page[] = []
+          for (const p of others) if ((await targetOfPage(p)) === want) hit.push(p)
+          if (hit.length === 1) match = hit
+        }
+      }
     }
   }
   if (!match.length) {
@@ -309,12 +340,25 @@ const local = (url: string): boolean => /^https?:\/\/(localhost|127\.0\.0\.1|0\.
 async function navigate(ctx: ToolContext, id: string, i: Input): Promise<string> {
   let url = typeof i.url === 'string' ? i.url.trim() : ''
   if (!url) throw new Error('“url” is required.')
-  if (!/^https?:\/\//i.test(url)) url = /^(localhost|127\.0\.0\.1)/i.test(url) ? `http://${url}` : `https://${url}`
-  if (!local(url)) {
+  if (/^[a-z]:[\\/]/i.test(url)) url = `file:///${url.replace(/\\/g, '/')}`
+  if (!/^(https?|file):\/\//i.test(url)) url = /^(localhost|127\.0\.0\.1)/i.test(url) ? `http://${url}` : `https://${url}`
+  if (!local(url) && !/^file:/i.test(url)) {
     const d = await ctx.ask({ id: `perm-${id}`, action: 'browse', title: 'Open a web page in the Browser tab', command: url, reason: 'The AI wants to browse to this page.' })
     if (d === 'deny') throw new Error('The person did not allow opening this page. Do not try another way; explain what you needed and ask how to proceed.')
   }
-  const page = await currentPage()
+  let page: Page
+  try {
+    page = await currentPage()
+  } catch (err) {
+    // the tab is stuck on an error page Playwright cannot match: load the address directly, then retry
+    const wc = await activeTab()
+    await wc.loadURL(url).catch(() => undefined)
+    try {
+      page = await currentPage()
+    } catch {
+      throw err
+    }
+  }
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 })
   } catch (err) {

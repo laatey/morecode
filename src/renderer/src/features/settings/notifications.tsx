@@ -6,17 +6,44 @@ import { useSettings } from './settings-store'
 
 export type NotifyKind = 'finished' | 'permission' | 'test'
 
-function beep(): void {
-  try {
-    const ctx = new AudioContext()
+let audio: AudioContext | null = null
+
+/** One soft bell note: a sine with a quiet overtone, a quick attack and a long, smooth fade (no clicks). */
+function bell(ctx: AudioContext, freq: number, at: number, peak: number, length: number): void {
+  const out = ctx.createGain()
+  out.gain.setValueAtTime(0.0001, at)
+  out.gain.exponentialRampToValueAtTime(peak, at + 0.012)
+  out.gain.exponentialRampToValueAtTime(0.0001, at + length)
+  out.connect(ctx.destination)
+  for (const [ratio, level] of [[1, 1], [2, 0.28], [3, 0.08]] as const) {
     const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.frequency.value = 880
-    gain.gain.value = 0.04
-    osc.connect(gain).connect(ctx.destination)
-    osc.start()
-    osc.stop(ctx.currentTime + 0.12)
-    osc.onended = () => void ctx.close()
+    const g = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = freq * ratio
+    g.gain.value = level
+    osc.connect(g).connect(out)
+    osc.start(at)
+    osc.stop(at + length + 0.05)
+  }
+}
+
+/**
+ * The notification chime, made with the Web Audio API so there is no sound file to ship.
+ * "Done" rises (a finished, resolved feel); "needs you" is two even taps that ask for attention without alarm.
+ */
+export function chime(kind: 'done' | 'attention' = 'done'): void {
+  try {
+    audio ??= new AudioContext()
+    const ctx = audio
+    void ctx.resume()
+    const t = ctx.currentTime + 0.02
+    if (kind === 'done') {
+      bell(ctx, 783.99, t, 0.16, 0.9) // G5
+      bell(ctx, 1174.66, t + 0.14, 0.14, 1.2) // D6
+    } else {
+      bell(ctx, 880, t, 0.15, 0.55) // A5
+      bell(ctx, 880, t + 0.2, 0.15, 0.7)
+    }
   } catch {
     // no audio available: stay quiet
   }
@@ -36,15 +63,20 @@ export function useNotify(): (kind: NotifyKind, title: string, body?: string) =>
       if (kind === 'permission' && !notify.permission) return
       const away = document.hidden || !document.hasFocus()
       if (kind === 'test') toast.success(title, { description: body })
-      if ((away || kind === 'test') && 'Notification' in window) {
-        const send = (): void => {
-          new Notification(title, { body, silent: true })
-        }
-        if (Notification.permission === 'granted') send()
-        else if (Notification.permission === 'default')
-          void Notification.requestPermission().then((p) => p === 'granted' && send())
+      if (away || kind === 'test') {
+        // the operating system's own notification (clicking it brings MoreCode back); the page's is the fallback
+        void window.api.notify
+          .show(title, body)
+          .catch(() => false)
+          .then((shown) => {
+            if (shown || !('Notification' in window)) return
+            const send = (): void => void new Notification(title, { body, silent: true })
+            if (Notification.permission === 'granted') send()
+            else if (Notification.permission === 'default')
+              void Notification.requestPermission().then((p) => p === 'granted' && send())
+          })
+        if (notify.sound) chime(kind === 'permission' ? 'attention' : 'done')
       }
-      if (notify.sound && (away || kind === 'test')) beep()
     },
     [notify]
   )
@@ -52,13 +84,17 @@ export function useNotify(): (kind: NotifyKind, title: string, body?: string) =>
 
 /** Watches the open chat and sends "finished" when the AI stops working. */
 export function TaskNotifier(): null {
-  const { running } = useChatContext()
+  const { running, messages } = useChatContext()
   const { active } = useWorkspace()
   const notify = useNotify()
   const was = useRef(running)
   useEffect(() => {
-    if (was.current && !running) notify('finished', 'Task finished', active.title)
+    if (was.current && !running) {
+      // pressing Stop is the person's own doing, so there is nothing to announce
+      const last = [...messages].reverse().find((m) => m.role === 'agent')
+      if (!(last && last.role === 'agent' && last.stopped)) notify('finished', 'Task finished', active.title)
+    }
     was.current = running
-  }, [running, active.title, notify])
+  }, [running, messages, active.title, notify])
   return null
 }

@@ -9,6 +9,7 @@ import { GeneralPage } from './pages/general'
 import { ModelsPage } from './pages/models'
 import { NotificationsPage } from './pages/notifications'
 import { PermissionsPage } from './pages/permissions'
+import { MemoryPage } from './pages/memory'
 import { ShortcutsPage } from './pages/shortcuts'
 import { useSettings, type SettingsTab } from './settings-store'
 
@@ -32,6 +33,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Safety',
     items: [
       { id: 'permissions', label: 'Permissions' },
+      { id: 'memory', label: 'Memory' },
       { id: 'data', label: 'Privacy' }
     ]
   },
@@ -56,6 +58,7 @@ const PAGES: Record<SettingsTab, () => React.JSX.Element> = {
   appearance: AppearancePage,
   models: ModelsPage,
   permissions: PermissionsPage,
+  memory: MemoryPage,
   shortcuts: ShortcutsPage,
   notifications: NotificationsPage,
   billing: BillingPage,
@@ -81,12 +84,12 @@ export function SettingsPage({ onBack }: { onBack?: () => void }): React.JSX.Ele
     <main className="flex min-h-0 flex-1 select-text overflow-hidden">
       <nav
         aria-label="Settings navigation"
-        className="flex w-[clamp(164px,18vw,248px)] shrink-0 flex-col border-r border-white/[0.08] px-2.5 pb-4 pt-3"
+        className="flex w-[clamp(164px,18vw,248px)] shrink-0 flex-col border-r border-border px-2.5 pb-4 pt-3"
       >
         <button
           type="button"
           onClick={handleBack}
-          className="mb-3 inline-flex h-7 w-fit cursor-pointer items-center gap-1.5 rounded-md px-2 text-[12px] text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+          className="mb-3 inline-flex h-7 w-fit cursor-pointer items-center gap-1.5 rounded-md px-2 text-[12px] text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back to chat
         </button>
@@ -107,10 +110,10 @@ export function SettingsPage({ onBack }: { onBack?: () => void }): React.JSX.Ele
                       aria-current={active ? 'page' : undefined}
                       onClick={() => setTab(n.id)}
                       className={cn(
-                        'flex h-7 w-full cursor-pointer items-center rounded-md px-2 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]',
+                        'flex h-7 w-full cursor-pointer items-center rounded-md px-2 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary',
                         active
-                          ? 'bg-white/[0.09] text-white'
-                          : 'text-[#c9c9c5] hover:bg-white/[0.05] hover:text-white'
+                          ? 'bg-foreground/[0.09] text-foreground'
+                          : 'text-soft-foreground hover:bg-foreground/[0.05] hover:text-foreground'
                       )}
                     >
                       <span className="truncate">{n.label}</span>

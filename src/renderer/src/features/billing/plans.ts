@@ -9,8 +9,8 @@ export interface Plan {
   yearly: number
   tagline: string
   perks: string[]
-  /** Messages per day on this plan (drives the "limit reached" demo). */
-  dailyMessages: number
+  /** How big this plan's 5-hour and weekly allowance is, in a few words. */
+  allowance: string
 }
 
 export const PLANS: Plan[] = [
@@ -20,8 +20,8 @@ export const PLANS: Plan[] = [
     monthly: 0,
     yearly: 0,
     tagline: 'Try it on a small project',
-    perks: ['25 messages a day', 'Fast model for quick edits', 'One project at a time'],
-    dailyMessages: 25
+    perks: ['A small 5-hour and weekly allowance', 'Fast model for quick edits', 'One project at a time'],
+    allowance: 'Small allowance'
   },
   {
     id: 'pro',
@@ -30,12 +30,12 @@ export const PLANS: Plan[] = [
     yearly: 16,
     tagline: 'For building every day',
     perks: [
-      'Around 10× more usage',
+      'Much higher 5-hour and weekly limits',
       'Every model, including the most capable',
       'Unlimited projects',
       'Plan mode and checkpoints'
     ],
-    dailyMessages: 400
+    allowance: 'Standard allowance'
   },
   {
     id: 'max',
@@ -44,12 +44,12 @@ export const PLANS: Plan[] = [
     yearly: 85,
     tagline: 'For heavy, all-day work',
     perks: [
-      'Around 5× more than Pro',
+      '5× the limits of Pro',
       'Priority when things are busy',
       'Run several tasks at once',
       'Early access to new features'
     ],
-    dailyMessages: 2000
+    allowance: '5× Pro'
   }
 ]
 

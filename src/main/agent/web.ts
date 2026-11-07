@@ -16,6 +16,8 @@ export interface PageText {
   text: string
   /** The page had more text than was returned. */
   clipped: boolean
+  /** Pictures of document pages that had no text (PDF links). */
+  images?: { media_type: string; data: string }[]
 }
 
 const UA =
@@ -254,11 +256,30 @@ export function normalizeUrl(raw: string): string {
   }
 }
 
+async function readBuffer(res: Response, limit: number): Promise<Buffer> {
+  if (!res.body) return Buffer.from(await res.arrayBuffer())
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    total += value.byteLength
+    if (total > limit) {
+      await reader.cancel().catch(() => undefined)
+      throw new Error(`That file is larger than ${Math.round(limit / 1048576)} MB, so it was not downloaded.`)
+    }
+  }
+  return Buffer.concat(chunks)
+}
+
 export async function webFetch(
   rawUrl: string,
   signal: AbortSignal,
   maxChars = 20_000,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  docOpts: { pages?: string; render?: boolean } = {}
 ): Promise<PageText> {
   const url = normalizeUrl(rawUrl)
   const res = await fetchImpl(url, {
@@ -272,6 +293,18 @@ export async function webFetch(
   if (!res.ok)
     throw new Error(`The page answered ${res.status}${res.statusText ? ` ${res.statusText}` : ''}.`)
   const type = (res.headers.get('content-type') ?? '').toLowerCase()
+  // PDF and Office files are converted, not refused. Servers often send them as octet-stream (or nothing),
+  // so the address counts too. The reader is loaded only then, since most fetches are plain pages.
+  const finalUrl = res.url || url
+  const byMime = /pdf|officedocument/.test(type)
+  const byName = /\.(pdf|docx|xlsx|xlsm|pptx)([?#]|$)/i.test(finalUrl) && (!type || /octet-stream|binary/.test(type))
+  const documents = byMime || byName ? await import('./documents') : null
+  const docKind = documents ? (documents.docKindFromMime(type) ?? documents.docKindFromName(finalUrl)) : null
+  if (docKind) {
+    const doc = await documents!.readDocument(await readBuffer(res, documents!.MAX_DOC_BYTES), docKind, { ...docOpts, maxChars })
+    const limit = Math.min(40_000, Math.max(1000, maxChars))
+    return { url: res.url || url, title: decodeURIComponent((res.url || url).split('?')[0].split('/').pop() ?? ''), text: doc.text.slice(0, limit), clipped: doc.text.length > limit, images: doc.images }
+  }
   if (type && !/(text\/|json|xml|javascript|markdown|yaml)/.test(type)) {
     throw new Error(
       `That address is a file (${type.split(';')[0]}), not a page that can be read as text.`

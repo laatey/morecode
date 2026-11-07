@@ -40,7 +40,7 @@ const Back = ({ onClick, children }: { onClick: () => void; children: React.Reac
   <button
     type="button"
     onClick={onClick}
-    className="mb-5 -ml-1 inline-flex cursor-pointer items-center gap-1.5 rounded-[6px] px-1 py-0.5 text-[13px] text-[#8d8d8a] transition-colors hover:text-[#ececea] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]/50"
+    className="mb-5 -ml-1 inline-flex cursor-pointer items-center gap-1.5 rounded-[6px] px-1 py-0.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
   >
     <ArrowLeft className="h-3.5 w-3.5" />
     {children}
@@ -70,7 +70,7 @@ function useSocial(): {
 
 const open = (url: string): void => void window.open(url, '_blank')
 
-export function WelcomeScreen({ go }: ScreenProps): React.JSX.Element {
+export function WelcomeScreen({ go, setEmail }: ScreenProps): React.JSX.Element {
   const social = useSocial()
   const { others, switchTo } = useAuth()
   const [switching, setSwitching] = useState<string | null>(null)
@@ -81,7 +81,7 @@ export function WelcomeScreen({ go }: ScreenProps): React.JSX.Element {
       </Heading>
       {others.length > 0 && (
         <div className="mb-5 space-y-2">
-          <p className="text-[12.5px] text-[#77776f]">On this computer</p>
+          <p className="text-[12.5px] text-faint-foreground">On this computer</p>
           {others.map((a) => (
             <button
               key={a.id}
@@ -89,16 +89,23 @@ export function WelcomeScreen({ go }: ScreenProps): React.JSX.Element {
               disabled={switching !== null}
               onClick={() => {
                 setSwitching(a.id)
-                void switchTo(a.id).finally(() => setSwitching(null))
+                switchTo(a.id)
+                  .catch(() => {
+                    // the saved sign-in ended (for example after signing out): ask for the password, email already filled
+                    setEmail(a.email)
+                    go('signin')
+                    toast('Enter your password to continue as ' + a.name + '.')
+                  })
+                  .finally(() => setSwitching(null))
               }}
-              className="flex w-full cursor-pointer items-center gap-3 rounded-[10px] border border-white/[0.1] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.05] disabled:cursor-wait disabled:opacity-60"
+              className="flex w-full cursor-pointer items-center gap-3 rounded-[10px] border border-border px-3 py-2.5 text-left transition-colors hover:bg-foreground/[0.05] disabled:cursor-wait disabled:opacity-60"
             >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#3b82f6]/25 text-[12px] font-medium text-[#a3c8ff]">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/25 text-[12px] font-medium text-link">
                 {(a.name[0] ?? a.email[0] ?? '?').toUpperCase()}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[13.5px] text-[#ececea]">Continue as {a.name}</span>
-                <span className="block truncate text-[12px] text-[#8d8d8a]">{a.email}</span>
+                <span className="block truncate text-[13.5px] text-foreground">Continue as {a.name}</span>
+                <span className="block truncate text-[12px] text-muted-foreground">{a.email}</span>
               </span>
             </button>
           ))}
@@ -115,7 +122,7 @@ export function WelcomeScreen({ go }: ScreenProps): React.JSX.Element {
         <SocialButtons busy={social.busy} onPick={social.pick} />
         <FormError>{social.error}</FormError>
       </div>
-      <p className="mt-6 text-[12px] leading-5 text-[#77776f]">
+      <p className="mt-6 text-[12px] leading-5 text-faint-foreground">
         By continuing you agree to the{' '}
         <TextLink onClick={() => open('https://morecode.app/terms')}>Terms</TextLink> and{' '}
         <TextLink onClick={() => open('https://morecode.app/privacy')}>Privacy Policy</TextLink>.
@@ -165,7 +172,7 @@ export function SignUpScreen({ go, setEmail, email }: ScreenProps): React.JSX.El
             I agree to the <TextLink onClick={() => open('https://morecode.app/terms')}>Terms</TextLink> and{' '}
             <TextLink onClick={() => open('https://morecode.app/privacy')}>Privacy Policy</TextLink>.
           </Checkbox>
-          {errors.agree && <p role="alert" className="mt-1.5 text-[12px] text-[#f0746c]">{errors.agree}</p>}
+          {errors.agree && <p role="alert" className="mt-1.5 text-[12px] text-destructive">{errors.agree}</p>}
         </div>
         <FormError>{formError}</FormError>
         <Submit loading={loading}>Create account</Submit>
@@ -175,7 +182,7 @@ export function SignUpScreen({ go, setEmail, email }: ScreenProps): React.JSX.El
       </div>
       <SocialButtons busy={social.busy} onPick={social.pick} />
       <FormError>{social.error}</FormError>
-      <p className="mt-6 text-center text-[13px] text-[#8d8d8a]">
+      <p className="mt-6 text-center text-[13px] text-muted-foreground">
         Already have an account? <TextLink onClick={() => go('signin')}>Sign in</TextLink>
       </p>
     </AuthShell>
@@ -206,7 +213,7 @@ export function VerifyScreen({ go, email }: ScreenProps): React.JSX.Element {
     <AuthShell>
       <Back onClick={() => go('signup')}>Use a different email</Back>
       <Heading title="Check your email">
-        We sent a 6-digit code to <span className="text-[#ececea]">{email}</span>. It expires in 10 minutes.
+        We sent a 6-digit code to <span className="text-foreground">{email}</span>. It expires in 10 minutes.
       </Heading>
       <div className="space-y-4">
         <CodeInput value={code} onChange={setCode} onComplete={verify} disabled={loading} error={Boolean(error)} />
@@ -214,7 +221,7 @@ export function VerifyScreen({ go, email }: ScreenProps): React.JSX.Element {
         <Submit type="button" loading={loading} disabled={code.length < 6} onClick={() => verify(code)}>
           Verify and continue
         </Submit>
-        <p className="text-center text-[13px] text-[#8d8d8a]">
+        <p className="text-center text-[13px] text-muted-foreground">
           Didn’t get it?{' '}
           <TextLink
             disabled={left > 0}
@@ -227,8 +234,8 @@ export function VerifyScreen({ go, email }: ScreenProps): React.JSX.Element {
           </TextLink>
         </p>
         {!HOSTED && (
-        <p className="rounded-[8px] bg-white/[0.04] px-3 py-2 text-[12px] leading-5 text-[#8d8d8a]">
-          Demo mode: no email is sent. Enter <span className="font-medium text-[#ececea]">{DEMO_CODE}</span>.
+        <p className="rounded-[8px] bg-foreground/[0.04] px-3 py-2 text-[12px] leading-5 text-muted-foreground">
+          Demo mode: no email is sent. Enter <span className="font-medium text-foreground">{DEMO_CODE}</span>.
         </p>
         )}
       </div>
@@ -286,7 +293,7 @@ export function SignInScreen({ go, email, setEmail }: ScreenProps): React.JSX.El
       </div>
       <SocialButtons busy={social.busy} onPick={social.pick} />
       <FormError>{social.error}</FormError>
-      <p className="mt-6 text-center text-[13px] text-[#8d8d8a]">
+      <p className="mt-6 text-center text-[13px] text-muted-foreground">
         New here? <TextLink onClick={() => go('signup')}>Create an account</TextLink>
       </p>
     </AuthShell>
@@ -328,18 +335,18 @@ export function ForgotSentScreen({ go, email }: ScreenProps): React.JSX.Element 
   return (
     <AuthShell>
       <Back onClick={() => go('signin')}>Back to sign in</Back>
-      <span className="mb-4 grid h-11 w-11 place-items-center rounded-[10px] bg-[#3b82f6]/15 text-[#7db1ff]">
+      <span className="mb-4 grid h-11 w-11 place-items-center rounded-[10px] bg-primary/15 text-link">
         <MailCheck className="h-5 w-5" />
       </span>
       <Heading title="Check your inbox">
-        If an account exists for <span className="text-[#ececea]">{email}</span>, a reset code is on its way.
+        If an account exists for <span className="text-foreground">{email}</span>, a reset code is on its way.
       </Heading>
       <div className="space-y-3">
         <Submit type="button" onClick={() => go('reset')}>
           I have a code
         </Submit>
         <SecondaryButton onClick={() => open('mailto:')}>Open my mail app</SecondaryButton>
-        <p className="pt-1 text-center text-[13px] text-[#8d8d8a]">
+        <p className="pt-1 text-center text-[13px] text-muted-foreground">
           Nothing yet?{' '}
           <TextLink
             disabled={left > 0}
@@ -352,8 +359,8 @@ export function ForgotSentScreen({ go, email }: ScreenProps): React.JSX.Element 
           </TextLink>
         </p>
         {!HOSTED && (
-        <p className="rounded-[8px] bg-white/[0.04] px-3 py-2 text-[12px] leading-5 text-[#8d8d8a]">
-          Demo mode: no email is sent. The code is <span className="font-medium text-[#ececea]">{DEMO_CODE}</span>.
+        <p className="rounded-[8px] bg-foreground/[0.04] px-3 py-2 text-[12px] leading-5 text-muted-foreground">
+          Demo mode: no email is sent. The code is <span className="font-medium text-foreground">{DEMO_CODE}</span>.
         </p>
         )}
       </div>
@@ -393,9 +400,9 @@ export function ResetScreen({ go, email }: ScreenProps): React.JSX.Element {
       <Heading title="Choose a new password" />
       <form onSubmit={submit} noValidate className="space-y-4">
         <div>
-          <p className="mb-1.5 text-[13px] text-[#c9c9c6]">Code from your email</p>
+          <p className="mb-1.5 text-[13px] text-soft-foreground">Code from your email</p>
           <CodeInput value={code} onChange={setCode} error={Boolean(errors.code)} />
-          {errors.code && <p role="alert" className="mt-1.5 text-[12px] text-[#f0746c]">{errors.code}</p>}
+          {errors.code && <p role="alert" className="mt-1.5 text-[12px] text-destructive">{errors.code}</p>}
         </div>
         <PasswordField label="New password" meter value={pw} autoComplete="new-password" error={errors.pw} onChange={(e) => setPw(e.target.value)} />
         <PasswordField label="Type it again" value={again} autoComplete="new-password" error={errors.again} onChange={(e) => setAgain(e.target.value)} />
@@ -409,7 +416,7 @@ export function ResetScreen({ go, email }: ScreenProps): React.JSX.Element {
 export function ResetDoneScreen({ go }: ScreenProps): React.JSX.Element {
   return (
     <AuthShell>
-      <span className="mb-4 grid h-11 w-11 place-items-center rounded-[10px] bg-[#3fb950]/15 text-[#5fd17a]">
+      <span className="mb-4 grid h-11 w-11 place-items-center rounded-[10px] bg-success/15 text-success">
         <Check className="h-5 w-5 stroke-[2.5]" />
       </span>
       <Heading title="Password updated">You can sign in with your new password now.</Heading>

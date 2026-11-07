@@ -1,5 +1,6 @@
-import { BrowserWindow, ipcMain, type WebContents } from 'electron'
+import { app, BrowserWindow, ipcMain, type WebContents } from 'electron'
 import { existsSync, statSync } from 'fs'
+import { join } from 'path'
 import { getChatRoot } from '../workspace'
 import { authorize } from '../mcp/oauth'
 import { disconnect, disconnectAll, testConnector } from '../mcp/manager'
@@ -8,7 +9,8 @@ import { ApiFailure, looksDropped } from './anthropic'
 import { GROQ_URL, modelScopeUrl, usesOpenAIFormat, type ModelScopeSite } from './openai-format'
 import { dropJob, getJob, listJobSnapshots, onJobsChange, stopAllJobs, stopJob } from './background'
 import { runAgent, type RunInput, type SkillInput, type Style } from './run'
-import { keepEdit, revertEdit, type Decision } from './tools'
+import { keepEdit, revertEdit, restoreEdit, type Decision } from './tools'
+import { runsChanged } from '../power'
 import { cleanAnswers, type QuestionAnswer, type QuestionItem } from '../../shared/question'
 
 interface Live {
@@ -71,6 +73,7 @@ function valid(p: unknown): p is Payload {
           ([k, v]) => /^x-morecode-[a-z-]+$/.test(k) && typeof v === 'string' && v.length < 80
         ))) &&
     (x.connectors === undefined || (Array.isArray(x.connectors) && x.connectors.length < 30 && x.connectors.every(goodConfig))) &&
+    (x.memory === undefined || (typeof x.memory === 'object' && x.memory !== null && (x.memory.mode === 'ask' || x.memory.mode === 'auto'))) &&
     (x.skills === undefined || (Array.isArray(x.skills) && x.skills.length < 100 && x.skills.every(goodSkill))) &&
     (x.routines === undefined || (Array.isArray(x.routines) && x.routines.length < 100 && x.routines.every(goodRoutine)))
   )
@@ -270,6 +273,7 @@ export function registerAgentIpc(): void {
     const sender = event.sender
     const live: Live = { abort: new AbortController(), waiting: new Map(), questions: new Map(), sender }
     runs.set(payload.runId, live)
+    runsChanged(runs.size)
     const send = (msg: Record<string, unknown>): void => {
       if (!sender.isDestroyed()) sender.send('agent:event', { runId: payload.runId, ...msg })
     }
@@ -286,6 +290,10 @@ export function registerAgentIpc(): void {
     void runAgent(
       {
         ...payload,
+        // the folder is always ours; the window only says whether memory is on and how saving works
+        memory: payload.memory ? { mode: payload.memory.mode, dir: app.getPath('userData') } : undefined,
+        // also ours: the window never chooses where skills are unpacked
+        skillsDir: join(app.getPath('userData'), 'skills'),
         projectPath: project,
         cwd: project ?? getChatRoot(payload.chatId ?? payload.runId)
       },
@@ -324,7 +332,10 @@ export function registerAgentIpc(): void {
           }
         })
       })
-      .finally(() => runs.delete(payload.runId))
+      .finally(() => {
+        runs.delete(payload.runId)
+        runsChanged(runs.size)
+      })
     return true
   })
 
@@ -366,6 +377,9 @@ export function registerAgentIpc(): void {
     if (typeof id === 'string') disconnect(id)
   })
 
+  ipcMain.handle('agent:restore', (_e, id: string): 'restored' | 'changed' | 'none' =>
+    typeof id === 'string' ? restoreEdit(id) : 'none'
+  )
   ipcMain.handle('agent:revert', (_e, id: string): boolean =>
     typeof id === 'string' ? revertEdit(id) : false
   )

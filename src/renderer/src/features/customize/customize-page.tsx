@@ -5,7 +5,6 @@ import { SkillsPanel } from '@/features/ai-assistant/panels/skills-panel'
 import { CATALOG, entryById, type CatalogEntry } from '@/features/connectors/catalog'
 import { useConnectors, type Connector, type Draft, type Perm } from '@/features/connectors/connectors-store'
 import { ConnectorLogo } from '@/features/connectors/logo'
-import { FeatureBanner } from '@/components/feature-banner'
 import { SegmentedSwitch } from '@/components/segmented-switch'
 import { cn } from '@/lib/utils'
 
@@ -33,7 +32,7 @@ const keep = (key: string, v: string): void => {
 
 function Tabs<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }): React.JSX.Element {
   return (
-    <div role="tablist" className="flex items-center gap-6 border-b border-[#33332f]">
+    <div role="tablist" className="flex items-center gap-6 border-b border-border">
       {options.map((o) => (
         <button
           key={o.value}
@@ -43,7 +42,7 @@ function Tabs<T extends string>({ value, options, onChange }: { value: T; option
           onClick={() => onChange(o.value)}
           className={cn(
             '-mb-px cursor-pointer border-b-2 px-0.5 pb-2.5 text-[13.5px] font-medium transition-colors focus-visible:outline-none',
-            o.value === value ? 'border-white text-white' : 'border-transparent text-[#8f8f8a] hover:text-[#e2e2e0]'
+            o.value === value ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
         >
           {o.label}
@@ -58,15 +57,15 @@ function Item({ logo, title, note, right, onClick }: { logo: React.ReactNode; ti
     <>
       {logo}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13.5px] font-medium text-[#f1f1ef]">{title}</span>
-        {note && <span className="block truncate text-[12.5px] text-[#8f8f8a]">{note}</span>}
+        <span className="block truncate text-[13.5px] font-medium text-foreground">{title}</span>
+        {note && <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">{note}</span>}
       </span>
       {right}
     </>
   )
-  const cls = 'flex w-full items-center gap-3 rounded-[10px] bg-[#272726] px-3 py-2.5 text-left'
+  const cls = 'flex w-full items-center gap-3 px-3.5 py-3 text-left'
   return onClick ? (
-    <button type="button" onClick={onClick} className={cn(cls, 'cursor-pointer transition-colors hover:bg-[#30302e] focus-visible:outline-none')}>
+    <button type="button" onClick={onClick} className={cn(cls, 'group cursor-pointer transition-colors hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:bg-foreground/[0.04]')}>
       {body}
     </button>
   ) : (
@@ -79,7 +78,7 @@ function Item({ logo, title, note, right, onClick }: { logo: React.ReactNode; ti
 function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }): React.JSX.Element {
   return (
     <div className="relative">
-      <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#a9a9a4]" />
+      <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <TextInput value={value} onChange={(e) => onChange(e.target.value)} placeholder="Search connectors" className="h-8 pl-7" />
     </div>
   )
@@ -127,8 +126,6 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
   /** A store entry counts as added if a connector came from it, or points at the same server (e.g. added as custom). */
   const addedFor = (e: CatalogEntry): Connector | undefined =>
     cx.connectors.find((c) => c.catalogId === e.id || (e.url && hostOf(c.url) === hostOf(e.url)))
-  const warehouse = entryById('ui-warehouse')
-  const warehouseAdded = warehouse ? addedFor(warehouse) : undefined
 
   return (
     <div className="pt-4">
@@ -136,26 +133,26 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
         <div className="min-w-0 flex-1">
           <SearchBox value={q} onChange={setQ} />
         </div>
-        <div className="flex items-center rounded-[8px] bg-[#272726] p-0.5">
+        <div className="flex items-center rounded-[8px] border border-border p-0.5">
           {(['yours', 'discover'] as const).map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => set(s)}
-              className={cn('cursor-pointer rounded-[6px] px-3 py-1 text-[12.5px] font-medium capitalize transition-colors', sub === s ? 'bg-[#ececea] text-[#1a1a19]' : 'text-[#9a9a95] hover:text-white')}
+              className={cn('cursor-pointer rounded-[6px] px-3 py-1 text-[12.5px] font-medium capitalize transition-colors', sub === s ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
             >
               {s}
             </button>
           ))}
         </div>
-        <Btn onClick={() => setView({ name: 'connect' })} className="h-8 gap-1 border-transparent bg-[#272726] shadow-none hover:bg-[#30302e]">
+        <Btn onClick={() => setView({ name: 'connect' })} className="h-8 gap-1">
           <Plus className="h-3.5 w-3.5" /> Add custom
         </Btn>
       </div>
 
       {sub === 'yours' ? (
         mine.length ? (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col divide-y divide-border/60 overflow-hidden rounded-[10px] border border-border">
             {mine.map((c) => (
               <Item
                 key={c.id}
@@ -163,43 +160,17 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
                 title={c.name}
                 note={c.enabled ? `${c.tools.length} tool${c.tools.length === 1 ? '' : 's'}` : 'Off'}
                 onClick={() => setView({ name: 'detail', id: c.id })}
-                right={<ChevronRight className="h-4 w-4 text-[#77776f]" />}
+                right={<ChevronRight className="h-4 w-4 text-faint-foreground" />}
               />
             ))}
           </div>
         ) : cx.connectors.length ? (
-          <p className="py-10 text-center text-[13px] text-[#8f8f8a]">No matches.</p>
+          <p className="rounded-[10px] border border-dashed border-border px-6 py-10 text-center text-[12.5px] text-muted-foreground">No matches.</p>
         ) : (
-          <FeatureBanner
-            tone="emerald"
-            art="warehouse"
-            eyebrow="From MoreCode"
-            tag="MCP"
-            title="Connect your stack"
-            description="Give the AI direct access to UI Warehouse, GitHub, Supabase, Linear, Playwright, or any local and remote MCP server."
-            actionLabel="Browse connectors"
-            onAction={() => set('discover')}
-            secondaryLabel="Add custom"
-            onSecondary={() => setView({ name: 'connect' })}
-          />
+          <p className="rounded-[10px] border border-dashed border-border px-6 py-10 text-center text-[12.5px] text-muted-foreground">No connectors yet. Browse the Discover tab to add one.</p>
         )
       ) : (
-        <div className="flex flex-col gap-1.5">
-          {!needle && (
-            <FeatureBanner
-              tone="emerald"
-              art="warehouse"
-              eyebrow="From MoreCode"
-              tag="Featured"
-              title="UI Warehouse"
-              description="Query 58+ unbranded desktop, web, and mobile shells, navigation bars, and component primitives directly from the agent."
-              actionLabel={warehouseAdded ? 'Manage' : 'Add'}
-              onAction={() => {
-                setView(warehouseAdded ? { name: 'detail', id: warehouseAdded.id } : { name: 'connect', catalogId: 'ui-warehouse' })
-              }}
-              className="mb-2.5"
-            />
-          )}
+        <div className="flex flex-col divide-y divide-border/60 overflow-hidden rounded-[10px] border border-border">
           {found.map((e) => {
             const mineHere = addedFor(e)
             const added = Boolean(mineHere)
@@ -214,9 +185,9 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
                 }}
                 right={
                   added ? (
-                    <Check className="h-4 w-4 text-[#4cc38a]" />
+                    <Check className="h-4 w-4 text-success" />
                   ) : (
-                    <span className="grid h-6 w-6 place-items-center rounded-md bg-[#3a3a37] text-[#e2e2e0]">
+                    <span className="grid h-6 w-6 place-items-center rounded-[6px] border border-border text-muted-foreground transition-colors group-hover:text-foreground">
                       <Plus className="h-3.5 w-3.5" />
                     </span>
                   )
@@ -224,7 +195,7 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
               />
             )
           })}
-          {!found.length && <p className="py-10 text-center text-[13px] text-[#8f8f8a]">No matches. Add it as a custom connector.</p>}
+          {!found.length && <p className="rounded-[10px] border border-dashed border-border px-6 py-10 text-center text-[12.5px] text-muted-foreground">No matches. Add it as a custom connector.</p>}
         </div>
       )}
     </div>
@@ -233,7 +204,7 @@ function ConnectorsTab({ view, setView }: { view: View; setView: (v: View) => vo
 
 /* ---------------- connect (store entry or custom) ---------------- */
 
-const label = 'mb-1.5 block text-[12.5px] text-[#a9a9a4]'
+const label = 'mb-1.5 block text-[12.5px] text-muted-foreground'
 
 function ConnectView({ catalogId, onBack, onDone }: { catalogId?: string; onBack: () => void; onDone: (id: string) => void }): React.JSX.Element {
   const cx = useConnectors()
@@ -279,14 +250,14 @@ function ConnectView({ catalogId, onBack, onDone }: { catalogId?: string; onBack
 
   return (
     <div className="pt-4">
-      <button type="button" onClick={onBack} className="mb-4 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-[#8f8f8a] hover:text-white">
+      <button type="button" onClick={onBack} className="mb-4 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-3.5 w-3.5" /> Connectors
       </button>
       <div className="mb-5 flex items-center gap-3">
         <ConnectorLogo id={entry?.id} domain={entry?.domain} name={name || 'C'} size={40} />
         <div className="min-w-0">
-          <h2 className="truncate text-[16px] font-semibold text-white">{entry ? entry.name : 'Custom connector'}</h2>
-          <p className="truncate text-[12.5px] text-[#8f8f8a]">{entry ? `${entry.description} · by ${entry.by}` : 'Connect any MCP server, on the web or on this computer.'}</p>
+          <h2 className="truncate text-[16px] font-semibold text-foreground">{entry ? entry.name : 'Custom connector'}</h2>
+          <p className="truncate text-[12.5px] text-muted-foreground">{entry ? `${entry.description} · by ${entry.by}` : 'Connect any MCP server, on the web or on this computer.'}</p>
         </div>
       </div>
 
@@ -299,9 +270,9 @@ function ConnectView({ catalogId, onBack, onDone }: { catalogId?: string; onBack
             </div>
             <div>
               <span className={label}>Type</span>
-              <div className="inline-flex rounded-[8px] bg-[#272726] p-0.5">
+              <div className="inline-flex rounded-[8px] bg-background p-0.5">
                 {([['http', 'Remote (URL)'], ['stdio', 'Local (command)']] as const).map(([k, t]) => (
-                  <button key={k} type="button" onClick={() => setKind(k)} className={cn('cursor-pointer rounded-[6px] px-3 py-1 text-[12.5px] font-medium transition-colors', kind === k ? 'bg-[#ececea] text-[#1a1a19]' : 'text-[#9a9a95] hover:text-white')}>
+                  <button key={k} type="button" onClick={() => setKind(k)} className={cn('cursor-pointer rounded-[6px] px-3 py-1 text-[12.5px] font-medium transition-colors', kind === k ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}>
                     {t}
                   </button>
                 ))}
@@ -313,7 +284,7 @@ function ConnectView({ catalogId, onBack, onDone }: { catalogId?: string; onBack
                   <span className={label}>Server URL</span>
                   <TextInput value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://mcp.example.com/mcp" className="h-8 font-mono" />
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[#e2e2e0]">
+                <label className="flex cursor-pointer items-center gap-2 text-[13px] text-foreground">
                   <Toggle checked={oauth} onChange={setOauth} label="Sign in with your browser" /> Sign in with your browser
                 </label>
                 {!oauth && (
@@ -340,7 +311,7 @@ function ConnectView({ catalogId, onBack, onDone }: { catalogId?: string; onBack
                     onChange={(e) => setEnvText(e.target.value)}
                     rows={3}
                     placeholder="API_KEY=…"
-                    className="slim-scroll w-full resize-none rounded-[7px] border border-[#3a3a37] bg-[#272726] px-2.5 py-2 font-mono text-[12.5px] text-white outline-none placeholder:text-[#9a9a95] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]"
+                    className="slim-scroll w-full resize-none rounded-[7px] border border-border bg-background px-2.5 py-2 font-mono text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </>
@@ -352,17 +323,17 @@ function ConnectView({ catalogId, onBack, onDone }: { catalogId?: string; onBack
           <div>
             <span className={label}>{entry.tokenLabel ?? 'Access token'}</span>
             <TextInput type="password" value={token} onChange={(e) => setToken(e.target.value)} className="h-8" autoFocus />
-            {entry.tokenHint && <p className="mt-1 text-[12px] text-[#77776f]">{entry.tokenHint}</p>}
+            {entry.tokenHint && <p className="mt-1 text-[12px] text-faint-foreground">{entry.tokenHint}</p>}
           </div>
         )}
-        {(entry?.auth === 'oauth' || (custom && oauth)) && <p className="text-[12px] text-[#77776f]">Your browser opens so you can sign in and allow access. Come back here when it says you are done.</p>}
+        {(entry?.auth === 'oauth' || (custom && oauth)) && <p className="text-[12px] text-faint-foreground">Your browser opens so you can sign in and allow access. Come back here when it says you are done.</p>}
         {entry?.fields?.map((f) => (
           <div key={f.key}>
             <span className={label}>{f.label}</span>
             <TextInput type={f.secret ? 'password' : 'text'} value={vals[f.key] ?? ''} onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })} placeholder={f.placeholder} className="h-8" />
           </div>
         ))}
-        {entry?.kind === 'stdio' && <p className="text-[12px] text-[#77776f]">Runs on this computer with “{entry.command} {entry.args?.join(' ')}”. The first start can take a moment while it downloads.</p>}
+        {entry?.kind === 'stdio' && <p className="text-[12px] text-faint-foreground">Runs on this computer with “{entry.command} {entry.args?.join(' ')}”. The first start can take a moment while it downloads.</p>}
 
         {error && <p className="text-[12px] leading-5 text-[var(--diff-del)]">{error}</p>}
         <div className="flex items-center gap-2 pt-1">
@@ -424,41 +395,42 @@ function DetailView({ id, onBack }: { id: string; onBack: () => void }): React.J
     ].filter((g) => g.tools.length)
   }, [c?.tools])
 
-  if (!c) return <div className="pt-4"><button type="button" onClick={onBack} className="text-[12.5px] text-[#8d8d8a]">Back</button></div>
+  if (!c) return <div className="pt-4"><button type="button" onClick={onBack} className="text-[12.5px] text-muted-foreground">Back</button></div>
 
   return (
     <div className="pt-4">
-      <button type="button" onClick={onBack} className="mb-4 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-[#8f8f8a] hover:text-white">
+      <button type="button" onClick={onBack} className="mb-4 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-3.5 w-3.5" /> Connectors
       </button>
-      <div className="mb-1 flex items-center gap-3">
-        <ConnectorLogo id={c.catalogId ?? c.id} domain={c.domain} name={c.name} size={40} />
+      <div className="mb-1 flex items-center gap-4">
+        <ConnectorLogo id={c.catalogId ?? c.id} domain={c.domain} name={c.name} size={48} />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[16px] font-semibold text-white">{c.name}</h2>
-          <p className="truncate text-[12.5px] text-[#8f8f8a]">{c.description ?? (c.kind === 'http' ? c.url : `${c.command} ${c.args.join(' ')}`)}</p>
+          <h2 className="truncate text-[18px] font-semibold tracking-[-0.01em] text-foreground">{c.name}</h2>
+          <p className="truncate text-[12.5px] text-muted-foreground">{c.description ?? (c.kind === 'http' ? c.url : `${c.command} ${c.args.join(' ')}`)}</p>
         </div>
         <Toggle checked={c.enabled} onChange={(v) => cx.setEnabled(id, v)} label={`Use ${c.name}`} />
       </div>
       {error && <p className="mt-2 text-[12px] text-[var(--diff-del)]">{error}</p>}
 
-      <h3 className="mb-1 mt-8 text-[14px] font-semibold text-white">Tool permissions</h3>
-      <p className="mb-3 text-[12.5px] text-[#8f8f8a]">Choose when the AI may use these tools.</p>
+      <div className="mt-6 border-t border-border" />
+      <h3 className="mb-1 mt-6 text-[13.5px] font-semibold text-foreground">Tool permissions</h3>
+      <p className="mb-4 text-[12.5px] text-muted-foreground">Choose when the AI may use these tools.</p>
       {groups.map((g) => {
         const eff = g.tools.map((t) => c.perms[t.name] ?? g.fallback)
         const same = eff.every((p) => p === eff[0]) ? eff[0] : null
         return (
-          <div key={g.title} className="mb-4 overflow-hidden rounded-[10px] bg-[#272726]">
-            <div className="flex items-center justify-between px-3.5 py-2.5">
-              <span className="text-[13px] font-medium text-white">
-                {g.title} <span className="font-normal text-[#77776f]">{g.tools.length}</span>
+          <div key={g.title} className="mb-4 overflow-hidden rounded-[10px] border border-border">
+            <div className="flex items-center justify-between bg-foreground/[0.02] px-3.5 py-2.5">
+              <span className="text-[13px] font-medium text-foreground">
+                {g.title} <span className="font-normal text-faint-foreground">{g.tools.length}</span>
               </span>
               <PermControl value={same} onChange={(p) => cx.setPerm(id, g.tools.map((t) => t.name), p === g.fallback ? null : p)} />
             </div>
             {g.tools.map((t) => (
-              <div key={t.name} className="flex items-center justify-between gap-3 border-t border-[#323230] px-3.5 py-2.5">
+              <div key={t.name} className="flex items-center justify-between gap-3 border-t border-border/60 px-3.5 py-2.5">
                 <span className="min-w-0">
-                  <span className="block truncate font-mono text-[12px] text-[#e2e2e0]">{t.name}</span>
-                  {t.description && <span className="block truncate text-[12px] text-[#77776f]">{t.description}</span>}
+                  <span className="block truncate font-mono text-[12px] text-foreground">{t.name}</span>
+                  {t.description && <span className="block truncate text-[12px] text-faint-foreground">{t.description}</span>}
                 </span>
                 <PermControl value={c.perms[t.name] ?? g.fallback} onChange={(p) => cx.setPerm(id, [t.name], p === g.fallback ? null : p)} />
               </div>
@@ -466,14 +438,14 @@ function DetailView({ id, onBack }: { id: string; onBack: () => void }): React.J
           </div>
         )
       })}
-      {!c.tools.length && <p className="py-4 text-[13px] text-[#8f8f8a]">{c.enabled ? 'No tools listed yet.' : 'Turn the connector on to see its tools.'}</p>}
+      {!c.tools.length && <p className="py-4 text-[13px] text-muted-foreground">{c.enabled ? 'No tools listed yet.' : 'Turn the connector on to see its tools.'}</p>}
 
-      <div className="mt-6 flex items-center gap-2">
+      <div className="mt-6 flex items-center gap-2 border-t border-border pt-5">
         <Btn busy={busy} onClick={() => { setBusy(true); void cx.refresh(id).then((e) => { setError(e); setBusy(false) }) }}>Reconnect</Btn>
         {c.auth === 'oauth' && (
           <Btn busy={busy} onClick={() => { setBusy(true); void cx.reauth(id).then((e) => { setError(e); setBusy(false) }) }}>Sign in again</Btn>
         )}
-        <Btn variant="danger" onClick={() => { cx.remove(id); onBack() }}>
+        <Btn variant="danger" className="ml-auto" onClick={() => { cx.remove(id); onBack() }}>
           <Trash2 className="h-3.5 w-3.5" /> Remove
         </Btn>
       </div>
@@ -518,8 +490,8 @@ export function CustomizePage(): React.JSX.Element {
   return (
     <div className="slim-scroll h-full min-h-0 overflow-y-auto">
       <div className="mx-auto w-full max-w-[720px] px-6 pb-16 pt-9">
-        <h1 className="mb-1 text-[22px] font-semibold tracking-tight text-white">Customize</h1>
-        <p className="mb-6 text-[13.5px] text-[#8f8f8a]">Teach the AI your way of working, and connect the tools you use.</p>
+        <h1 className="mb-1 text-[22px] font-semibold tracking-tight text-foreground">Customize</h1>
+        <p className="mb-6 text-[13.5px] text-muted-foreground">Teach the AI your way of working, and connect the tools you use.</p>
         <Tabs value={tab} onChange={change} options={[{ value: 'skills', label: 'Skills' }, { value: 'connectors', label: 'Connectors' }]} />
         {tab === 'skills' ? (
           <div className="pt-4">

@@ -36,7 +36,7 @@ const ResizableHandle = ({
       disabled={disabled}
       onDoubleClick={disabled ? undefined : onToggle}
       className={cn(
-        'group relative flex items-center justify-center bg-white/[0.08] focus-visible:outline-none',
+        'group relative flex items-center justify-center bg-foreground/[0.08] focus-visible:outline-none',
         direction === 'horizontal'
           ? 'h-full self-stretch w-px cursor-col-resize'
           : 'w-full h-px cursor-row-resize',
@@ -50,7 +50,7 @@ const ResizableHandle = ({
       {withHandle && !disabled && (
         <div
           className={cn(
-            'absolute z-30 rounded-full bg-[#3b82f6] opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150 pointer-events-none',
+            'absolute z-30 rounded-full bg-primary opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150 pointer-events-none',
             direction === 'horizontal'
               ? 'left-1/2 -translate-x-1/2 w-[4px] h-[36px]'
               : 'top-1/2 -translate-y-1/2 h-[4px] w-[36px]'

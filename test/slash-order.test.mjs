@@ -6,7 +6,7 @@ import ts from 'typescript'
 // Stub visual dependencies only; execute the production filtering function.
 const source = readFileSync(new URL('../src/renderer/src/features/ai-assistant/slash-commands.ts', import.meta.url), 'utf8')
   .replace(/^import .*$/gm, '')
-const icons = 'BarChart3 CircleHelp ClipboardList Command Eraser FileText Gauge Minimize2 NotebookText Puzzle ShieldCheck'.split(' ')
+const icons = 'Brain BarChart3 CircleHelp ClipboardList Command Eraser FileText Gauge Minimize2 NotebookText Puzzle ShieldCheck'.split(' ')
 const prelude = `const ${icons.map((name) => `${name} = () => null`).join(', ')}; const skillIcon = () => FileText;`
 const compiled = ts.transpileModule(prelude + source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 }

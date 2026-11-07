@@ -1,7 +1,10 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, Close, Plus, Stop } from 'fluid-icons/react'
-import { AppWindow, AtSign, ChevronDown, File as FileIcon, Folder, GitBranch, Globe, Grid2x2, Image as ImageIcon, Mic, MoreHorizontal, Package, Pencil, RefreshCw, Search as SearchIcon, ShieldCheck, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp } from '@/components/icons'
+import { HomeHero } from './home-hero'
+import { useAuth } from '@/features/auth/auth-store'
+import { getPlan } from '@/features/billing/plans'
+import { AppWindow, AtSign, ChevronDown, File as FileIcon, Folder, GitBranch, Globe, Grid2x2, Image as ImageIcon, Mic, MoreHorizontal, Package, Pencil, RefreshCw, Search as SearchIcon, ShieldCheck, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Trash2 } from '@/components/icons'
 import { QuestionPanel } from './question-panel'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -12,7 +15,12 @@ import { CommandPanel } from './panels/panel-shell'
 import { isTrusted, TRUST_KEYS, useSettings, type Settings } from '@/features/settings/settings-store'
 import { useWorkspace } from '@/features/workspace/workspace-store'
 import { AttachmentChip, folderFrom, pathFor, readDrop } from './attachments'
+import { ImageThumbs } from './image-lightbox'
+import { MemoryPill } from './memory-pill'
+import { ContextRing } from './context-ring'
+import { setMemoryOff } from '@/lib/chat-memory'
 import { useChatContext } from './chat-context'
+import { UsageHint } from './usage-hint'
 import { BackgroundTasksBar, type HelperTask } from './background-tasks-bar'
 import { ChangesBar } from './changes-bar'
 import { fileIconHtml } from '@/components/file-icon'
@@ -51,21 +59,26 @@ const took = (ms?: number): string | null => {
   const s = Math.max(1, Math.round(ms / 1000))
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
 }
-const tokensLabel = (n?: number): string | null =>
-  n ? `${n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n} tokens` : null
+const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
+/** The headline is what the AI wrote (output tokens), like Claude Code's live counter. */
+const tokensLabel = (n?: number): string | null => (n ? `${fmtK(n)} tokens` : null)
+const usageTitle = (u?: { input: number; output: number; cacheRead: number; cacheWrite: number }): string | undefined =>
+  u
+    ? `Output ${fmtK(u.output)} · Input ${fmtK(u.input)} · Cache read ${fmtK(u.cacheRead)} · Cache write ${fmtK(u.cacheWrite)}`
+    : undefined
 
 /** Starting points for an empty chat. They depend on where the chat lives: a chat in a project can be pointed at its files, a loose one cannot. */
 const PROJECT_STARTERS = [
-  { label: 'Explain this project', text: 'Explain how this project is organised and where I should start reading.' },
-  { label: 'Look for bugs', text: 'Look through this project for bugs or mistakes and list what you find, most serious first.' },
-  { label: 'Run the tests', text: 'Run the tests and tell me what fails and why.' },
-  { label: 'Review my changes', text: 'Review the changes I have made since my last saved version and point out any problems.' }
+  { label: 'Explain this project', hint: 'How it is organised and where to start', text: 'Explain how this project is organised and where I should start reading.' },
+  { label: 'Look for bugs', hint: 'A list of problems, most serious first', text: 'Look through this project for bugs or mistakes and list what you find, most serious first.' },
+  { label: 'Run the tests', hint: 'What fails, and why', text: 'Run the tests and tell me what fails and why.' },
+  { label: 'Review my changes', hint: 'A second look at what you changed', text: 'Review the changes I have made since my last saved version and point out any problems.' }
 ]
 const LOOSE_STARTERS = [
-  { label: 'Build something new', text: 'Build me a small app that ' },
-  { label: 'Explain an error', text: 'Explain this error and how to fix it:\n\n' },
-  { label: 'Plan before building', text: 'Help me plan how to build ' },
-  { label: 'Automate a task', text: 'Write a script that ' }
+  { label: 'Build something new', hint: 'Describe an app and watch it take shape', text: 'Build me a small app that ' },
+  { label: 'Explain an error', hint: 'Paste it in and get the fix', text: 'Explain this error and how to fix it:\n\n' },
+  { label: 'Plan before building', hint: 'Work out the steps before any code', text: 'Help me plan how to build ' },
+  { label: 'Automate a task', hint: 'A script for the chore you keep repeating', text: 'Write a script that ' }
 ]
 const MAX_ATTACHMENTS = 10
 
@@ -162,7 +175,7 @@ function populateComposer(root: HTMLElement, text: string, slashes: string[] = [
     tag.contentEditable = 'false'
     tag.dataset.slashToken = '1'
     tag.dataset.mentionToken = slash
-    tag.className = 'inline-flex select-all items-center rounded-[5px] bg-[#3b82f6]/15 px-1 text-[#3b8cff]'
+    tag.className = 'inline-flex select-all items-center rounded-[5px] bg-primary/15 px-1 text-link'
     tag.textContent = slash
     root.append(tag)
     cursor = at + slash.length
@@ -176,7 +189,7 @@ function populateComposer(root: HTMLElement, text: string, slashes: string[] = [
     const chip = document.createElement('span')
     chip.contentEditable = 'false'
     chip.dataset.mentionToken = token
-    chip.className = 'inline-flex select-all items-center rounded-[5px] bg-[#3b82f6]/15 px-1.5 text-[#70a7ff]'
+    chip.className = 'inline-flex select-all items-center rounded-[5px] bg-primary/15 px-1.5 text-link'
     const path = token.slice(1)
     chip.innerHTML = fileIconHtml(path.split('/').pop() ?? path)
     const label = document.createElement('span')
@@ -220,13 +233,12 @@ function useElapsed(since: number | undefined, active: boolean): number {
   return since ? Math.max(0, Math.floor((now - since) / 1000)) : 0
 }
 
-/** Consecutive tool calls render as one tight group; text parts render as markdown. */
-function AgentMessage({ msg, isLast }: { msg: AgentMsg; isLast: boolean }): React.JSX.Element {
-  const { rate, retry, running } = useChatContext()
-  const groups: Array<
-    { tools: Part[] } | { text: string } | { error: Extract<Part, { type: 'error' }> }
-  > = []
-  for (const p of msg.parts) {
+type Group = { tools: Part[] } | { text: string } | { error: Extract<Part, { type: 'error' }> }
+
+/** Consecutive tool calls become one tight group; text parts stay separate. */
+function groupParts(parts: Part[]): Group[] {
+  const groups: Group[] = []
+  for (const p of parts) {
     if (p.type === 'text') groups.push({ text: p.text })
     else if (p.type === 'error') groups.push({ error: p })
     else {
@@ -235,36 +247,68 @@ function AgentMessage({ msg, isLast }: { msg: AgentMsg; isLast: boolean }): Reac
       else groups.push({ tools: [p] })
     }
   }
-  const elapsed = useElapsed(msg.startedAt, Boolean(msg.running))
-  const meta = [took(msg.durationMs), tokensLabel(msg.tokens), msg.stopped ? 'Stopped' : null]
-    .filter(Boolean)
-    .join(' · ')
-  const replyText = msg.parts
-    .map((p) => (p.type === 'text' ? p.text : ''))
-    .filter(Boolean)
-    .join('\n\n')
+  return groups
+}
 
+/** Rows that need the person's eyes or a click, so they stay in the chat when a finished run folds up. */
+const STAYS_VISIBLE = new Set(['edit', 'question', 'plan', 'permission', 'skill-draft', 'routine-draft'])
+/** A run with fewer steps than this is not worth a fold line. */
+const MIN_FOLD_STEPS = 3
+
+/**
+ * When a run has finished normally (it ended with the AI's own reply, not a tool call, an error or a
+ * stop), everything before that final reply folds into one "Worked for 2m 14s · 23 steps" line.
+ * File edits and anything waiting on the person stay visible next to it.
+ */
+function foldRun(msg: AgentMsg): { folded: Part[]; kept: Part[]; summary: Part[]; steps: number } | null {
+  if (msg.running || msg.stopped) return null
+  const parts = msg.parts
+  if (parts.some((p) => p.type === 'error')) return null
+  let tail = parts.length
+  while (tail > 0 && parts[tail - 1].type === 'text') tail--
+  if (tail === 0 || tail === parts.length) return null // no tool calls, or it did not end on a reply
+  const head = parts.slice(0, tail)
+  const stays = (p: Part): boolean => p.type === 'tool' && STAYS_VISIBLE.has(p.tool.kind)
+  const folded = head.filter((p) => !stays(p))
+  const steps = folded.filter((p) => p.type === 'tool' && p.tool.kind !== 'thinking' && p.tool.kind !== 'todos').length
+  if (steps < MIN_FOLD_STEPS) return null
+  return { folded, kept: head.filter(stays), summary: parts.slice(tail), steps }
+}
+
+function Groups({ groups, agentId }: { groups: Group[]; agentId: string }): React.JSX.Element {
   return (
-    <div className="min-w-0 text-[13px] leading-6 [overflow-wrap:anywhere]">
-      {groups.map((g, i) =>
-        'text' in g ? (
-          <div key={i} className="my-1.5">
-            <Markdown text={g.text} />
-          </div>
-        ) : 'error' in g ? (
-          <ErrorCard key={i} part={g.error} agentId={msg.id} />
-        ) : (
-          <div key={i} className="my-1 space-y-px">
-            {g.tools.map((p) => p.type === 'tool' && <ToolRow key={p.tool.id} tool={p.tool} />)}
-          </div>
-        )
+    <>
+      {fold ? (
+        <>
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="my-1 flex min-h-6 w-full cursor-pointer items-center gap-1.5 rounded-[4px] px-1 text-left text-[12.5px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span>
+              {msg.durationMs ? `Worked for ${took(msg.durationMs)}` : 'Worked'} · {fold.steps} {fold.steps === 1 ? 'step' : 'steps'}
+            </span>
+            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !open && '-rotate-90')} />
+          </button>
+          {open && (
+            <div className="ml-1 border-l border-border/60 pl-2">
+              <Groups groups={groupParts(fold.folded)} agentId={msg.id} />
+            </div>
+          )}
+          <Groups groups={groupParts([...fold.kept, ...fold.summary])} agentId={msg.id} />
+        </>
+      ) : (
+        <Groups groups={groupParts(msg.parts)} agentId={msg.id} />
       )}
       {msg.running ? (
         <div className="mt-1.5 flex items-center gap-2 px-1 text-[12.5px]">
           <ThinkingGlyph active />
           <span className="text-shimmer">{currentActivity(msg.parts)}</span>
           <span className="text-[11.5px] tabular-nums text-muted-foreground">
-            {elapsed > 0 && `${elapsed}s · `}Esc to stop
+            {elapsed > 0 && `${elapsed}s · `}
+            {(msg.tokens ?? 0) + (msg.liveTokens ?? 0) > 0 && `${fmtK((msg.tokens ?? 0) + (msg.liveTokens ?? 0))} tokens · `}
+            Esc to stop
           </span>
         </div>
       ) : (
@@ -293,7 +337,7 @@ function AgentMessage({ msg, isLast }: { msg: AgentMsg; isLast: boolean }): Reac
             </IconAction>
           )}
           {meta && (
-            <span className="ml-1.5 flex items-center gap-1.5">
+            <span className="ml-1.5 flex items-center gap-1.5" title={usageTitle(msg.usage)}>
               {meta}
             </span>
           )}
@@ -308,6 +352,7 @@ export function AiAssistant(): React.JSX.Element {
     messages,
     running,
     totals,
+    undoRewind,
     send,
     acceptAll,
     discardAll,
@@ -352,6 +397,7 @@ export function AiAssistant(): React.JSX.Element {
     return out
   }, [messages])
 
+  const { account, openPlanDialog } = useAuth()
   const scroller = useRef<HTMLDivElement>(null)
   const field = useRef<HTMLDivElement>(null)
   const photoPicker = useRef<HTMLInputElement>(null)
@@ -434,7 +480,10 @@ export function AiAssistant(): React.JSX.Element {
     const editor = field.current
     if (!editor) return
     const current = composerContent(editor)
-    const slashes = slashTokens(input, commands.map((c) => c.id))
+    const slashes = slashTokens(
+      input,
+      commands.filter(promptLike).map((c) => c.id)
+    )
     const shown = Array.from(editor.children).flatMap((el) => (el instanceof HTMLElement && el.dataset.slashToken ? [el.textContent ?? ''] : []))
     const inSync = current === input && shown.length === slashes.length && shown.every((t, i) => t === slashes[i])
     if (inSync && nextCaret.current === null) return
@@ -613,6 +662,11 @@ export function AiAssistant(): React.JSX.Element {
       requestAnimationFrame(() => field.current?.focus())
     } else if (c.action === 'compact') compact(model)
     else if (c.action === 'permissions') openSettings('permissions')
+    else if (c.action === 'fresh') {
+      setMemoryOff(ws.active.id, true)
+      setInput('')
+      toast('Memory is off for this chat. Nothing saved is shown to the AI here.')
+    }
     else if (c.action === 'clear') {
       if (running) toast.error('Stop the current run first')
       else if (totals.files > 0) toast.error('Keep or undo the pending changes first')
@@ -691,8 +745,10 @@ export function AiAssistant(): React.JSX.Element {
       if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
         e.preventDefault()
         if (slashOpen) {
-          if (e.key === 'Tab') insertToken(slashList[pickIndex])
-          else pickCommand(slashList[pickIndex])
+          const picked = slashList[pickIndex]
+          // panels and actions (/usage, /context, /clear…) have nothing to add text to: Tab runs them like Enter
+          if (e.key === 'Tab' && promptLike(picked)) insertToken(picked)
+          else pickCommand(picked)
         } else pickMention(mentionList[pickIndex])
         return
       }
@@ -790,6 +846,8 @@ export function AiAssistant(): React.JSX.Element {
       row('web', <SearchIcon className="h-3.5 w-3.5" />, 'Search the web', r.web === 'allow', (on) => setRule('web', on)),
       row('browse', <Globe className="h-3.5 w-3.5" />, 'Browse sites', r.browse === 'allow', (on) => setRule('browse', on)),
       row('git', <GitBranch className="h-3.5 w-3.5" />, 'Commit and push', r.git === 'allow', (on) => setRule('git', on)),
+      // not part of "Trust the AI": deleting stays a separate, deliberate choice
+      row('remove', <Trash2 className="h-3.5 w-3.5" />, 'Delete files', r.remove === 'allow', (on) => setRule('remove', on)),
       {
         id: 'more',
         icon: <MoreHorizontal className="h-3.5 w-3.5" />,
@@ -802,7 +860,7 @@ export function AiAssistant(): React.JSX.Element {
   const permLevel = (() => {
     if (trusted) return { label: 'Trusted', tone: true }
     // web searching starts switched on, so it does not count as the person loosening things
-    const n = [autoAccept, ...TRUST_KEYS.filter((k) => k !== 'web').map((k) => settings.rules[k] === 'allow')].filter(Boolean).length
+    const n = [autoAccept, settings.rules.remove === 'allow', ...TRUST_KEYS.filter((k) => k !== 'web').map((k) => settings.rules[k] === 'allow')].filter(Boolean).length
     if (n === 0) return { label: 'Ask first', tone: false }
     if (n === 1 && autoAccept) return { label: 'Auto-accept edits', tone: true }
     return { label: `${n} automatic`, tone: true }
@@ -819,15 +877,15 @@ export function AiAssistant(): React.JSX.Element {
       )}
     >
       {dragging && createPortal(
-        <div className="drop-veil pointer-events-none fixed inset-0 z-[9999] grid place-items-center bg-black/20 p-3 backdrop-blur-[6px]">
-          <div className="absolute inset-3 rounded-[20px] border border-dashed border-[#3b82f6]/70 bg-[#3b82f6]/[0.04]" />
-          <div className="relative flex flex-col items-center gap-3 text-[#1683ff]">
+        <div className="drop-veil pointer-events-none fixed inset-0 z-[9999] grid place-items-center bg-scrim/20 p-3 backdrop-blur-[6px]">
+          <div className="absolute inset-3 rounded-[20px] border border-dashed border-primary/70 bg-primary/[0.04]" />
+          <div className="relative flex flex-col items-center gap-3 text-link">
             <div className="flex items-center justify-center gap-1">
               <ImageIcon className="drop-icon h-9 w-9 stroke-[1.6]" style={{ '--from': '34px', '--rot': '-14deg', '--lift': '3px', '--delay': '40ms' } as React.CSSProperties} />
               <FileIcon className="drop-icon h-9 w-9 stroke-[1.6]" style={{ '--from': '0px', '--rot': '0deg', '--lift': '-3px', '--delay': '0ms' } as React.CSSProperties} />
               <Folder className="drop-icon h-9 w-9 stroke-[1.6]" style={{ '--from': '-34px', '--rot': '14deg', '--lift': '3px', '--delay': '80ms' } as React.CSSProperties} />
             </div>
-            <span className="drop-label text-[18px] font-medium text-[#5aa6ff]">Drop files here</span>
+            <span className="drop-label text-[18px] font-medium text-link">Drop files here</span>
           </div>
         </div>,
         document.body
@@ -835,8 +893,27 @@ export function AiAssistant(): React.JSX.Element {
       {empty && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 [background-image:radial-gradient(rgba(255,255,255,0.1)_1px,transparent_1.2px)] [background-size:22px_22px] [-webkit-mask-image:radial-gradient(ellipse_75%_65%_at_50%_48%,#000_20%,transparent_100%)] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_48%,#000_20%,transparent_100%)]"
+          className="pointer-events-none absolute inset-0 -z-10 [background-image:radial-gradient(color-mix(in_oklab,var(--foreground)_10%,transparent)_1px,transparent_1.2px)] [background-size:22px_22px] [-webkit-mask-image:radial-gradient(ellipse_75%_65%_at_50%_48%,#000_20%,transparent_100%)] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_48%,#000_20%,transparent_100%)]"
         />
+      )}
+      {empty && account && (
+        <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2">
+          <div className="flex items-center gap-2 rounded-[10px] bg-secondary px-3 py-1.5 text-[12.5px] text-soft-foreground">
+            <span>{account.apiKey ? 'Your own API key' : `${getPlan(account.plan).name} plan`}</span>
+            {!account.apiKey && (
+              <>
+                <span aria-hidden className="text-faint-foreground">·</span>
+                <button
+                  type="button"
+                  onClick={() => openPlanDialog('upgrade')}
+                  className="cursor-pointer text-link underline underline-offset-2 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {account.plan === 'free' ? 'Upgrade' : 'Change plan'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )}
       <div className={cn('@container relative flex flex-col', empty ? 'flex-none' : 'min-h-0 flex-1')}>
       {!empty && <MessageRail messages={messages} scroller={scroller} />}
@@ -850,11 +927,8 @@ export function AiAssistant(): React.JSX.Element {
       >
         <div className="mx-auto w-full max-w-[var(--content-w,56rem)] space-y-5 pb-3 pt-1">
           {empty && (
-            <div className="flex flex-col items-center gap-1 pb-3 text-center">
-              <h1 className="font-display text-[28px] font-semibold leading-9 tracking-tight text-[#ececea]">
-                What are we working on?
-              </h1>
-              {folder && <p className="text-[13px] text-muted-foreground">{folder}</p>}
+            <div className="pb-10 pt-2 @[900px]:pb-12">
+              <HomeHero subtitle={folder || undefined} />
             </div>
           )}
           {messages.map((m, i) =>
@@ -870,11 +944,31 @@ export function AiAssistant(): React.JSX.Element {
               />
             ) : m.role === 'system' ? (
               <div key={m.id} className="text-center text-[11.5px] text-muted-foreground">
-                {m.text}
+                {m.rewind ? (
+                  <div className="flex items-center justify-center gap-2 border-y border-border/50 py-1.5">
+                    <span>{m.text}</span>
+                    <button
+                      type="button"
+                      disabled={running}
+                      onClick={() =>
+                        void undoRewind(m.id).then((r) => {
+                          if (!r) return
+                          if (r.skipped.length) toast.warning(`Chat restored. Left as they are now, because you changed them: ${r.skipped.join(', ')}`)
+                          else toast.success('Rewind undone')
+                        })
+                      }
+                      className="cursor-pointer rounded-md bg-foreground/[0.08] px-2 py-0.5 text-[11.5px] text-foreground hover:bg-foreground/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Undo rewind
+                    </button>
+                  </div>
+                ) : (
+                  m.text
+                )}
                 {m.summary && (
                   <details className="mx-auto mt-1 max-w-[34rem] text-left">
                     <summary className="cursor-pointer text-center hover:text-foreground">Show summary</summary>
-                    <p className="mt-1 whitespace-pre-wrap rounded-lg border border-white/[0.08] bg-[#242423] p-2.5 text-[12px] leading-5 text-[#b4b4b0]">{m.summary}</p>
+                    <p className="mt-1 whitespace-pre-wrap rounded-lg border border-border bg-card p-2.5 text-[12px] leading-5 text-muted-foreground">{m.summary}</p>
                   </details>
                 )}
               </div>
@@ -887,16 +981,16 @@ export function AiAssistant(): React.JSX.Element {
       </div>
 
       <div className="relative shrink-0 px-3 pb-1 pt-1">
-        <div className="relative mx-auto w-full max-w-[46rem]">
+        <div className="relative mx-auto w-full max-w-[min(46rem,var(--content-w,56rem))]">
           {!atBottom && messages.length > 0 && (
             <button
               type="button"
               aria-label={running ? 'AI is working. Scroll to latest' : 'Scroll to latest'}
               onClick={() => scrollToEnd()}
-              className={`absolute bottom-full left-1/2 z-20 mb-3 grid -translate-x-1/2 cursor-pointer place-items-center rounded-full border bg-[#2b2b2a] shadow-md transition-colors ${
+              className={`absolute bottom-full left-1/2 z-20 mb-3 grid -translate-x-1/2 cursor-pointer place-items-center rounded-full border bg-muted shadow-md transition-colors ${
                 running
-                  ? 'h-8 w-8 border-white/[0.12] text-muted-foreground hover:text-foreground'
-                  : 'h-8 w-8 border-white/[0.12] text-muted-foreground hover:text-foreground'
+                  ? 'h-8 w-8 border-border text-muted-foreground hover:text-foreground'
+                  : 'h-8 w-8 border-border text-muted-foreground hover:text-foreground'
               }`}
             >
               {running ? (
@@ -924,12 +1018,12 @@ export function AiAssistant(): React.JSX.Element {
             />
           )}
           {suggested && !slashOpen && !mentionOpen && (
-            <div className="absolute bottom-full left-0 z-20 mb-1.5 flex max-w-full items-center gap-2 rounded-[8px] border border-white/[0.09] bg-[#242423] py-1 pl-2 pr-1 text-[12px] shadow-[0_6px_20px_rgba(0,0,0,0.4)]">
+            <div className="absolute bottom-full left-0 z-20 mb-1.5 flex max-w-full items-center gap-2 rounded-[8px] border border-border bg-card py-1 pl-2 pr-1 text-[12px] shadow-[0_6px_20px_rgba(0,0,0,0.4)]">
               {React.createElement(skillIcon(suggested.icon), {
-                className: 'h-3.5 w-3.5 shrink-0 text-[#8d8d8a]'
+                className: 'h-3.5 w-3.5 shrink-0 text-muted-foreground'
               })}
-              <span className="truncate text-[#a8a8a6]">
-                Use the <span className="text-[#ececea]">{suggested.name}</span> skill?
+              <span className="truncate text-muted-foreground">
+                Use the <span className="text-foreground">{suggested.name}</span> skill?
               </span>
               <button
                 type="button"
@@ -937,7 +1031,7 @@ export function AiAssistant(): React.JSX.Element {
                   e.preventDefault()
                   setInput(`/${suggested.id} ${input.trim()}`)
                 }}
-                className="cursor-pointer rounded-[5px] bg-white/[0.1] px-2 py-0.5 text-[#ececea] transition-colors hover:bg-white/[0.16]"
+                className="cursor-pointer rounded-[5px] bg-foreground/[0.1] px-2 py-0.5 text-foreground transition-colors hover:bg-foreground/[0.16]"
               >
                 Use
               </button>
@@ -948,7 +1042,7 @@ export function AiAssistant(): React.JSX.Element {
                   e.preventDefault()
                   setSkipped((l) => [...l, suggested.id])
                 }}
-                className="grid h-5 w-5 cursor-pointer place-items-center rounded-[5px] text-[#8d8d8a] hover:bg-white/[0.08] hover:text-[#ececea]"
+                className="grid h-5 w-5 cursor-pointer place-items-center rounded-[5px] text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground"
               >
                 <Close className="h-3 w-3" />
               </button>
@@ -1008,9 +1102,11 @@ export function AiAssistant(): React.JSX.Element {
           >
             {images.length || attachments.length ? (
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                {images.map((src, i) => (
-                  <div key={i} className="relative">
-                    <img src={src} alt="" className="h-14 w-14 rounded-lg border object-cover" />
+                <ImageThumbs
+                  images={images}
+                  className="contents"
+                  thumbClassName="h-14 w-14 rounded-lg border object-cover"
+                  renderExtra={(i) => (
                     <button
                       type="button"
                       aria-label="Remove image"
@@ -1019,8 +1115,8 @@ export function AiAssistant(): React.JSX.Element {
                     >
                       <Close className="h-3 w-3" />
                     </button>
-                  </div>
-                ))}
+                  )}
+                />
                 {attachments.map((a, i) => (
                   <AttachmentChip
                     key={`${a.name}-${i}`}
@@ -1288,8 +1384,8 @@ export function AiAssistant(): React.JSX.Element {
             </div>
           </div>
 
-          <div className="flex select-none items-center justify-between px-1.5 pt-1.5 pb-0.5 text-xs text-muted-foreground">
-            <div className="flex items-center gap-3">
+          <div className="@container flex select-none items-center justify-between gap-2 px-1.5 pt-1.5 pb-0.5 text-xs text-muted-foreground">
+            <div className="flex min-w-0 items-center gap-3 @max-[24rem]:gap-2.5">
               <ActionMenu
                 side="top"
                 align="start"
@@ -1299,15 +1395,16 @@ export function AiAssistant(): React.JSX.Element {
                     type="button"
                     aria-label="What the AI may do without asking"
                     className={cn(
-                      'flex cursor-pointer items-center gap-1.5 text-[11.5px] transition-colors hover:text-foreground',
-                      permLevel.tone && 'text-[#d6d6d3]'
+                      'flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[11.5px] transition-colors hover:text-foreground',
+                      permLevel.tone && 'text-soft-foreground'
                     )}
                   >
                     <ShieldCheck className="h-3.5 w-3.5 stroke-[1.8]" />
-                    {permLevel.label}
+                    <span className="@max-[19rem]:sr-only">{permLevel.label}</span>
                   </button>
                 }
               />
+              <MemoryPill chatId={ws.active.id} projectPath={projectPath} />
               <ActionMenu
                 side="top"
                 align="start"
@@ -1336,7 +1433,7 @@ export function AiAssistant(): React.JSX.Element {
                     type="button"
                     aria-label="Project folder"
                     title="Project folder"
-                    className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                    className="shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
                   >
                     <AppWindow className="h-3.5 w-3.5 stroke-[1.8]" />
                   </button>
@@ -1352,114 +1449,120 @@ export function AiAssistant(): React.JSX.Element {
                 }}
                 className={cn(
                   'flex cursor-pointer items-center gap-1.5 transition-colors hover:text-foreground',
-                  listening ? 'text-[#f87171] hover:text-[#f87171]' : 'text-muted-foreground'
+                  listening ? 'text-destructive hover:text-destructive' : 'text-muted-foreground'
                 )}
               >
                 <span className="relative grid place-items-center">
-                  {listening && <span className="absolute h-3.5 w-3.5 animate-ping rounded-full bg-[#f87171]/30" />}
+                  {listening && <span className="absolute h-3.5 w-3.5 animate-ping rounded-full bg-destructive/30" />}
                   <Mic className="relative h-3.5 w-3.5 stroke-[1.8]" />
                 </span>
                 {listening && <span className="text-[11.5px]">Listening</span>}
               </button>
             </div>
 
-            <ActionMenu
-              side="top"
-              align="end"
-              compact
-              contentClassName="w-[min(280px,calc(100vw-32px))] min-w-0"
-              items={[
-                ...modelChoices
-                  .filter((c) => c.model.source !== 'modelscope' && c.model.source !== 'groq')
-                  .map((c) => ({
-                    id: c.model.id,
-                    label: c.model.name,
-                    description: c.locked ? `${c.model.description} · Upgrade to use` : c.model.description,
-                    checked: c.model.id === model,
-                    onClick: () => chooseModel(c)
-                  })),
-                {
-                  id: 'groq',
-                  label: 'Groq',
-                  description: isGroq(model) ? modelName(model) : 'Very fast free models, with your key',
-                  submenu: [
-                    ...modelChoices
-                      .filter((c) => c.model.source === 'groq')
-                      .map((c) => ({
-                        id: c.model.id,
-                        label: c.model.name,
-                        description: c.needsSetup ? `${c.model.description} · Needs a key` : c.model.description,
-                        checked: c.model.id === model,
-                        onClick: () => {
-                          if (chooseModel(c) && c.needsSetup) openSettings('models')
-                        }
-                      })),
-                    {
-                      id: 'groq-key',
-                      label: settings.groqKey ? 'Groq settings' : 'Add your Groq key',
-                      separatorBefore: true,
-                      onClick: () => openSettings('models')
-                    }
-                  ]
-                },
-                {
-                  // expands like Connectors in the plus menu: the fixed ModelScope models, each with its details
-                  id: 'modelscope',
-                  label: 'ModelScope',
-                  description: isModelScope(model) ? modelName(model) : 'Free open models, with your key',
-                  submenu: [
-                    ...modelChoices
-                      .filter((c) => c.model.source === 'modelscope')
-                      .map((c) => ({
-                        id: c.model.id,
-                        label: c.model.name,
-                        description: c.needsSetup ? `${c.model.description} · Needs a key` : c.model.description,
-                        checked: c.model.id === model,
-                        onClick: () => {
-                          if (chooseModel(c) && c.needsSetup) openSettings('models')
-                        }
-                      })),
-                    {
-                      id: 'modelscope-key',
-                      label: settings.modelScopeKey ? 'ModelScope settings' : 'Add your ModelScope key',
-                      separatorBefore: true,
-                      onClick: () => openSettings('models')
-                    }
-                  ]
+            <div className="flex min-w-0 shrink items-center gap-2">
+              <UsageHint />
+              <ContextRing chatId={ws.active.id} />
+              <ActionMenu
+                side="top"
+                align="end"
+                compact
+                contentClassName="w-[min(280px,calc(100vw-32px))] min-w-0"
+                items={[
+                  ...modelChoices
+                    .filter((c) => c.model.source !== 'modelscope' && c.model.source !== 'groq')
+                    .map((c) => ({
+                      id: c.model.id,
+                      label: c.model.name,
+                      description: c.locked ? `${c.model.description} · Upgrade to use` : c.model.description,
+                      checked: c.model.id === model,
+                      onClick: () => chooseModel(c)
+                    })),
+                  {
+                    id: 'groq',
+                    label: 'Groq',
+                    description: isGroq(model) ? modelName(model) : 'Very fast free models, with your key',
+                    submenu: [
+                      ...modelChoices
+                        .filter((c) => c.model.source === 'groq')
+                        .map((c) => ({
+                          id: c.model.id,
+                          label: c.model.name,
+                          description: c.needsSetup ? `${c.model.description} · Needs a key` : c.model.description,
+                          checked: c.model.id === model,
+                          onClick: () => {
+                            if (chooseModel(c) && c.needsSetup) openSettings('models')
+                          }
+                        })),
+                      {
+                        id: 'groq-key',
+                        label: settings.groqKey ? 'Groq settings' : 'Add your Groq key',
+                        separatorBefore: true,
+                        onClick: () => openSettings('models')
+                      }
+                    ]
+                  },
+                  {
+                    // expands like Connectors in the plus menu: the fixed ModelScope models, each with its details
+                    id: 'modelscope',
+                    label: 'ModelScope',
+                    description: isModelScope(model) ? modelName(model) : 'Free open models, with your key',
+                    submenu: [
+                      ...modelChoices
+                        .filter((c) => c.model.source === 'modelscope')
+                        .map((c) => ({
+                          id: c.model.id,
+                          label: c.model.name,
+                          description: c.needsSetup ? `${c.model.description} · Needs a key` : c.model.description,
+                          checked: c.model.id === model,
+                          onClick: () => {
+                            if (chooseModel(c) && c.needsSetup) openSettings('models')
+                          }
+                        })),
+                      {
+                        id: 'modelscope-key',
+                        label: settings.modelScopeKey ? 'ModelScope settings' : 'Add your ModelScope key',
+                        separatorBefore: true,
+                        onClick: () => openSettings('models')
+                      }
+                    ]
+                  }
+                ]}
+                trigger={
+                  <button
+                    type="button"
+                    title={modelName(model)}
+                    className="flex min-w-0 cursor-pointer items-center gap-1 whitespace-nowrap text-[11.5px] text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <span className="min-w-0 max-w-[11rem] truncate @max-[30rem]:max-w-[7rem] @max-[22rem]:max-w-[4.5rem]">{modelName(model)}</span>
+                    <ChevronDown className="h-3 w-3 stroke-[2] opacity-70" />
+                  </button>
                 }
-              ]}
-              trigger={
-                <button
-                  type="button"
-                  className="flex cursor-pointer items-center gap-1 text-[11.5px] text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <span>{modelName(model)}</span>
-                  <ChevronDown className="h-3 w-3 stroke-[2] opacity-70" />
-                </button>
-              }
-            />
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {empty && (
-        <div className="mx-auto mt-2 flex w-full max-w-[46rem] flex-col items-center gap-2 px-3">
+        <div className="mx-auto mt-3 flex w-full max-w-[min(46rem,var(--content-w,56rem))] flex-col items-center gap-3 px-3">
           <div className="flex flex-wrap justify-center gap-1.5">
             {(projectPath ? PROJECT_STARTERS : LOOSE_STARTERS).map((t) => (
               <button
                 key={t.label}
                 type="button"
+                title={t.hint}
                 onClick={() => {
                   setInput(t.text)
                   field.current?.focus()
                 }}
-                className="cursor-pointer rounded-full border border-white/[0.08] px-2.5 py-0.5 text-[11.5px] text-[#a8a8a6] transition-colors hover:border-white/[0.2] hover:text-foreground"
+                className="cursor-pointer whitespace-nowrap rounded-[8px] border border-border px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:border-border-strong hover:bg-foreground/[0.04] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 {t.label}
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-[#77776f]">
+          <p className="text-[11px] text-faint-foreground">
             {projectPath ? 'Type @ to mention a file, or / for commands.' : 'Type / for commands. Move this chat into a project to work on its files.'}
           </p>
         </div>
@@ -1468,7 +1571,7 @@ export function AiAssistant(): React.JSX.Element {
       {panel && (
         <CommandPanel
           panel={panel}
-          ctx={{ model, onModel: setModel, totals, autoAccept, openPanel: setPanel }}
+          ctx={{ chatId: ws.active.id, model, onModel: setModel, totals, autoAccept, openPanel: setPanel }}
           onClose={() => setPanel(null)}
         />
       )}

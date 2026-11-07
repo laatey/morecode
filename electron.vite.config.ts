@@ -8,7 +8,7 @@ import type { Plugin } from 'vite'
 const strictScripts = (): Plugin => ({
   name: 'strict-script-csp',
   apply: 'build',
-  transformIndexHtml: (html) => html.replace("script-src 'self' 'unsafe-inline' 'unsafe-eval'", "script-src 'self'")
+  transformIndexHtml: (html) => html.replace("script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'", "script-src 'self' 'wasm-unsafe-eval'")
 })
 
 export default defineConfig({

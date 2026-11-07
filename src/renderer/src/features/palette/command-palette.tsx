@@ -6,12 +6,12 @@ import {
   Bell,
   CircleHelp,
   CreditCard,
+  CrownPlus,
   FolderOpen,
   LogOut,
   MessageSquare,
   PanelLeft,
   PanelRight,
-  Rocket,
   Search,
   Settings as SettingsIcon,
   Sparkles,
@@ -154,7 +154,7 @@ function PaletteBody(): React.JSX.Element {
 
     out.push(
       { id: 'billing', group: 'Account', label: 'Usage and billing', detail: 'Plan, invoices, payment method', icon: CreditCard, words: 'invoice card plan limit', run: settings('billing') },
-      { id: 'upgrade', group: 'Account', label: 'Upgrade plan', icon: Rocket, run: () => openPlanDialog('upgrade') },
+      { id: 'upgrade', group: 'Account', label: 'Upgrade plan', icon: CrownPlus, run: () => openPlanDialog('upgrade') },
       { id: 'help', group: 'Account', label: 'Help and what’s new', icon: CircleHelp, words: 'docs support about version', run: settings('about') },
       { id: 'bug', group: 'Account', label: 'Report a bug', icon: CircleHelp, words: 'feedback problem', run: settings('about') },
       { id: 'tour', group: 'Account', label: 'Take the tour', icon: CircleHelp, run: () => setTimeout(startTour, 200) },
@@ -200,29 +200,29 @@ function PaletteBody(): React.JSX.Element {
   return (
     <Dialog.Content
       aria-describedby={undefined}
-      className="fixed left-1/2 top-[14vh] z-50 w-[min(440px,calc(100vw-32px))] -translate-x-1/2 select-text overflow-hidden rounded-[10px] border border-white/[0.09] bg-[#262625] shadow-[0_12px_36px_rgba(0,0,0,0.5)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+      className="fixed left-1/2 top-[14vh] z-50 w-[min(440px,calc(100vw-32px))] -translate-x-1/2 select-text overflow-hidden rounded-[10px] border border-border bg-card shadow-[0_12px_36px_rgba(0,0,0,0.5)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
     >
       <Dialog.Title className="sr-only">Command palette</Dialog.Title>
       <Command shouldFilter={false} loop label="Command palette">
-        <div className="flex items-center gap-2 border-b border-white/[0.07] px-3">
-          <Search className="h-3.5 w-3.5 shrink-0 text-[#77776f]" />
+        <div className="flex items-center gap-2 border-b border-border/50 px-3">
+          <Search className="h-3.5 w-3.5 shrink-0 text-faint-foreground" />
           <Command.Input
             autoFocus
             value={query}
             onValueChange={setQuery}
             placeholder="Search chats, run a command, open a setting"
-            className="h-10 flex-1 bg-transparent text-[13px] text-[#ececea] outline-none placeholder:text-[#77776f]"
+            className="h-10 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-faint-foreground"
           />
         </div>
         <Command.List className="slim-scroll max-h-[min(280px,50vh)] overflow-y-auto p-1">
-          <Command.Empty className="px-3 py-6 text-center text-[12.5px] text-[#8d8d8a]">
+          <Command.Empty className="px-3 py-6 text-center text-[12.5px] text-muted-foreground">
             Nothing matches “{query}”.
           </Command.Empty>
           {groups.map(([name, rows]) => (
             <Command.Group
               key={name}
               heading={name}
-              className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-0.5 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:text-[#77776f]"
+              className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-0.5 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:text-faint-foreground"
             >
               {rows.map(({ item, snippet }) => (
                 <Command.Item
@@ -230,14 +230,14 @@ function PaletteBody(): React.JSX.Element {
                   value={item.id}
                   onSelect={() => choose(item)}
                   className={cn(
-                    'flex h-8 cursor-pointer items-center gap-2 rounded-[6px] px-2 text-[12.5px] text-[#d6d6d3] outline-none',
-                    'data-[selected=true]:bg-white/[0.08] data-[selected=true]:text-[#ececea]'
+                    'flex h-8 cursor-pointer items-center gap-2 rounded-[6px] px-2 text-[12.5px] text-soft-foreground outline-none',
+                    'data-[selected=true]:bg-foreground/[0.08] data-[selected=true]:text-foreground'
                   )}
                 >
-                  <item.icon className="h-3.5 w-3.5 shrink-0 text-[#8d8d8a]" />
+                  <item.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="shrink-0 truncate">{item.label}</span>
                   {(snippet || item.detail) && (
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-[#77776f]">{snippet || item.detail}</span>
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-faint-foreground">{snippet || item.detail}</span>
                   )}
                   {item.shortcut && bindings[item.shortcut] && (
                     <span className="ml-auto flex shrink-0 items-center gap-1">

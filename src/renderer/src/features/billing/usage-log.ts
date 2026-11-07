@@ -28,37 +28,111 @@ const key = (accountId: string): string => `morecode:usage:v1:${accountId}`
 const KEEP_MS = 30 * 24 * 3_600_000
 const MAX_RECORDS = 3000
 
-/** When this run of the app started: "this session" means since then. */
-const sessionStart = Date.now()
-let lastContext = 0
+/** Context-window size after each chat's most recent step, so every chat shows its own. Kept across restarts. */
+const CONTEXT_KEY = 'morecode:context:v1'
+const MAX_CONTEXTS = 200
+const contexts: Map<string, number> = (() => {
+  try {
+    const raw = localStorage.getItem(CONTEXT_KEY)
+    return new Map<string, number>(raw ? (Object.entries(JSON.parse(raw)) as [string, number][]) : [])
+  } catch {
+    return new Map<string, number>()
+  }
+})()
 let version = 0
 const listeners = new Set<() => void>()
-const sessionEdits = new Map<string, Map<string, { added: number; removed: number }>>()
-
 export interface SessionEditTotals {
   added: number
   removed: number
 }
 
-/** Count each applied edit once for this app session; undoing it removes its contribution. */
-export function recordSessionEdit(accountId: string, id: string, added: number, removed: number): void {
-  const edits = sessionEdits.get(accountId) ?? new Map<string, SessionEditTotals>()
-  if (edits.has(id)) return
-  edits.set(id, { added, removed })
-  sessionEdits.set(accountId, edits)
+/**
+ * "This session" is kept on disk, so a restart or reload does not wipe it. It carries on until the
+ * person has been away for SESSION_IDLE_MS, then the next step starts a fresh one.
+ */
+const SESSION_IDLE_MS = 6 * 3_600_000
+/** A gap longer than this between two steps is time away, not time working. */
+const ACTIVE_GAP_MS = 5 * 60_000
+const MAX_SESSION_EDITS = 500
+const sessionKey = (accountId: string): string => `morecode:session:v1:${accountId}`
+
+interface SessionState {
+  start: number
+  last: number
+  /** Milliseconds spent working in this session. */
+  active: number
+  edits: Record<string, SessionEditTotals>
+}
+
+const sessions = new Map<string, SessionState>()
+
+function saveSession(accountId: string, s: SessionState): void {
+  try {
+    localStorage.setItem(sessionKey(accountId), JSON.stringify(s))
+  } catch {
+    // storage full: the numbers on screen still update until the app closes
+  }
+}
+
+function readSession(accountId: string): SessionState | null {
+  try {
+    const raw = localStorage.getItem(sessionKey(accountId))
+    if (!raw) return null
+    const s = JSON.parse(raw) as Partial<SessionState>
+    if (typeof s.start !== 'number' || typeof s.last !== 'number') return null
+    return { start: s.start, last: s.last, active: typeof s.active === 'number' ? s.active : 0, edits: s.edits ?? {} }
+  } catch {
+    return null
+  }
+}
+
+/** This account's current session: loaded from disk, or started now if there is none or it has gone stale. */
+function currentSession(accountId: string, now = Date.now()): SessionState {
+  let s = sessions.get(accountId) ?? readSession(accountId)
+  if (!s || now - s.last > SESSION_IDLE_MS) {
+    s = { start: now, last: now, active: 0, edits: {} }
+    saveSession(accountId, s)
+  }
+  sessions.set(accountId, s)
+  return s
+}
+
+/** Something happened: the session is still alive, and the time since the last step counts as active. */
+function touchSession(accountId: string, now = Date.now()): SessionState {
+  const s = currentSession(accountId, now)
+  s.active += Math.min(Math.max(0, now - s.last), ACTIVE_GAP_MS)
+  s.last = now
+  return s
+}
+
+function notify(): void {
   version++
   listeners.forEach((l) => l())
 }
 
+/** Count each applied edit once for this session; undoing it removes its contribution. */
+export function recordSessionEdit(accountId: string, id: string, added: number, removed: number): void {
+  const s = touchSession(accountId)
+  if (s.edits[id]) return
+  s.edits[id] = { added, removed }
+  const ids = Object.keys(s.edits)
+  // oldest first: drop the earliest ones if a very long session piles up
+  for (const old of ids.slice(0, Math.max(0, ids.length - MAX_SESSION_EDITS))) delete s.edits[old]
+  saveSession(accountId, s)
+  notify()
+}
+
 export function forgetSessionEdit(accountId: string, id: string): void {
-  if (!sessionEdits.get(accountId)?.delete(id)) return
-  version++
-  listeners.forEach((l) => l())
+  const s = currentSession(accountId)
+  if (!s.edits[id]) return
+  delete s.edits[id]
+  saveSession(accountId, s)
+  notify()
 }
 
 export function getSessionEditTotals(accountId: string): SessionEditTotals {
   const totals = { added: 0, removed: 0 }
-  for (const edit of sessionEdits.get(accountId)?.values() ?? []) {
+  for (const edit of Object.values(currentSession(accountId).edits)) {
     totals.added += edit.added
     totals.removed += edit.removed
   }
@@ -74,17 +148,26 @@ export function load(accountId: string): UsageRecord[] {
   }
 }
 
-export function recordUsage(accountId: string, r: Omit<UsageRecord, 't'>): void {
+export function recordUsage(accountId: string, r: Omit<UsageRecord, 't'>, chatId?: string): void {
   const now = Date.now()
+  saveSession(accountId, touchSession(accountId, now))
   const all = [...load(accountId), { ...r, t: now }].filter((x) => now - x.t < KEEP_MS).slice(-MAX_RECORDS)
   try {
     localStorage.setItem(key(accountId), JSON.stringify(all))
   } catch {
     // storage full: the numbers on screen still update for this session
   }
-  lastContext = r.context
-  version++
-  listeners.forEach((l) => l())
+  if (chatId) {
+    contexts.delete(chatId)
+    contexts.set(chatId, r.context)
+    while (contexts.size > MAX_CONTEXTS) contexts.delete(contexts.keys().next().value as string)
+    try {
+      localStorage.setItem(CONTEXT_KEY, JSON.stringify(Object.fromEntries(contexts)))
+    } catch {
+      // not being able to remember it across restarts is harmless
+    }
+  }
+  notify()
 }
 
 /** Re-render panels that are open while the AI works. */
@@ -96,8 +179,8 @@ export function subscribeUsage(cb: () => void): () => void {
 /** Changes every time a step is recorded; lets panels re-render with useSyncExternalStore. */
 export const getUsageVersion = (): number => version
 
-/** Tokens in the context window after the most recent step (0 before anything has run). */
-export const getLastContext = (): number => lastContext
+/** Tokens in this chat's context window after its most recent step (0 before it has run). */
+export const getLastContext = (chatId: string): number => contexts.get(chatId) ?? 0
 
 export const emptyTotals = (): Totals => ({ requests: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, ms: 0 })
 
@@ -119,10 +202,13 @@ export interface UsageSummary {
   /** Share of this session's steps that ran with more than 150k tokens of context. */
   longContextShare: number
   sessionStart: number
+  /** Time spent working in this session, in milliseconds. */
+  activeMs: number
 }
 
 export function summarize(accountId: string, now = Date.now()): UsageSummary {
   const records = load(accountId)
+  const session = currentSession(accountId, now)
   const startOfDay = new Date(now)
   startOfDay.setHours(0, 0, 0, 0)
   const weekAgo = now - 7 * 24 * 3_600_000
@@ -133,11 +219,12 @@ export function summarize(accountId: string, now = Date.now()): UsageSummary {
     week: emptyTotals(),
     byModel: {},
     longContextShare: 0,
-    sessionStart
+    sessionStart: session.start,
+    activeMs: session.active
   }
   let long = 0
   for (const r of records) {
-    if (r.t >= sessionStart) {
+    if (r.t >= session.start) {
       out.session = add(out.session, r)
       out.byModel[r.model] = add(out.byModel[r.model] ?? emptyTotals(), r)
       if (r.context > 150_000) long++

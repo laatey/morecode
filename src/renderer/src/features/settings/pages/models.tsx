@@ -4,7 +4,9 @@ import { useAuth } from '@/features/auth/auth-store'
 import { AuthError } from '@/features/auth/auth-service'
 import { errorText } from '@/features/auth/ui'
 import { MODELS, sourceOf } from '@/features/ai-assistant/models'
+import { resetsIn } from '@/features/billing/limits'
 import { getPlan } from '@/features/billing/plans'
+import { resetsIn } from '@/features/billing/limits'
 import { Btn, Group, Page, Pick, Row, TextInput } from '../kit'
 import { useSettings } from '../settings-store'
 
@@ -76,12 +78,12 @@ function ProviderRow({
     <div className="py-3">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="min-w-[180px] flex-1">
-          <div className="text-[13px] text-[#ededeb]">{title}</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">{description}</div>
+          <div className="text-[13px] text-foreground">{title}</div>
+          <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{description}</div>
         </div>
         {connected && !adding ? (
           <div className="flex items-center gap-2">
-            <span className="max-w-40 truncate font-mono text-[12px] text-[#c9c9c6]">
+            <span className="max-w-40 truncate font-mono text-[12px] text-soft-foreground">
               {summary}
             </span>
             <Btn variant="danger" onClick={() => void Promise.resolve(remove())}>
@@ -119,7 +121,7 @@ function ProviderRow({
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
               />
-              {error && <p className="mt-1.5 text-[12.5px] text-[#f4a39e]">{error}</p>}
+              {error && <p className="mt-1.5 text-[12.5px] text-destructive">{error}</p>}
             </div>
             <Btn
               variant="primary"
@@ -139,7 +141,7 @@ function ProviderRow({
 
 /** Where the Claude models come from: your MoreCode plan, unless you added your own key below. */
 function PlanRow(): React.JSX.Element | null {
-  const { account, messagesLeft } = useAuth()
+  const { account, limitHit } = useAuth()
   const { setTab } = useSettings()
   if (!account) return null
   const plan = getPlan(account.plan)
@@ -149,7 +151,9 @@ function PlanRow(): React.JSX.Element | null {
       description={
         account.apiKey
           ? 'Not used while your own API key is added below.'
-          : `${messagesLeft} of ${plan.dailyMessages} messages left today.`
+          : limitHit
+            ? `${limitHit.kind === 'week' ? 'Weekly' : '5-hour'} limit reached. ${resetsIn(limitHit.resetsAt)}.`
+            : `${plan.allowance}, with a 5-hour and a weekly limit.`
       }
     >
       <Btn onClick={() => setTab('billing')}>Manage plan</Btn>

@@ -128,7 +128,7 @@ export function buildSkillFromBundle(
 ): Skill {
   const paths = Object.keys(bundle).sort()
   if (paths.length === 0) {
-    throw new Error('No readable skill files (.md, .json, .yaml, .txt) found.')
+    throw new Error('No readable skill files (SKILL.md, .json, .yaml, .txt) found in that package.')
   }
 
   let name = fallbackName.replace(/\.(zip|md|json|skill)$/i, '').replace(/[-_]+/g, ' ').trim()
@@ -238,7 +238,13 @@ export function buildSkillFromBundle(
   }
 }
 
-/** Parse one or more uploaded File objects (.zip, .md, .json, or folder files) into a Skill. */
+/** Zip files start with "PK" and a version marker; true even when the file has some other extension. */
+async function looksLikeZip(file: File): Promise<boolean> {
+  const head = new Uint8Array(await file.slice(0, 4).arrayBuffer())
+  return head[0] === 0x50 && head[1] === 0x4b && (head[2] === 0x03 || head[2] === 0x05) && (head[3] === 0x04 || head[3] === 0x06)
+}
+
+/** Parse one or more uploaded File objects (.skill, .zip, .md, .json, or folder files) into a Skill. */
 export async function parseUploadedSkillFiles(
   fileList: FileList | File[],
   takenIds: string[]
@@ -246,8 +252,8 @@ export async function parseUploadedSkillFiles(
   const files = Array.from(fileList)
   if (files.length === 0) throw new Error('No file selected.')
 
-  // Single .zip archive
-  if (files.length === 1 && /\.zip$/i.test(files[0].name)) {
+  // Single archive: a .skill file is a zip with a different name, so the file's first bytes decide, not its extension
+  if (files.length === 1 && (/\.(zip|skill)$/i.test(files[0].name) || (await looksLikeZip(files[0])))) {
     const bundle = await extractZipFiles(files[0])
     return buildSkillFromBundle(bundle, files[0].name, takenIds)
   }

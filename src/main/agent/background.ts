@@ -124,7 +124,7 @@ export function startJob(command: string, cwd: string): Job {
     shell: true,
     detached: process.platform !== 'win32',
     windowsHide: true,
-    env: { ...process.env, CI: '1', NO_COLOR: '1', TERM: 'dumb' }
+    env: { ...process.env, CI: '1', NO_COLOR: '1', TERM: 'dumb', PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }
   })
   const job: Job = {
     id: `bg${++counter}`,

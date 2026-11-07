@@ -1,5 +1,5 @@
 import { skillIcon, type CustomCommand, type Skill } from '@/features/skills/skills-data'
-import { BarChart3, CircleHelp, ClipboardList, Command, Eraser, FileText, Gauge, Minimize2, NotebookText, Puzzle, ShieldCheck, type IconComponent } from '@/components/icons'
+import { Brain, BarChart3, CircleHelp, ClipboardList, Command, Eraser, FileText, Gauge, Minimize2, NotebookText, Puzzle, ShieldCheck, type IconComponent } from '@/components/icons'
 
 export type PanelId =
   | 'model'
@@ -8,7 +8,7 @@ export type PanelId =
   | 'usage'
   | 'skills'
   | 'commands'
-export type ActionId = 'compact' | 'clear' | 'permissions'
+export type ActionId = 'compact' | 'clear' | 'permissions' | 'fresh'
 export type CommandGroup =
   | 'Conversation'
   | 'Skills'
@@ -71,6 +71,14 @@ export const BUILT_IN_COMMANDS: SlashCommand[] = [
     group: 'Utilities',
     kind: 'action',
     action: 'clear'
+  },
+  {
+    id: 'fresh',
+    description: 'Switch memory off for this chat, so the AI starts from nothing',
+    icon: Brain,
+    group: 'Conversation',
+    kind: 'action',
+    action: 'fresh'
   },
   {
     id: 'permissions',

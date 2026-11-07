@@ -47,6 +47,13 @@ CREATE TABLE IF NOT EXISTS usage (
   count INTEGER NOT NULL,
   PRIMARY KEY (user_id, day)
 );
+CREATE TABLE IF NOT EXISTS limits (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  session_start BIGINT NOT NULL,
+  session_tokens BIGINT NOT NULL,
+  week_start BIGINT NOT NULL,
+  week_tokens BIGINT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS runs (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   run_id TEXT NOT NULL,
@@ -232,6 +239,26 @@ export async function openPgRepo(url, opts = {}) {
      * transaction that is serialised per person, so two requests at once cannot both slip through.
      * A run already counted is let through free.
      */
+    runSeen: async (userId, runId) => Boolean(runId && (await one('SELECT 1 AS x FROM runs WHERE user_id = $1 AND run_id = $2', [userId, runId]))),
+
+    limitsGet: async (userId) => {
+      const r = await one('SELECT * FROM limits WHERE user_id = $1', [userId])
+      return r ? { sessionStart: Number(r.session_start), sessionTokens: Number(r.session_tokens), weekStart: Number(r.week_start), weekTokens: Number(r.week_tokens) } : null
+    },
+    limitsUpdate: (userId, fn) =>
+      tx(async (c) => {
+        await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['limits:' + userId])
+        const r = (await c.query('SELECT * FROM limits WHERE user_id = $1', [userId])).rows[0]
+        const { next, out } = fn(r ? { sessionStart: Number(r.session_start), sessionTokens: Number(r.session_tokens), weekStart: Number(r.week_start), weekTokens: Number(r.week_tokens) } : null)
+        if (next) {
+          await c.query(
+            'INSERT INTO limits (user_id, session_start, session_tokens, week_start, week_tokens) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id) DO UPDATE SET session_start = EXCLUDED.session_start, session_tokens = EXCLUDED.session_tokens, week_start = EXCLUDED.week_start, week_tokens = EXCLUDED.week_tokens',
+            [userId, next.sessionStart, next.sessionTokens, next.weekStart, next.weekTokens]
+          )
+        }
+        return out
+      }),
+
     admitMessage: (userId, day, limit, runId, now = Date.now()) =>
       tx(async (c) => {
         await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [userId])

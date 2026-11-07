@@ -137,7 +137,7 @@ const DROPPED = /stream|closed|terminated|socket|ECONN|reset|timed? ?out|overloa
  */
 export async function readOpenAIStream(
   chunks: AsyncIterable<string>,
-  on: { text?: (delta: string) => void }
+  on: { text?: (delta: string) => void; progress?: (chars: number, thinking?: boolean) => void; thinking?: (delta: string) => void }
 ): Promise<{ content: ContentBlock[]; stopReason: string | null; usage: Usage }> {
   let text = ''
   const calls = new Map<number, { id: string; name: string; args: string }>()
@@ -183,6 +183,13 @@ export async function readOpenAIStream(
     if (typeof delta.content === 'string' && delta.content) {
       text += delta.content
       on.text?.(delta.content)
+      on.progress?.(delta.content.length)
+    }
+    // hidden thinking (DeepSeek and others) is not shown, but it uses up the reply and the tokens, so it is counted
+    const thought = delta.reasoning_content ?? delta.reasoning
+    if (typeof thought === 'string' && thought) {
+      on.thinking?.(thought)
+      on.progress?.(thought.length, true)
     }
 
     for (const tc of delta.tool_calls ?? []) {
@@ -191,7 +198,10 @@ export async function readOpenAIStream(
       const entry = calls.get(index) ?? { id: '', name: '', args: '' }
       if (tc.id) entry.id = tc.id
       if (tc.function?.name && !entry.name) entry.name = tc.function.name
-      if (typeof tc.function?.arguments === 'string') entry.args += tc.function.arguments
+      if (typeof tc.function?.arguments === 'string') {
+        entry.args += tc.function.arguments
+        on.progress?.(tc.function.arguments.length)
+      }
       calls.set(index, entry)
     }
 
@@ -211,7 +221,7 @@ export async function readOpenAIStream(
       input = c.args ? JSON.parse(c.args) : {}
     } catch {
       // cut off or malformed: marked so the tool reports it instead of running with nothing
-      input = { __invalid: true }
+      input = { __invalid: true, __path: /"path"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(c.args)?.[1] }
     }
     content.push({ type: 'tool_use', id: c.id || `call_${index}`, name: c.name, input })
   }

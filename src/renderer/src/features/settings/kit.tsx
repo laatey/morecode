@@ -18,8 +18,8 @@ export function Page({
   return (
     <div className="w-full space-y-7">
       <header className="pb-1">
-        <h2 className="text-[17px] font-medium text-[#f7f7f4]">{title}</h2>
-        {description && <p className="mt-1 max-w-[500px] text-[12px] leading-relaxed text-[#9a9a96]">{description}</p>}
+        <h2 className="text-[17px] font-medium text-foreground">{title}</h2>
+        {description && <p className="mt-1 max-w-[500px] text-[12px] leading-relaxed text-muted-foreground">{description}</p>}
       </header>
       {children}
     </div>
@@ -38,8 +38,8 @@ export function Group({
 }): React.JSX.Element {
   return (
     <section>
-      {title && <h3 className="pb-2 text-[13px] font-medium text-[#ececea]">{title}</h3>}
-      <div className="divide-y divide-white/[0.07] overflow-hidden rounded-[10px] border border-white/[0.1]">
+      {title && <h3 className="pb-2 text-[13px] font-medium text-foreground">{title}</h3>}
+      <div className="divide-y divide-border/50 overflow-hidden rounded-[10px] border border-border">
         {React.Children.toArray(children).map((child, i) =>
           React.isValidElement(child) && child.type === Row ? child : (
             <div key={i} className="px-4 py-3">
@@ -48,7 +48,7 @@ export function Group({
           )
         )}
       </div>
-      {note && <p className="px-1 pt-2 text-[12px] leading-relaxed text-[#737370]">{note}</p>}
+      {note && <p className="px-1 pt-2 text-[12px] leading-relaxed text-faint-foreground">{note}</p>}
     </section>
   )
 }
@@ -72,8 +72,8 @@ export function Row({
       <div className="flex min-w-[180px] flex-1 items-start gap-3">
         {icon && <div className="mt-0.5 shrink-0">{icon}</div>}
         <div className="min-w-0 flex-1">
-          <div className="text-[12.5px] font-medium leading-snug text-[#f1f1ef]">{title}</div>
-          {description && <div className="mt-0.5 text-[11.5px] leading-relaxed text-[#92928e]">{description}</div>}
+          <div className="text-[12.5px] font-medium leading-snug text-foreground">{title}</div>
+          {description && <div className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">{description}</div>}
         </div>
       </div>
       {children && <div className="flex shrink-0 items-center justify-end gap-2">{children}</div>}
@@ -101,13 +101,13 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6] disabled:cursor-not-allowed disabled:opacity-40',
-        checked ? 'bg-[#3b82f6]' : 'bg-[#5a5a54] hover:bg-[#67675f]'
+        'relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-40',
+        checked ? 'bg-primary' : 'bg-faint-foreground hover:bg-faint-foreground'
       )}
     >
       <span
         className={cn(
-          'absolute left-[2px] top-[2px] h-4 w-4 rounded-full bg-white transition-transform',
+          'absolute left-[2px] top-[2px] h-4 w-4 rounded-full bg-primary-foreground transition-transform',
           checked && 'translate-x-4'
         )}
       />
@@ -127,10 +127,13 @@ export function Segmented<T extends string>({
 }): React.JSX.Element {
   return (
     <SegmentedSwitch
-      options={options}
+      options={options.map((o) => ({
+        ...o,
+        // fit the label (12px text) with even padding instead of a fixed width
+        width: typeof o.label === 'string' ? Math.max(68, Math.ceil(o.label.length * 6.4) + 28) : 68
+      }))}
       value={value}
       onChange={onChange}
-      itemWidth={68}
       height={28}
     />
   )
@@ -163,10 +166,10 @@ export function Pick<T extends string>({
         <button
           type="button"
           style={width ? { minWidth: width } : undefined}
-          className="inline-flex h-7 cursor-pointer items-center justify-end gap-1.5 px-2 text-[12px] text-[#f1f1ef] transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]"
+          className="inline-flex h-7 cursor-pointer items-center justify-end gap-1.5 px-2 text-[12px] text-foreground transition-colors hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
         >
           <span className="truncate">{current}</span>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#8e8e8a]" />
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         </button>
       }
     />
@@ -191,10 +194,10 @@ export function Btn({
       {...props}
       disabled={props.disabled || busy}
       className={cn(
-        'h-8 rounded-[7px] border-transparent px-3 text-[12.5px] font-medium text-white shadow-none',
-        variant === 'primary' && 'bg-[#3b82f6] hover:bg-[#2f6fe0]',
-        variant === 'danger' && 'bg-[#d6453d] hover:bg-[#bf3a33]',
-        variant === 'default' && 'bg-[#33332f] hover:bg-[#3d3d39]',
+        'h-8 rounded-[7px] border-transparent px-3 text-[12.5px] font-medium text-foreground shadow-none',
+        variant === 'primary' && 'bg-primary hover:bg-primary/90',
+        variant === 'danger' && 'bg-destructive hover:bg-destructive/90',
+        variant === 'default' && 'bg-secondary hover:bg-accent',
         className
       )}
     >
@@ -212,7 +215,7 @@ export const TextInput = React.forwardRef<
     ref={ref}
     {...props}
     className={cn(
-      'h-8 w-full rounded-[7px] border border-[#3a3a37] bg-[#272726] px-2.5 text-[12.5px] text-white outline-none transition-colors placeholder:text-[#9a9a95] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]',
+      'h-8 w-full rounded-[7px] border border-border bg-background px-2.5 text-[12.5px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary',
       className
     )}
   />
@@ -258,8 +261,8 @@ export function DangerRow({
     <div className="py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="min-w-[180px] flex-1">
-          <div className="text-[13px] leading-snug text-[#f1f1ef]">{title}</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-[#8e8e8a]">{description}</div>
+          <div className="text-[13px] leading-snug text-foreground">{title}</div>
+          <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{description}</div>
         </div>
         {!open && (
           <Btn variant="danger" onClick={() => setOpen(true)}>
@@ -268,10 +271,10 @@ export function DangerRow({
         )}
       </div>
       {open && (
-        <div className="mt-3 space-y-3 border border-[#e5584f]/25 bg-[#e5584f]/[0.06] p-3">
+        <div className="mt-3 space-y-3 border border-destructive/25 bg-destructive/[0.06] p-3">
           {typeToConfirm && (
-            <label className="block text-[13px] text-[#c9c9c6]">
-              Type <span className="font-medium text-[#ececea]">{typeToConfirm}</span> to confirm
+            <label className="block text-[13px] text-soft-foreground">
+              Type <span className="font-medium text-foreground">{typeToConfirm}</span> to confirm
               <TextInput
                 className="mt-1.5"
                 autoFocus

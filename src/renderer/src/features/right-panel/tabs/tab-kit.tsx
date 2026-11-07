@@ -18,10 +18,10 @@ export function TabEmpty({
   return (
     <div className="flex h-full w-full items-center justify-center p-6">
       <div className="flex max-w-[280px] flex-col items-center text-center">
-        <span className="mb-3 grid h-10 w-10 place-items-center rounded-[10px] bg-white/[0.05] text-[#a8a8a6]">
+        <span className="mb-3 grid h-10 w-10 place-items-center rounded-[10px] bg-foreground/[0.05] text-muted-foreground">
           <Icon className="h-[18px] w-[18px] stroke-[1.5]" />
         </span>
-        <h2 className="text-[13px] font-medium text-[#ececea]">{title}</h2>
+        <h2 className="text-[13px] font-medium text-foreground">{title}</h2>
         <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground">{children}</p>
         {action && <div className="mt-3.5">{action}</div>}
       </div>
@@ -40,7 +40,7 @@ export function TabToolbar({
   return (
     <div
       className={cn(
-        'flex min-h-[30px] shrink-0 items-center gap-1.5 border-b border-white/[0.045] px-2.5 py-0.5',
+        'flex min-h-[30px] shrink-0 items-center gap-1.5 border-b border-border/50 px-2.5 py-0.5',
         className
       )}
     >
@@ -73,10 +73,10 @@ export function Chip({
   children: React.ReactNode
 }): React.JSX.Element {
   const tones = {
-    neutral: 'bg-white/[0.07] text-[#a8a8a6]',
-    good: 'bg-[#3fb950]/15 text-[#5fd17a]',
-    warn: 'bg-[#e5a54b]/15 text-[#e8b365]',
-    bad: 'bg-[#e5584f]/15 text-[#f0746c]'
+    neutral: 'bg-foreground/[0.07] text-muted-foreground',
+    good: 'bg-success/15 text-success',
+    warn: 'bg-warning/15 text-warning',
+    bad: 'bg-destructive/15 text-destructive'
   }
   return (
     <span

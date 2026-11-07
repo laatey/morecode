@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { loadBillingConfig } from '../billing/prices'
 import { getPlan, type PlanId } from '../billing/plans'
 import { dayKey, rollDay } from '../billing/usage'
+import { limitHit as limitHitOf } from '../billing/limits'
 import { workspaceKey } from '@/lib/storage-keys'
 import { defaultAuthService } from './http-auth-service'
 import {
@@ -28,9 +29,9 @@ interface AuthApi {
   switchTo: (id: string) => Promise<void>
   /** Remember a project and make it the current one. */
   openProject: (p: Project) => Promise<void>
-  /** Messages left today on the current plan (Infinity when using your own key). */
-  messagesLeft: number
-  /** Count one sent message. Returns false (and opens the limit dialog) when none are left. */
+  /** Which usage limit is full right now, and when it resets. Null when there is room (or you use your own key). */
+  limitHit: { kind: 'session' | 'week'; resetsAt: number } | null
+  /** Check there is room to send. Returns false (and opens the limit dialog) when a limit is full. */
   spendMessage: () => boolean
   /** Re-read the plan and today's count from the server (the server's count is the one that is enforced). */
   refreshAccount: () => void
@@ -173,14 +174,13 @@ export function AuthProvider({
     }, 1500)
   }, [service])
 
-  const messagesLeft =
-    !account || account.apiKey
-      ? Infinity
-      : Math.max(0, getPlan(account.plan).dailyMessages - account.sentToday)
+  // the server counts and enforces the limits; the app only reads them (and checks before sending, to save a trip)
+  const limitHit = useMemo(() => limitHitOf(account), [account])
 
   const spendMessage = useCallback((): boolean => {
     if (!account) return true
-    if (messagesLeft <= 0) {
+    // checked fresh: a window that reset a minute ago must not still block
+    if (limitHitOf(account)) {
       setPlanDialog('limit')
       return false
     }
@@ -191,7 +191,7 @@ export function AuthProvider({
       usage: { ...account.usage, [today]: (account.usage?.[today] ?? 0) + 1 }
     })
     return true
-  }, [account, messagesLeft, update])
+  }, [account, update])
 
   const cancelPlan = useCallback(async () => {
     if (!account) return
@@ -208,6 +208,8 @@ export function AuthProvider({
       if (!account) return
       const plan = getPlan(id)
       const billing = account.billing ?? EMPTY_BILLING
+      // nothing paid can be chosen while payments (or the AI they pay for) are not set up, whatever the screen offered
+      if (id !== 'free' && (await loadBillingConfig()).billing === 'off') throw new Error('Plans are not available yet.')
       if (id === 'free') {
         if (account.plan !== 'free') {
           if (extra?.patch) await update(extra.patch)
@@ -273,7 +275,7 @@ export function AuthProvider({
       signOut,
       switchTo,
       openProject,
-      messagesLeft,
+      limitHit,
       spendMessage,
       refreshAccount,
       choosePlan,
@@ -297,7 +299,7 @@ export function AuthProvider({
       signOut,
       switchTo,
       openProject,
-      messagesLeft,
+      limitHit,
       spendMessage,
       refreshAccount,
       choosePlan,

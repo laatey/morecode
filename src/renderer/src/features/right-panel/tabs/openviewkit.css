@@ -1,0 +1,67 @@
+/* Make openviewkit look native: flush with the panel, no rounding, and the app's own switch style.
+   Every colour is a theme token, so previews follow Settings → Appearance. */
+.ovk-host { display: flex; flex: 1 1 0; min-height: 0; min-width: 0; flex-direction: column; background: var(--background); }
+.ovk-host > .fv-root,
+.ovk-host .fv-zip-view > .fv-root { flex: 1 1 0; min-height: 0; border-radius: 0; font-size: 13px; }
+.ovk-host .fv-root,
+.ovk-host .fv-zip-view .fv-root {
+  /* Files opened inside an archive get their own viewer root that never receives the `theme` prop, so it would
+     fall back to the package's dark palette on a light theme; setting the base colours here covers every root. */
+  --fv-bg: var(--background);
+  --fv-surface: var(--muted);
+  --fv-surface-alt: var(--secondary);
+  --fv-border: var(--border);
+  --fv-text: var(--foreground);
+  --fv-muted: var(--muted-foreground);
+  --fv-accent: var(--primary);
+  --fv-accent-contrast: var(--primary-foreground);
+  --fv-radius: 0px;
+}
+.ovk-host .fv-root {
+  --fv-control-bg: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --fv-control-hover: color-mix(in oklab, var(--foreground) 9%, transparent);
+  --fv-control-on: var(--accent);
+  --fv-float-bg: var(--secondary);
+  --fv-shadow: none;
+  --fv-syn-comment: var(--syn-comment);
+  --fv-syn-string: var(--syn-string);
+  --fv-syn-number: var(--syn-number);
+  --fv-syn-literal: var(--syn-constant);
+  --fv-syn-keyword: var(--syn-keyword);
+  --fv-syn-function: var(--syn-title);
+  --fv-syn-type: var(--syn-type);
+  --fv-syn-prop: var(--syn-attr);
+  --fv-syn-operator: var(--soft-foreground);
+}
+
+/* segmented switches + sheet tabs: same track/thumb as SegmentedSwitch */
+.ovk-host .fv-seg,
+.ovk-host .fv-seg-float,
+.ovk-host .fv-float-bar,
+.ovk-host .fv-model-bar.fv-float-wrap .fv-seg {
+  gap: 0; padding: 0; border: 0; border-radius: 8px; background: var(--secondary); box-shadow: none;
+  backdrop-filter: none; -webkit-backdrop-filter: none; overflow: hidden;
+}
+.ovk-host .fv-seg button,
+.ovk-host .fv-seg-float button,
+.ovk-host .fv-tabs button {
+  padding: 0 12px; height: 26px; border-radius: 7px; font-size: 12px; font-weight: 400; color: var(--muted-foreground);
+}
+.ovk-host .fv-seg button:hover:not(.is-on),
+.ovk-host .fv-seg-float button:hover:not(.is-on),
+.ovk-host .fv-tabs button:hover:not(.is-on) { color: var(--foreground); background: transparent; }
+.ovk-host .fv-seg button.is-on,
+.ovk-host .fv-seg-float button.is-on,
+.ovk-host .fv-tabs button.is-on {
+  background: var(--accent); color: var(--foreground); font-weight: 500; box-shadow: inset 0 0 0 1.5px var(--border-strong);
+}
+.ovk-host .fv-tabs { gap: 4px; padding: 6px 8px; }
+.ovk-host .fv-btn { border-radius: 7px; width: 28px; height: 28px; }
+.ovk-host .fv-input { border-radius: 5px; padding: 0 8px; height: 24px; font-size: 11.5px; background: color-mix(in oklab, var(--foreground) 4%, transparent); border: 1px solid var(--border); }
+.ovk-host .fv-chip, .ovk-host .fv-zoom, .ovk-host .fv-zip-back { border-radius: 7px; }
+
+/* The package's hover, scrollbar and focus tints are white-on-dark; these follow the theme's text colour instead. */
+.ovk-host .fv-root ::-webkit-scrollbar-thumb { background: var(--scrollbar); }
+.ovk-host .fv-root ::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-hover); }
+.ovk-host .fv-input:focus { border-color: var(--border-strong); }
+.ovk-host .fv-csv tbody tr:hover td { background: color-mix(in oklab, var(--foreground) 4%, transparent); }

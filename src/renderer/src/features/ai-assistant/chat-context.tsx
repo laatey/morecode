@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState
 } from 'react'
+import { isMemoryOff } from '@/lib/chat-memory'
 import { useAuth } from '@/features/auth/auth-store'
 import { useWorkspace } from '@/features/workspace/workspace-store'
 import { useSettings } from '@/features/settings/settings-store'
@@ -130,6 +131,8 @@ export function ChatProvider({
       connectors: connectorsForRun,
       skills: skillsForRun,
       routines: routinesForRun,
+      // memory is on unless it is off in settings or this chat was made fresh; read when a request starts
+      memory: () => (settings.rules.memory === 'block' || isMemoryOff(active.id) ? undefined : { mode: settings.rules.memory === 'allow' ? 'auto' : 'ask' }),
       onUsage: (u) => {
         recordUsage(account?.id ?? 'guest', {
           model: u.model,
@@ -139,12 +142,12 @@ export function ChatProvider({
           cacheWrite: u.cacheWrite,
           context: u.contextTokens,
           ms: u.ms
-        })
+        }, active.id)
         // a message through the plan was just counted by the server: show its count, not an estimate
         if (route.kind === 'subscription') refreshAccount()
       }
     }
-  }, [route, account, active.id, active.projectId, groups, refreshAccount, connectorsForRun, skillsForRun, routinesForRun])
+  }, [route, account, active.id, active.projectId, groups, refreshAccount, connectorsForRun, skillsForRun, routinesForRun, settings.rules.memory])
   const runner = useMemo<AgentRunner>(
     () =>
       typeof window !== 'undefined' && window.api?.agent

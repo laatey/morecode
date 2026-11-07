@@ -58,6 +58,26 @@ export function showWindow(): void {
   win.focus()
 }
 
+/** Held until dismissed: an unreferenced Notification can be collected before the person clicks it. */
+const live = new Set<Notification>()
+
+/** A desktop notification from the operating system itself; clicking it brings MoreCode back. */
+function showNotification(title: string, body: string): boolean {
+  if (!Notification.isSupported() || !title) return false
+  // the app plays its own chime, so the system's default sound is switched off
+  const n = new Notification({ title: title.slice(0, 120), body: body.slice(0, 300), silent: true })
+  live.add(n)
+  const done = (): void => void live.delete(n)
+  n.on('click', () => {
+    showWindow()
+    done()
+  })
+  n.on('close', done)
+  n.on('failed', done)
+  n.show()
+  return true
+}
+
 function applyLogin(): void {
   // registering the development copy of Electron to start at sign-in would be wrong
   if (!app.isPackaged || process.platform === 'linux') return
@@ -120,6 +140,7 @@ export function registerBackground(): void {
     quitting = true
   })
   ipcMain.handle('window:get-state', () => windowState())
+  ipcMain.handle('notify:show', (_e, title: unknown, body: unknown) => showNotification(String(title ?? ''), String(body ?? '')))
   applyLogin()
 }
 

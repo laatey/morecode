@@ -72,7 +72,7 @@ export function RoutineDraftCard({ tool }: { tool: Tool }): React.JSX.Element {
         <span className="shrink-0 text-muted-foreground">
           {saved ? (auto ? 'Routine saved' : 'Saved routine') : 'Routine removed'}
         </span>
-        <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
+        <span className="min-w-0 truncate rounded-[4px] bg-foreground/[0.05] px-1.5 text-[12px] leading-[18px] text-foreground">
           {saved?.title ?? title}
         </span>
         {saved && (
@@ -108,7 +108,7 @@ export function RoutineDraftCard({ tool }: { tool: Tool }): React.JSX.Element {
   }
 
   return (
-    <div className="my-1 rounded-[10px] border border-white/[0.08] p-3">
+    <div className="my-1 rounded-[10px] border border-border p-3">
       <div className="flex min-w-0 items-center gap-2">
         <CalendarClock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <input
@@ -116,7 +116,7 @@ export function RoutineDraftCard({ tool }: { tool: Tool }): React.JSX.Element {
           value={title}
           maxLength={80}
           onChange={(e) => setTitle(e.target.value)}
-          className="min-w-0 flex-1 truncate rounded-[4px] bg-transparent text-[13px] font-medium text-[#ededeb] outline-none focus:bg-white/[0.05]"
+          className="min-w-0 flex-1 truncate rounded-[4px] bg-transparent text-[13px] font-medium text-foreground outline-none focus:bg-foreground/[0.05]"
         />
       </div>
 
@@ -128,7 +128,7 @@ export function RoutineDraftCard({ tool }: { tool: Tool }): React.JSX.Element {
             maxLength={4000}
             onChange={(e) => setPrompt(e.target.value)}
             rows={Math.min(10, Math.max(4, Math.ceil(prompt.length / 70)))}
-            className="slim-scroll w-full resize-none rounded-[8px] border border-white/[0.09] bg-black/25 px-2.5 py-2 text-[12px] leading-[18px] text-[#d6d6d3] outline-none focus:border-[#3b82f6]/60"
+            className="slim-scroll w-full resize-none rounded-[8px] border border-border bg-scrim/25 px-2.5 py-2 text-[12px] leading-[18px] text-soft-foreground outline-none focus:border-primary/60"
           />
         ) : (
           <p className="line-clamp-2 text-[12px] leading-[18px] text-muted-foreground">{prompt}</p>

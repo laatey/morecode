@@ -38,6 +38,9 @@ export const BookOpen = make(H.BookOpen01Icon)
 export const Bookmark = make(H.Bookmark01Icon)
 export const Bot = make(H.BotIcon)
 export const Bug = make(H.Bug01Icon)
+export const Brain = make(H.BrainIcon)
+export const Moon = make(H.Moon02Icon)
+export const Sun = make(H.Sun03Icon)
 export const CalendarClock = make(H.Calendar03Icon)
 export const Check = make(H.Tick02Icon)
 export const ChevronDown = make(H.ArrowDown01Icon)
@@ -87,7 +90,7 @@ export const Lightbulb = make(H.Idea01Icon)
 export const Link2 = make(H.Link01Icon)
 export const Link2Off = make(H.Unlink01Icon)
 export const List = make(H.LeftToRightListBulletIcon)
-export const ListFilter = make(H.FilterHorizontalIcon)
+export const ListFilter = make(H.ListFilterIcon)
 export const ListTodo = make(H.CheckListIcon)
 export const ListTree = make(H.ListViewIcon)
 export const Loader2 = make(H.Loading03Icon)
@@ -112,7 +115,6 @@ export const Play = make(H.PlayIcon)
 export const Plus = make(H.PlusSignIcon)
 export const Puzzle = make(H.PuzzleIcon)
 export const RefreshCw = make(H.RefreshIcon)
-export const Rocket = make(H.Rocket01Icon)
 export const RotateCcw = make(H.RotateLeft01Icon)
 export const RotateCw: IconComponent = ({ size = 24, strokeWidth = 1.6, color = 'currentColor', className }) => (
   <svg
@@ -135,6 +137,7 @@ export const Rows2 = make(H.LayoutBottomIcon)
 export const ScanSearch = make(H.SearchVisualIcon)
 export const Search = make(H.Search01Icon)
 export const SendHorizontal = make(H.SentIcon)
+export const CrownPlus = make(H.CrownPlusIcon)
 export const Settings = make(H.Settings01Icon)
 export const Shield = make(H.Shield01Icon)
 export const ShieldCheck = make(H.SecurityCheckIcon)
@@ -150,7 +153,23 @@ export const ThumbsDown = make(H.ThumbsDownIcon)
 export const ThumbsUp = make(H.ThumbsUpIcon)
 export const Trash2 = make(H.Delete02Icon)
 export const TriangleAlert = make(H.Alert02Icon)
-export const Undo2 = make(H.Undo02Icon)
+export const Undo2: IconComponent = ({ size = 24, strokeWidth = 1.6, color = 'currentColor', className }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </svg>
+)
 export const UserRound = make(H.UserIcon)
 export const Wand2 = make(H.MagicWand01Icon)
 export const WifiOff = make(H.WifiOff01Icon)

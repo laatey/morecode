@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ChevronRight } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
@@ -23,7 +23,7 @@ export function ThinkingGlyph({
       {widths.map((w, i) => (
         <span
           key={i}
-          className="think-line block h-px rounded-full bg-[#a8a8a6]"
+          className="think-line block h-px rounded-full bg-muted-foreground"
           style={{ width: `${(w / 11) * 100}%` }}
         />
       ))}
@@ -39,14 +39,22 @@ const seconds = (ms?: number): string => {
 export function ThinkingBlock({
   text,
   status,
-  durationMs
+  durationMs,
+  startedAt
 }: {
   text: string
   status: 'running' | 'done' | 'error'
   durationMs?: number
+  startedAt?: number
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const active = status === 'running'
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!active || !startedAt) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [active, startedAt])
   const hasText = text.trim().length > 0
 
   return (
@@ -56,15 +64,16 @@ export function ThinkingBlock({
         onClick={hasText ? () => setOpen((o) => !o) : undefined}
         aria-expanded={hasText ? open : undefined}
         className={cn(
-          'flex min-h-6 w-full items-center gap-2 rounded-[4px] px-1 py-0.5 text-left text-[12.5px]',
-          hasText ? 'cursor-pointer hover:bg-white/[0.04]' : 'cursor-default'
+          'flex min-h-5 w-full items-center gap-1.5 rounded-[4px] px-1 text-left text-[11.5px]',
+          hasText ? 'cursor-pointer hover:bg-foreground/[0.04]' : 'cursor-default'
         )}
       >
-        <ThinkingGlyph active={active} />
         {active ? (
-          <span className="text-shimmer">Thinking…</span>
+          <span className="text-shimmer">
+            {startedAt ? `Thinking ${seconds(now - startedAt)}` : 'Thinking…'}
+          </span>
         ) : (
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground/60">
             {durationMs ? `Thought for ${seconds(durationMs)}` : 'Thought it through'}
           </span>
         )}
@@ -78,7 +87,7 @@ export function ThinkingBlock({
         )}
       </button>
       {open && hasText && (
-        <p className="my-1 ml-[7px] border-l border-white/[0.1] pl-3.5 text-[12.5px] leading-5 text-[#8d8d8a] [overflow-wrap:anywhere]">
+        <p className="my-1 ml-[7px] border-l border-border pl-3.5 text-[12.5px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
           {text}
         </p>
       )}

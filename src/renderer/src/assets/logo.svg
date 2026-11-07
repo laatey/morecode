@@ -1,5 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect x="60" y="180" width="230" height="230" rx="64" fill="#FFB020"/>
-  <rect x="141" y="141" width="230" height="230" rx="64" fill="#FF5A1F"/>
-  <rect x="222" y="102" width="230" height="230" rx="64" fill="#2F5BFF"/>
+  <defs>
+    <pattern id="h" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(55)">
+      <rect width="8" height="8" fill="#0B1E4A"/>
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#4C8DFF" stroke-width="1.6"/>
+    </pattern>
+  </defs>
+  <g stroke="#7FB2FF" stroke-width="4" stroke-linejoin="round">
+    <path d="M124 170 H462 V430 H148 Q124 430 124 406 Z" fill="url(#h)"/>
+    <path d="M150 80 L82 120 V420 L150 380 Z" fill="#4C8DFF"/>
+    <path d="M150 80 H404 Q430 80 430 106 V380 H150 Z" fill="#123A8C"/>
+  </g>
+  <!-- blocky geometric M -->
+  <path d="M206 310 V150 H246 L290 226 L334 150 H374 V310 H338 V214 L302 276 H278 L242 214 V310 Z" fill="#9CC6FF"/>
 </svg>

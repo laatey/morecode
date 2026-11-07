@@ -4,20 +4,23 @@ import { join } from 'path'
 import { buildAppMenu, registerMenuIpc } from './menu'
 import { registerGitIpc } from './git'
 import { registerAgentIpc, stopAllAgents } from './agent/ipc'
+import { registerPowerIpc } from './power'
+import { actionFromArgv, deliverAction, registerOpenWithIpc, setupJumpList } from './open-with'
+import { registerMemoryIpc } from './memory-ipc'
 import { enableBrowserDebugging, registerBrowserIpc } from './agent/browser'
 import { registerApiProxy } from './api-proxy'
 import { registerTerminalIpc } from './terminal'
 import { registerWorkspaceIpc } from './workspace'
-import { registerAppIpc } from './app-info'
+import { loadChrome, registerAppIpc } from './app-info'
 import { registerSecretsIpc } from './secrets'
 import { attachBackground, registerBackground, showWindow, startedHidden } from './tray'
-import { loadWindowState, trackWindowState, MIN_HEIGHT, MIN_WIDTH } from './window-state'
+import { loadWindowState, registerWindowFitIpc, trackWindowState, MIN_HEIGHT, MIN_WIDTH } from './window-state'
 
-const BG_COLOR = '#272726'
 const TITLEBAR_HEIGHT = 38
 
 function createWindow(): void {
   const state = loadWindowState()
+  const chrome = loadChrome()
   // Windows wants an .ico for the taskbar; the other systems use the .png
   const iconPath = app.isPackaged
     ? join(process.resourcesPath, `icon.${process.platform === 'win32' ? 'ico' : 'png'}`)
@@ -30,11 +33,11 @@ function createWindow(): void {
     y: state.y,
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
-    backgroundColor: BG_COLOR,
+    backgroundColor: chrome.background,
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: BG_COLOR, symbolColor: '#9ca3af', height: TITLEBAR_HEIGHT },
+    titleBarOverlay: { color: chrome.background, symbolColor: chrome.symbol, height: TITLEBAR_HEIGHT },
     ...(existsSync(iconPath) ? { icon: iconPath } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -112,7 +115,11 @@ enableBrowserDebugging()
 // one copy only: opening MoreCode again brings the hidden one back instead of starting a second
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) app.quit()
-app.on('second-instance', showWindow)
+app.on('second-instance', (_event, argv, cwd) => {
+  showWindow()
+  const action = actionFromArgv(argv, cwd)
+  if (action) deliverAction(action)
+})
 
 app.whenReady().then(() => {
   if (!gotLock) return
@@ -132,8 +139,15 @@ app.whenReady().then(() => {
   }
 
   registerWorkspaceIpc()
+  registerWindowFitIpc()
   registerTerminalIpc()
   registerAgentIpc()
+  registerPowerIpc()
+  registerOpenWithIpc()
+  setupJumpList()
+  const firstAction = actionFromArgv(process.argv)
+  if (firstAction) deliverAction(firstAction)
+  registerMemoryIpc()
   registerBrowserIpc()
   registerApiProxy()
   app.on('before-quit', stopAllAgents)

@@ -1,10 +1,9 @@
 import { ModalOverlay } from '@/components/modal-overlay'
 import React, { useEffect, useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { ChevronDown, Clock3, MoreHorizontal, Plus, X } from '@/components/icons'
+import { CalendarClock, ChevronDown, Clock3, MoreHorizontal, Plus, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { ActionMenu, type ActionMenuItem } from '@/components/action-menu'
-import { FeatureBanner } from '@/components/feature-banner'
 import { Btn, Toggle } from '@/features/settings/kit'
 import { useNotify } from '@/features/settings/notifications'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -13,7 +12,7 @@ import { useWorkspace } from '@/features/workspace/workspace-store'
 import { useRoutines, type Routine, type RoutineCadence } from './routines-store'
 
 const PILL =
-  'flex h-7 cursor-pointer items-center gap-1.5 rounded-full border border-white/[0.09] bg-white/[0.03] px-2.5 text-[12px] font-normal text-[#d6d6d2] transition-colors hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white'
+  'flex h-7 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-foreground/[0.03] px-2.5 text-[12px] font-normal text-soft-foreground transition-colors hover:border-border-strong hover:bg-foreground/[0.06] hover:text-foreground'
 const describe = (cadence: RoutineCadence, time: string, weekday: number): string => {
   if (cadence === 'hourly') return 'Every hour'
   if (cadence === 'daily') return `Every day at ${time}`
@@ -45,7 +44,7 @@ function MenuChoice({
     onClick: () => onChange(item.value)
   }))
   return (
-    <label className={pill ? 'contents' : 'flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]'}>
+    <label className={pill ? 'contents' : 'flex flex-col gap-1.5 text-[12px] font-medium text-muted-foreground'}>
       {!pill && label}
       <ActionMenu
         align="start"
@@ -55,11 +54,11 @@ function MenuChoice({
           <button
             type="button"
             aria-label={`${label}: ${selected}`}
-            className={pill ? PILL : "flex h-9 w-full min-w-[126px] cursor-pointer items-center justify-between gap-3 rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] px-3 text-[13px] font-normal text-[#ececea] transition-colors hover:border-white/[0.18] hover:bg-[#222221]"}
+            className={pill ? PILL : "flex h-9 w-full min-w-[126px] cursor-pointer items-center justify-between gap-3 rounded-[7px] border border-border bg-inset px-3 text-[13px] font-normal text-foreground transition-colors hover:border-border-strong hover:bg-card"}
           >
             <span className="truncate">{selected}</span>
             <ChevronDown
-              className={`h-3.5 w-3.5 shrink-0 text-[#8f8f8a] transition-transform ${open ? 'rotate-180' : ''}`}
+              className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
             />
           </button>
         )}
@@ -102,42 +101,42 @@ function ClockPicker({
       aria-label={label}
       aria-pressed={selected}
       onClick={onClick}
-      className={`h-7 cursor-pointer rounded-[5px] text-[11.5px] tabular-nums transition-colors ${selected ? 'bg-[#3568d4] text-white' : 'text-[#c9c9c5] hover:bg-white/[0.08] hover:text-white'}`}
+      className={`h-7 cursor-pointer rounded-[5px] text-[11.5px] tabular-nums transition-colors ${selected ? 'bg-primary text-primary-foreground' : 'text-soft-foreground hover:bg-foreground/[0.08] hover:text-foreground'}`}
     >
       {text}
     </button>
   )
   return (
-    <label className={pill ? 'contents' : 'flex flex-col gap-1.5 text-[12px] font-medium text-[#b8b8b3]'}>
+    <label className={pill ? 'contents' : 'flex flex-col gap-1.5 text-[12px] font-medium text-muted-foreground'}>
       {!pill && 'Time'}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             aria-label={`Time: ${format(value)}`}
-            className={pill ? PILL : "flex h-9 min-w-[124px] cursor-pointer items-center justify-between gap-2 rounded-[7px] border border-white/[0.1] bg-[#1f1f1e] px-2.5 text-[12.5px] font-normal text-[#ececea] transition-colors hover:border-white/[0.18] hover:bg-[#222221]"}
+            className={pill ? PILL : "flex h-9 min-w-[124px] cursor-pointer items-center justify-between gap-2 rounded-[7px] border border-border bg-inset px-2.5 text-[12.5px] font-normal text-foreground transition-colors hover:border-border-strong hover:bg-card"}
           >
             <span className="flex items-center gap-2">
-              <Clock3 className="h-3.5 w-3.5 text-[#8f8f8a]" />
+              <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
               {format(value)}
             </span>
             <ChevronDown
-              className={`h-3.5 w-3.5 text-[#8f8f8a] transition-transform ${open ? 'rotate-180' : ''}`}
+              className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
             />
           </button>
         </PopoverTrigger>
         <PopoverContent
           align="start"
           sideOffset={5}
-          className="z-[60] w-[252px] rounded-[9px] border border-white/[0.12] bg-[#252524] p-3 shadow-xl"
+          className="z-[60] w-[252px] rounded-[9px] border border-border bg-card p-3 shadow-xl"
         >
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[11px] font-medium text-[#d2d2cf]">Choose a time</span>
-            <span className="text-[12px] tabular-nums text-[#a9c8ff]">{format(value)}</span>
+            <span className="text-[11px] font-medium text-soft-foreground">Choose a time</span>
+            <span className="text-[12px] tabular-nums text-link">{format(value)}</span>
           </div>
           <div className="grid grid-cols-[1fr_1fr_44px] gap-2">
             <div>
-              <p className="mb-1 text-center text-[10px] text-[#777773]">HOUR</p>
+              <p className="mb-1 text-center text-[10px] text-faint-foreground">HOUR</p>
               <div className="slim-scroll grid max-h-[176px] grid-cols-3 gap-1 overflow-y-auto">
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((h) =>
                   choice(
@@ -150,7 +149,7 @@ function ClockPicker({
               </div>
             </div>
             <div>
-              <p className="mb-1 text-center text-[10px] text-[#777773]">MINUTE</p>
+              <p className="mb-1 text-center text-[10px] text-faint-foreground">MINUTE</p>
               <div className="grid grid-cols-3 gap-1">
                 {Array.from({ length: 12 }, (_, i) => i * 5).map((m) =>
                   choice(
@@ -163,7 +162,7 @@ function ClockPicker({
               </div>
             </div>
             <div>
-              <p className="mb-1 text-center text-[10px] text-[#777773]">PERIOD</p>
+              <p className="mb-1 text-center text-[10px] text-faint-foreground">PERIOD</p>
               <div className="grid gap-1">
                 {(['AM', 'PM'] as const).map((p) =>
                   choice(p, p === period, () => setParts(hour12, Number(minuteText), p), p)
@@ -174,7 +173,7 @@ function ClockPicker({
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="mt-3 h-7 w-full cursor-pointer rounded-md bg-white/[0.07] text-[11.5px] text-[#e2e2df] hover:bg-white/[0.12]"
+            className="mt-3 h-7 w-full cursor-pointer rounded-md bg-foreground/[0.07] text-[11.5px] text-foreground hover:bg-foreground/[0.12]"
           >
             Done
           </button>
@@ -188,7 +187,7 @@ const stamp = (at: number): string =>
   new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(at)
 
 const PRIMARY =
-  'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[7px] bg-[#ececea] px-3 text-[12.5px] font-medium text-[#1a1a19] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40'
+  'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[7px] bg-foreground px-3 text-[12.5px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40'
 
 /** Ideas to start from, for people who are not sure what a routine is good for. */
 const IDEAS: { title: string; prompt: string; cadence: RoutineCadence; time: string; hint: string }[] = [
@@ -326,22 +325,22 @@ export function RoutineScheduler(): React.JSX.Element {
           aria-describedby="routine-missed-description"
           onEscapeKeyDown={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
-          className="fixed left-1/2 top-1/2 z-50 w-[min(460px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[11px] border border-white/[0.1] bg-[#272726] shadow-[0_24px_80px_rgba(0,0,0,0.6)] outline-none"
+          className="fixed left-1/2 top-1/2 z-50 w-[min(460px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[11px] border border-border bg-background shadow-[0_24px_80px_rgba(0,0,0,0.6)] outline-none"
         >
-          <div className="border-b border-white/[0.07] px-5 pb-3.5 pt-4">
-            <Dialog.Title className="text-[15px] font-semibold text-[#f1f1ef]">
+          <div className="border-b border-border/50 px-5 pb-3.5 pt-4">
+            <Dialog.Title className="text-[15px] font-semibold text-foreground">
               {waiting.length === 1 ? 'A routine was missed' : `${waiting.length} routines were missed`}
             </Dialog.Title>
-            <Dialog.Description id="routine-missed-description" className="mt-0.5 text-[12.5px] text-[#92928e]">
+            <Dialog.Description id="routine-missed-description" className="mt-0.5 text-[12.5px] text-muted-foreground">
               MoreCode was closed or asleep when {waiting.length === 1 ? 'it was' : 'they were'} due. Run {waiting.length === 1 ? 'it' : 'them'} now, or leave {waiting.length === 1 ? 'it' : 'them'} until the next scheduled time.
             </Dialog.Description>
           </div>
-          <ul className="slim-scroll max-h-[50vh] divide-y divide-white/[0.07] overflow-y-auto">
+          <ul className="slim-scroll max-h-[50vh] divide-y divide-border/50 overflow-y-auto">
             {waiting.map((r) => (
               <li key={r.id} className="flex items-center gap-3 px-5 py-3">
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium text-[#ececea]">{r.title}</div>
-                  <div className="mt-0.5 text-[11.5px] text-[#858580]">Was due {stamp(r.nextRunAt)}</div>
+                  <div className="truncate text-[13px] font-medium text-foreground">{r.title}</div>
+                  <div className="mt-0.5 text-[11.5px] text-muted-foreground">Was due {stamp(r.nextRunAt)}</div>
                 </div>
                 <Btn
                   onClick={() => {
@@ -365,7 +364,7 @@ export function RoutineScheduler(): React.JSX.Element {
             ))}
           </ul>
           {waiting.length > 1 && (
-            <div className="flex justify-end gap-2 border-t border-white/[0.07] px-5 py-3">
+            <div className="flex justify-end gap-2 border-t border-border/50 px-5 py-3">
               <Btn
                 onClick={() => {
                   waiting.forEach((r) => skip(r.id))
@@ -450,9 +449,9 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
   return (
     <main className="slim-scroll min-h-0 flex-1 overflow-y-auto px-6 pb-10 pt-9 md:px-10">
       <div className="mx-auto max-w-[720px]">
-        <header className="mb-5 flex items-start justify-between gap-4">
+        <header className="mb-7 flex items-start justify-between gap-4">
           <div>
-            <h1 className="font-display text-[24px] font-semibold text-[#ececea]">Routines</h1>
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Routines</h1>
             <p className="mt-1.5 max-w-[520px] text-[13px] leading-5 text-muted-foreground">
               Give MoreCode a task to repeat on a schedule. Each run gets its own chat in your list, so nothing
               lands in the chat you are working in.
@@ -463,64 +462,69 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
           </button>
         </header>
 
-        <FeatureBanner
-          tone="amber"
-          art="routines"
-          eyebrow="Scheduled Automation"
-          tag="Daily · 9:00 AM"
-          title="Morning Codebase Briefing"
-          description="Have the agent check recent commits, run your test suite, and post a short readiness report in its own chat."
-          actionLabel="Use template"
-          onAction={() =>
-            openNew({
-              title: IDEAS[0].title,
-              prompt: IDEAS[0].prompt,
-              cadence: IDEAS[0].cadence,
-              time: IDEAS[0].time
-            })
-          }
-          secondaryLabel="Custom routine"
-          onSecondary={() => openNew()}
-          className="mb-6"
-        />
-
         {routines.length === 0 ? (
           <section>
-            <h2 className="mb-2 text-[12px] font-medium text-[#cfcfcb]">Start from an idea</h2>
-            <ul className="divide-y divide-white/[0.07] overflow-hidden rounded-[10px] border border-white/[0.1]">
+            <div className="mb-6 flex flex-col items-center rounded-[12px] border border-dashed border-border px-6 py-9 text-center">
+              <span className="grid h-10 w-10 place-items-center rounded-[10px] border border-border bg-secondary text-muted-foreground">
+                <CalendarClock className="h-4 w-4" />
+              </span>
+              <div className="mt-3 text-[14px] font-medium text-foreground">No routines yet</div>
+              <p className="mt-1 max-w-[360px] text-[12.5px] leading-5 text-muted-foreground">
+                Set up a task once and MoreCode will run it for you on a schedule.
+              </p>
+            </div>
+            <h2 className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-faint-foreground">Start from an idea</h2>
+            <ul className="grid gap-2.5 sm:grid-cols-2">
               {IDEAS.map((idea) => (
-                <li key={idea.title} className="flex items-center justify-between gap-4 px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-medium text-[#ececea]">{idea.title}</div>
-                    <div className="mt-0.5 text-[12px] text-muted-foreground">
-                      {idea.hint} · {describe(idea.cadence, idea.time, 1)}
-                    </div>
-                  </div>
-                  <Btn onClick={() => openNew({ title: idea.title, prompt: idea.prompt, cadence: idea.cadence, time: idea.time })}>Use this</Btn>
+                <li key={idea.title}>
+                  <button
+                    type="button"
+                    onClick={() => openNew({ title: idea.title, prompt: idea.prompt, cadence: idea.cadence, time: idea.time })}
+                    className="group flex h-full w-full cursor-pointer flex-col items-start rounded-[10px] border border-border p-3.5 text-left transition-colors hover:border-border-strong hover:bg-foreground/[0.02]"
+                  >
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span className="text-[13px] font-medium text-foreground">{idea.title}</span>
+                      <Plus className="h-3.5 w-3.5 text-faint-foreground transition-colors group-hover:text-foreground" />
+                    </span>
+                    <span className="mt-0.5 text-[12px] text-muted-foreground">{idea.hint}</span>
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-[11.5px] text-faint-foreground">
+                      <Clock3 className="h-3 w-3" />
+                      {describe(idea.cadence, idea.time, 1)}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-[12px] text-muted-foreground">
+            <p className="mt-4 text-[12px] leading-5 text-faint-foreground">
               Each routine keeps one chat, shown under Routines in the sidebar. Routines keep running while MoreCode is closed to the tray; quit from the tray icon to stop them. Commands still follow your approval settings, so a run may pause to ask.
             </p>
           </section>
         ) : (
           <section>
-            <ul className="divide-y divide-white/[0.07] overflow-hidden rounded-[10px] border border-white/[0.1]">
+            <ul className="divide-y divide-border/60 overflow-hidden rounded-[10px] border border-border">
               {routines.map((r) => {
                 const due = r.enabled && r.nextRunAt <= now
                 const lastChat = r.chatId && chats.some((c) => c.id === r.chatId) ? r.chatId : null
                 return (
-                  <li key={r.id} className="flex items-center gap-3 px-4 py-3">
+                  <li key={r.id} className="flex items-center gap-3.5 px-4 py-3.5 transition-colors hover:bg-foreground/[0.02]">
                     <Toggle checked={r.enabled} onChange={() => toggle(r.id)} label={`${r.enabled ? 'Pause' : 'Resume'} ${r.title}`} />
                     <div className={`min-w-0 flex-1 ${r.enabled ? '' : 'opacity-60'}`}>
-                      <div className="truncate text-[13px] font-medium text-[#ececea]">{r.title}</div>
-                      <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                        {when(r)} · {projectName(r.projectId)}
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-[13.5px] font-medium text-foreground">{r.title}</span>
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1 text-[11px] font-medium ${due ? 'text-link' : r.enabled ? 'text-success' : 'text-faint-foreground'}`}
+                        >
+                          <span className={`h-1.5 w-1.5 rounded-full ${due ? 'bg-link' : r.enabled ? 'bg-success' : 'bg-faint-foreground'}`} />
+                          {due ? 'Ready' : r.enabled ? 'Active' : 'Paused'}
+                        </span>
                       </div>
-                      <div className="mt-0.5 text-[11.5px] text-[#858580]">
+                      <div className="mt-1 flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">
+                        <Clock3 className="h-3 w-3 shrink-0 text-faint-foreground" />
+                        <span className="truncate">{when(r)} · {projectName(r.projectId)}</span>
+                      </div>
+                      <div className="mt-0.5 text-[11.5px] text-faint-foreground">
                         {due ? (
-                          <span className="text-[#7db0ff]">Ready to run</span>
+                          <span className="text-link">Ready to run</span>
                         ) : r.enabled ? (
                           `Next ${date(r.nextRunAt)}`
                         ) : (
@@ -534,7 +538,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
                               select(lastChat)
                               onBack()
                             }}
-                            className="ml-2 cursor-pointer text-[#7db0ff] hover:underline"
+                            className="ml-2 cursor-pointer text-link hover:underline"
                           >
                             Open
                           </button>
@@ -560,7 +564,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
                         <button
                           type="button"
                           aria-label={`More for ${r.title}`}
-                          className="grid h-7 w-7 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-white/[0.07] hover:text-foreground"
+                          className="grid h-7 w-7 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-foreground/[0.07] hover:text-foreground"
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </button>
@@ -570,7 +574,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
                 )
               })}
             </ul>
-            <p className="mt-3 text-[12px] text-muted-foreground">
+            <p className="mt-3 text-[12px] leading-5 text-faint-foreground">
               Routines run while MoreCode is open. When one is due you get a notification with a Run button, unless
               it is set to start by itself.
             </p>
@@ -582,10 +586,10 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
             <ModalOverlay tone="blurred" />
             <Dialog.Content
               aria-describedby="routine-create-description"
-              className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-48px)] w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#222221] shadow-[0_20px_60px_rgba(0,0,0,0.5)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]"
+              className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-48px)] w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-border bg-card shadow-[0_20px_60px_rgba(0,0,0,0.5)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]"
             >
               <div className="flex h-10 shrink-0 items-center justify-between pl-5 pr-2.5">
-                <Dialog.Title className="text-[12px] font-medium text-[#8f8f8a]">
+                <Dialog.Title className="text-[12px] font-medium text-muted-foreground">
                   {editing?.id ? 'Edit routine' : 'New routine'}
                 </Dialog.Title>
                 <Dialog.Description id="routine-create-description" className="sr-only">
@@ -593,7 +597,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
                 </Dialog.Description>
                 <Dialog.Close
                   aria-label="Close"
-                  className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-[#8f8f8a] transition-colors hover:bg-white/[0.07] hover:text-white"
+                  className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground"
                 >
                   <X className="h-3.5 w-3.5" />
                 </Dialog.Close>
@@ -604,7 +608,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
                     <input
                       autoFocus
                       aria-label="Name"
-                      className="w-full bg-transparent text-[17px] font-semibold tracking-[-0.01em] text-[#f1f1ef] outline-none placeholder:text-[#5f5f5b]"
+                      className="w-full bg-transparent text-[17px] font-semibold tracking-[-0.01em] text-foreground outline-none placeholder:text-faint-foreground"
                       value={draft.title}
                       onChange={(event) => set({ title: event.target.value })}
                       placeholder="Routine name"
@@ -613,7 +617,7 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
                     <textarea
                       aria-label="Instructions"
                       rows={5}
-                      className="mt-2 min-h-[110px] w-full resize-none bg-transparent text-[13.5px] leading-[21px] text-[#d6d6d2] outline-none placeholder:text-[#5f5f5b]"
+                      className="mt-2 min-h-[110px] w-full resize-none bg-transparent text-[13.5px] leading-[21px] text-soft-foreground outline-none placeholder:text-faint-foreground"
                       value={draft.prompt}
                       onChange={(event) => set({ prompt: event.target.value })}
                       placeholder="What should MoreCode do each time? e.g. Look at what changed since yesterday and tell me what needs attention."
@@ -651,8 +655,8 @@ export function RoutinesPage({ onBack }: { onBack: () => void }): React.JSX.Elem
                       onChange={(projectId) => set({ projectId })}
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-4 py-3">
-                    <span className="truncate text-[11.5px] text-[#7d7d79]">
+                  <div className="flex items-center justify-between gap-3 border-t border-border/50 px-4 py-3">
+                    <span className="truncate text-[11.5px] text-faint-foreground">
                       Runs {describe(draft.cadence, draft.time, draft.weekday).replace(/^Every/, 'every')}
                     </span>
                     <div className="flex shrink-0 items-center gap-2">

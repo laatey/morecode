@@ -1,6 +1,9 @@
 import { FileDiff as PierreFileDiff } from '@pierre/diffs/react'
 import { parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
-import { useMemo, type CSSProperties, type JSX } from 'react'
+import { useMemo, type JSX } from 'react'
+import { useSettings } from '@/features/settings/settings-store'
+import { PIERRE_THEME } from '@/lib/pierre-theme'
+import { themeIsDark } from '@/theme/themes'
 
 export type DiffLine = {
   type: 'ctx' | 'add' | 'del'
@@ -42,23 +45,16 @@ function pierreDiff(file: FileDiff): FileDiffMetadata | null {
 /** Pierre supplies a virtualized Shiki-backed unified diff while MoreCode owns its surrounding UI. */
 export function DiffView({ file }: { file: FileDiff }): JSX.Element {
   const diff = useMemo(() => pierreDiff(file), [file])
+  const { activeThemeId } = useSettings()
   if (!diff) return <p className="px-4 py-6 text-xs text-muted-foreground">No textual changes.</p>
 
   return (
     <PierreFileDiff
       fileDiff={diff}
       className="morecode-pierre-diff"
-      style={
-        {
-          '--diffs-bg': '#272726',
-          '--diffs-bg-context': '#272726',
-          '--diffs-bg-separator': '#2f2f2e',
-          '--diffs-fg': '#d6d6d3'
-        } as CSSProperties
-      }
       options={{
-        theme: 'pierre-dark',
-        themeType: 'dark',
+        theme: PIERRE_THEME,
+        themeType: themeIsDark(activeThemeId) ? 'dark' : 'light',
         diffStyle: 'unified',
         diffIndicators: 'bars',
         disableFileHeader: true,

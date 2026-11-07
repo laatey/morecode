@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import type { ActionMenuItem } from '@/components/action-menu'
 import { HOSTED, hostedRequest } from '@/features/auth/http-auth-service'
 import { toHistory } from '@/features/ai-assistant/use-chat'
-import { chatToMarkdown, useWorkspace, type Chat } from './workspace-store'
+import { chatToMarkdown, chatToTranscript, useWorkspace, type Chat } from './workspace-store'
 
 const ICON = 'h-[13px] w-[13px] stroke-[1.8]'
 
@@ -26,6 +26,18 @@ export function useCopyChat(): (chat: Chat) => void {
     navigator.clipboard
       .writeText(md)
       .then(() => toast.success('Chat copied'))
+      .catch(() => toast.error('Could not copy'))
+  }
+}
+
+/** Copy a whole chat for debugging: every message, tool call input and result, and error. */
+export function useCopyTranscript(): (chat: Chat) => void {
+  const ws = useWorkspace()
+  return (chat) => {
+    const text = chatToTranscript(chat.title, ws.getMessages(chat.id))
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success('Full transcript copied'))
       .catch(() => toast.error('Could not copy'))
   }
 }
@@ -83,6 +95,7 @@ export function useShareChat(): { share: (chat: Chat) => void; unshare: (chat: C
 export function useChatMenu(): (chat: Chat) => ActionMenuItem[] {
   const ws = useWorkspace()
   const copy = useCopyChat()
+  const copyTranscript = useCopyTranscript()
   const { share, unshare } = useShareChat()
   return (chat) => [
     {
@@ -109,6 +122,13 @@ export function useChatMenu(): (chat: Chat) => ActionMenuItem[] {
       label: 'Copy as Markdown',
       icon: <Copy className={ICON} />,
       onClick: () => copy(chat)
+    },
+    {
+      id: 'copy-transcript',
+      label: 'Copy full transcript',
+      description: 'Every message, tool call and result',
+      icon: <Copy className={ICON} />,
+      onClick: () => copyTranscript(chat)
     },
     ...(HOSTED
       ? [

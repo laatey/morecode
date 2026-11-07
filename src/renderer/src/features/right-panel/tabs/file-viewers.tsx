@@ -87,7 +87,7 @@ export function SpreadsheetViewer({ sheets }: { sheets: SheetData[] }): React.JS
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-white/[0.07] bg-white/[0.015] px-3">
+      <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-foreground/[0.015] px-3">
         <div className="relative flex min-w-0 flex-1 max-w-[240px] items-center">
           <Search className="pointer-events-none absolute left-2 h-3 w-3 text-muted-foreground" />
           <input
@@ -95,7 +95,7 @@ export function SpreadsheetViewer({ sheets }: { sheets: SheetData[] }): React.JS
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter rows…"
-            className="h-6 w-full rounded-[5px] border border-white/[0.09] bg-white/[0.04] pl-6 pr-2 text-[11.5px] text-[#ececea] outline-none placeholder:text-[#77776f] focus:border-white/[0.22]"
+            className="h-6 w-full rounded-[5px] border border-border bg-foreground/[0.04] pl-6 pr-2 text-[11.5px] text-foreground outline-none placeholder:text-faint-foreground focus:border-border-strong"
           />
         </div>
         <span className="text-[11px] tabular-nums text-muted-foreground">
@@ -105,25 +105,25 @@ export function SpreadsheetViewer({ sheets }: { sheets: SheetData[] }): React.JS
 
       <div className="slim-scroll min-h-0 flex-1 overflow-auto">
         <table className="w-max min-w-full border-collapse text-left text-[12px]">
-          <thead className="sticky top-0 z-10 bg-[#252524] text-[11.5px] font-medium text-[#cfcfcb] shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+          <thead className="sticky top-0 z-10 bg-card text-[11.5px] font-medium text-soft-foreground shadow-[0_1px_0_color-mix(in_oklab,var(--foreground)_8%,transparent)]">
             <tr>
-              <th className="sticky left-0 z-20 w-10 border-r border-white/[0.08] bg-[#252524] px-2 py-1.5 text-right font-mono text-[10.5px] text-[#77776f]">
+              <th className="sticky left-0 z-20 w-10 border-r border-border bg-card px-2 py-1.5 text-right font-mono text-[10.5px] text-faint-foreground">
                 #
               </th>
               {Array.from({ length: colCount }, (_, c) => (
                 <th
                   key={c}
-                  className="max-w-[280px] min-w-[96px] truncate border-r border-white/[0.07] px-2.5 py-1.5 font-medium"
+                  className="max-w-[280px] min-w-[96px] truncate border-r border-border/50 px-2.5 py-1.5 font-medium"
                 >
                   {header[c] || String.fromCharCode(65 + (c % 26))}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/[0.05] font-mono text-[11.5px] text-[#d6d6d3]">
+          <tbody className="divide-y divide-border/50 font-mono text-[11.5px] text-soft-foreground">
             {body.slice(0, 1500).map((r, rIdx) => (
-              <tr key={rIdx} className="hover:bg-white/[0.03]">
-                <td className="sticky left-0 z-10 border-r border-white/[0.08] bg-[#1f1f1e] px-2 py-1 text-right text-[10.5px] tabular-nums text-[#6d6d68]">
+              <tr key={rIdx} className="hover:bg-foreground/[0.03]">
+                <td className="sticky left-0 z-10 border-r border-border bg-inset px-2 py-1 text-right text-[10.5px] tabular-nums text-faint-foreground">
                   {rIdx + 1}
                 </td>
                 {Array.from({ length: colCount }, (_, c) => {
@@ -133,8 +133,8 @@ export function SpreadsheetViewer({ sheets }: { sheets: SheetData[] }): React.JS
                     <td
                       key={c}
                       className={cn(
-                        'max-w-[320px] truncate border-r border-white/[0.05] px-2.5 py-1 font-sans',
-                        isNum && 'text-right font-mono tabular-nums text-[#a9c8ff]'
+                        'max-w-[320px] truncate border-r border-border/50 px-2.5 py-1 font-sans',
+                        isNum && 'text-right font-mono tabular-nums text-link'
                       )}
                     >
                       {val}
@@ -148,7 +148,7 @@ export function SpreadsheetViewer({ sheets }: { sheets: SheetData[] }): React.JS
       </div>
 
       {sheets.length > 1 && (
-        <div className="flex h-7 shrink-0 items-center gap-1 overflow-x-auto border-t border-white/[0.07] bg-white/[0.02] px-2">
+        <div className="flex h-7 shrink-0 items-center gap-1 overflow-x-auto border-t border-border/50 bg-foreground/[0.02] px-2">
           {sheets.map((s, idx) => (
             <button
               key={s.name}
@@ -157,8 +157,8 @@ export function SpreadsheetViewer({ sheets }: { sheets: SheetData[] }): React.JS
               className={cn(
                 'cursor-pointer rounded-[5px] px-2.5 py-0.5 text-[11.5px] transition-colors',
                 idx === activeSheet
-                  ? 'bg-white/[0.11] font-medium text-[#ececea]'
-                  : 'text-muted-foreground hover:bg-white/[0.05] hover:text-foreground'
+                  ? 'bg-foreground/[0.11] font-medium text-foreground'
+                  : 'text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground'
               )}
             >
               {s.name}
@@ -256,7 +256,7 @@ export function XlsxViewer({ base64 }: { base64: string }): React.JSX.Element {
     }
   }, [base64])
 
-  if (error) return <p className="p-4 text-[12px] text-[#e8b365]">{error}</p>
+  if (error) return <p className="p-4 text-[12px] text-warning">{error}</p>
   if (!sheets) return <p className="p-4 text-[12px] text-muted-foreground">Opening spreadsheet…</p>
   return <SpreadsheetViewer sheets={sheets} />
 }
@@ -280,13 +280,13 @@ export function DocxViewer({ base64 }: { base64: string }): React.JSX.Element {
     }
   }, [base64])
 
-  if (error) return <p className="p-4 text-[12px] text-[#e8b365]">{error}</p>
+  if (error) return <p className="p-4 text-[12px] text-warning">{error}</p>
   if (html === null) return <p className="p-4 text-[12px] text-muted-foreground">Opening document…</p>
 
   return (
     <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-6 py-5">
       <div
-        className="mx-auto max-w-[680px] space-y-3 text-[13px] leading-6 text-[#dcdcd8] [&_h1]:mt-5 [&_h1]:font-display [&_h1]:text-[20px] [&_h1]:font-semibold [&_h1]:text-[#ececea] [&_h2]:mt-4 [&_h2]:font-display [&_h2]:text-[16px] [&_h2]:font-semibold [&_h2]:text-[#ececea] [&_h3]:mt-3 [&_h3]:text-[14px] [&_h3]:font-semibold [&_h3]:text-[#ececea] [&_ul]:ml-5 [&_ul]:list-disc [&_ul]:space-y-1 [&_ol]:ml-5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_table]:text-[12px] [&_td]:border [&_td]:border-white/[0.1] [&_td]:px-2.5 [&_td]:py-1.5 [&_th]:border [&_th]:border-white/[0.1] [&_th]:bg-white/[0.04] [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:font-medium [&_a]:text-[#7db1ff] [&_a]:underline [&_img]:max-w-full [&_img]:rounded-md"
+        className="mx-auto max-w-[680px] space-y-3 text-[13px] leading-6 text-soft-foreground [&_h1]:mt-5 [&_h1]:font-display [&_h1]:text-[20px] [&_h1]:font-semibold [&_h1]:text-foreground [&_h2]:mt-4 [&_h2]:font-display [&_h2]:text-[16px] [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:mt-3 [&_h3]:text-[14px] [&_h3]:font-semibold [&_h3]:text-foreground [&_ul]:ml-5 [&_ul]:list-disc [&_ul]:space-y-1 [&_ol]:ml-5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_table]:text-[12px] [&_td]:border [&_td]:border-border [&_td]:px-2.5 [&_td]:py-1.5 [&_th]:border [&_th]:border-border [&_th]:bg-foreground/[0.04] [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:font-medium [&_a]:text-link [&_a]:underline [&_img]:max-w-full [&_img]:rounded-md"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>
@@ -324,7 +324,7 @@ function NotebookCodeSnippet({ code }: { code: string }): React.JSX.Element {
     }
   }, [code])
   return (
-    <pre className="overflow-x-auto px-3.5 py-2.5 font-mono text-[11.5px] leading-relaxed text-[#d6d6d3]">
+    <pre className="overflow-x-auto px-3.5 py-2.5 font-mono text-[11.5px] leading-relaxed text-soft-foreground">
       <code className="pierre-code" dangerouslySetInnerHTML={{ __html: html }} />
     </pre>
   )
@@ -341,7 +341,7 @@ export function NotebookViewer({ text }: { text: string }): React.JSX.Element {
   }, [text])
 
   if (!parsed) {
-    return <p className="p-4 text-[12px] text-[#e8b365]">Invalid Jupyter notebook JSON.</p>
+    return <p className="p-4 text-[12px] text-warning">Invalid Jupyter notebook JSON.</p>
   }
 
   return (
@@ -356,14 +356,14 @@ export function NotebookViewer({ text }: { text: string }): React.JSX.Element {
           )
         }
         return (
-          <div key={idx} className="overflow-hidden rounded-[8px] border border-white/[0.09] bg-white/[0.02]">
-            <div className="flex items-center justify-between border-b border-white/[0.07] bg-white/[0.02] px-3 py-1 font-mono text-[11px] text-muted-foreground">
+          <div key={idx} className="overflow-hidden rounded-[8px] border border-border bg-foreground/[0.02]">
+            <div className="flex items-center justify-between border-b border-border/50 bg-foreground/[0.02] px-3 py-1 font-mono text-[11px] text-muted-foreground">
               <span>In [{cell.execution_count ?? ' '}]:</span>
               <span>{cell.cell_type ?? 'code'}</span>
             </div>
             <NotebookCodeSnippet code={src} />
             {cell.outputs && cell.outputs.length > 0 && (
-              <div className="space-y-2 border-t border-white/[0.07] bg-[#1a1a19] p-3 font-mono text-[11.5px]">
+              <div className="space-y-2 border-t border-border/50 bg-inset p-3 font-mono text-[11.5px]">
                 {cell.outputs.map((out, oIdx) => {
                   const png = out.data?.['image/png'] ? joinLines(out.data['image/png']).trim() : null
                   const plain = out.text ? joinLines(out.text) : out.data?.['text/plain'] ? joinLines(out.data['text/plain']) : null
@@ -374,11 +374,11 @@ export function NotebookViewer({ text }: { text: string }): React.JSX.Element {
                         <img
                           src={`data:image/png;base64,${png}`}
                           alt="Notebook output"
-                          className="max-h-[360px] rounded border border-white/[0.08] bg-white p-1"
+                          className="max-h-[360px] rounded border border-border bg-foreground p-1"
                         />
                       )}
-                      {plain && <pre className="whitespace-pre-wrap text-[#c9c9c6]">{plain}</pre>}
-                      {err && <pre className="whitespace-pre-wrap text-[#f4a39e]">{err}</pre>}
+                      {plain && <pre className="whitespace-pre-wrap text-soft-foreground">{plain}</pre>}
+                      {err && <pre className="whitespace-pre-wrap text-destructive">{err}</pre>}
                     </div>
                   )
                 })}
@@ -407,17 +407,17 @@ function JsonNode({
   if (!isArray && !isObject) {
     const formatted =
       typeof value === 'string' ? (
-        <span className="text-[#9ecbff]">&quot;{value}&quot;</span>
+        <span className="text-link">&quot;{value}&quot;</span>
       ) : typeof value === 'number' ? (
-        <span className="text-[#79b8ff]">{String(value)}</span>
+        <span className="text-link">{String(value)}</span>
       ) : typeof value === 'boolean' ? (
-        <span className="text-[#f97583]">{String(value)}</span>
+        <span className="text-destructive">{String(value)}</span>
       ) : (
-        <span className="text-[#8d8d8a]">null</span>
+        <span className="text-muted-foreground">null</span>
       )
     return (
       <div className="flex items-baseline gap-1.5 py-0.5 font-mono text-[12px] leading-5">
-        {name !== undefined && <span className="text-[#d6d6d3]">{name}:</span>}
+        {name !== undefined && <span className="text-soft-foreground">{name}:</span>}
         <span className="break-all">{formatted}</span>
       </div>
     )
@@ -432,16 +432,16 @@ function JsonNode({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-white/[0.05]"
+        className="flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-foreground/[0.05]"
       >
         <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
-        {name !== undefined && <span className="text-[#ececea]">{name}:</span>}
+        {name !== undefined && <span className="text-foreground">{name}:</span>}
         <span className="text-[11px] text-muted-foreground">
           {isArray ? `[ ${entries.length} ${entries.length === 1 ? 'item' : 'items'} ]` : `{ ${entries.length} ${entries.length === 1 ? 'key' : 'keys'} }`}
         </span>
       </button>
       {open && entries.length > 0 && (
-        <div className="ml-3 border-l border-white/[0.08] pl-3">
+        <div className="ml-3 border-l border-border pl-3">
           {entries.slice(0, 500).map(([k, v]) => (
             <JsonNode key={k} name={k} value={v} depth={depth + 1} />
           ))}
@@ -471,7 +471,7 @@ export function JsonTreeViewer({ text, jsonl = false }: { text: string; jsonl?: 
   }, [text, jsonl])
 
   if (!parsed.ok) {
-    return <p className="p-4 text-[12px] text-[#e8b365]">Invalid JSON: {parsed.error}</p>
+    return <p className="p-4 text-[12px] text-warning">Invalid JSON: {parsed.error}</p>
   }
 
   return (
@@ -483,12 +483,12 @@ export function JsonTreeViewer({ text, jsonl = false }: { text: string; jsonl?: 
 
 export function HtmlPreview({ html }: { html: string }): React.JSX.Element {
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#1b1b1a]">
+    <div className="flex min-h-0 flex-1 flex-col bg-inset">
       <iframe
         title="HTML preview"
         sandbox="allow-scripts"
         srcDoc={html}
-        className="h-full w-full flex-1 border-0 bg-white"
+        className="h-full w-full flex-1 border-0 bg-foreground"
       />
     </div>
   )
@@ -499,11 +499,11 @@ export function SvgPreview({ svg }: { svg: string }): React.JSX.Element {
   const dataUrl = useMemo(() => `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`, [svg])
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-7 shrink-0 items-center justify-end gap-1.5 border-b border-white/[0.07] px-3 text-[11px] text-muted-foreground">
+      <div className="flex h-7 shrink-0 items-center justify-end gap-1.5 border-b border-border/50 px-3 text-[11px] text-muted-foreground">
         <button
           type="button"
           onClick={() => setZoom((z) => Math.max(25, z - 25))}
-          className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-white/[0.07] hover:text-foreground"
+          className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-foreground/[0.07] hover:text-foreground"
         >
           −
         </button>
@@ -511,7 +511,7 @@ export function SvgPreview({ svg }: { svg: string }): React.JSX.Element {
         <button
           type="button"
           onClick={() => setZoom((z) => Math.min(400, z + 25))}
-          className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-white/[0.07] hover:text-foreground"
+          className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-foreground/[0.07] hover:text-foreground"
         >
           +
         </button>
@@ -519,7 +519,7 @@ export function SvgPreview({ svg }: { svg: string }): React.JSX.Element {
           <button
             type="button"
             onClick={() => setZoom(100)}
-            className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-white/[0.07] hover:text-foreground"
+            className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-foreground/[0.07] hover:text-foreground"
           >
             Reset
           </button>
@@ -542,7 +542,7 @@ export function BinaryMediaViewer({ base64, mime, path }: { base64: string; mime
   useEffect(() => () => URL.revokeObjectURL(url), [url])
 
   if (mime === 'application/pdf') {
-    return <iframe title={path} src={url} className="h-full w-full flex-1 border-0 bg-[#1e1e1d]" />
+    return <iframe title={path} src={url} className="h-full w-full flex-1 border-0 bg-inset" />
   }
   if (mime.startsWith('audio/')) {
     return (
@@ -553,7 +553,7 @@ export function BinaryMediaViewer({ base64, mime, path }: { base64: string; mime
   }
   if (mime.startsWith('video/')) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-black/40 p-4">
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-scrim/40 p-4">
         <video controls src={url} className="max-h-full max-w-full rounded-[8px]" />
       </div>
     )

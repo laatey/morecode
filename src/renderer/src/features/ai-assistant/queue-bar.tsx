@@ -10,7 +10,7 @@ export interface QueueItem {
 }
 
 const icon =
-  'grid h-5 w-5 cursor-pointer place-items-center rounded text-[#8e8e8a] transition-colors hover:bg-white/[0.08] hover:text-foreground'
+  'grid h-5 w-5 cursor-pointer place-items-center rounded text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground'
 
 /**
  * Messages typed while the AI is busy. It is a tab on the message box, like the changes bar, and the
@@ -57,23 +57,23 @@ export function QueueBar({
                   if (e.key === 'Enter') save()
                   if (e.key === 'Escape') setEditing(null)
                 }}
-                className="h-5 min-w-0 flex-1 rounded border border-white/[0.14] bg-black/20 px-1.5 text-[11.5px] text-foreground outline-none focus:border-primary/60"
+                className="h-5 min-w-0 flex-1 rounded border border-border-strong bg-scrim/20 px-1.5 text-[11.5px] text-scrim-foreground outline-none focus:border-primary/60"
               />
-              <button type="button" onClick={save} className="h-5 cursor-pointer rounded bg-white/[0.1] px-1.5 text-[10.5px] hover:bg-white/[0.16]">
+              <button type="button" onClick={save} className="h-5 cursor-pointer rounded bg-foreground/[0.1] px-1.5 text-[10.5px] hover:bg-foreground/[0.16]">
                 Save
               </button>
-              <button type="button" onClick={() => setEditing(null)} className="h-5 cursor-pointer rounded px-1 text-[10.5px] text-[#8e8e8a] hover:text-foreground">
+              <button type="button" onClick={() => setEditing(null)} className="h-5 cursor-pointer rounded px-1 text-[10.5px] text-muted-foreground hover:text-foreground">
                 Cancel
               </button>
             </li>
           ) : (
-            <li key={it.id} className="group flex h-6 items-center gap-1.5 rounded-md px-1 hover:bg-white/[0.04]">
-              <CornerDownRight className="h-3 w-3 shrink-0 text-[#6f6f6b]" />
-              <span className="shrink-0 text-[10.5px] text-[#8e8e8a]">
+            <li key={it.id} className="group flex h-6 items-center gap-1.5 rounded-md px-1 hover:bg-foreground/[0.04]">
+              <CornerDownRight className="h-3 w-3 shrink-0 text-faint-foreground" />
+              <span className="shrink-0 text-[10.5px] text-muted-foreground">
                 {items.length > 1 ? `${idx + 1}/${items.length} queued` : `Queued${running ? '' : ' · paused'}`}
               </span>
-              <span className="text-[#555552]">·</span>
-              <span className="min-w-0 flex-1 truncate text-[#d6d6d3]" title={it.raw}>
+              <span className="text-faint-foreground">·</span>
+              <span className="min-w-0 flex-1 truncate text-soft-foreground" title={it.raw}>
                 {it.raw}
               </span>
               <button type="button" title="Send now" aria-label="Send now" className={icon} onClick={() => onSendNow(it.id)}>

@@ -10,9 +10,9 @@ import { getLayout, LAYOUTS } from './layouts'
 import { useRightPanel } from './store'
 
 const MENU =
-  'app-no-drag z-50 min-w-[176px] overflow-hidden rounded-[6px] border border-white/[0.09] bg-[#2b2b2a] p-0.5 text-foreground shadow-lg outline-none select-none animate-in fade-in-0 zoom-in-95'
+  'app-no-drag z-50 min-w-[176px] overflow-hidden rounded-[6px] border border-border bg-muted p-0.5 text-foreground shadow-lg outline-none select-none animate-in fade-in-0 zoom-in-95'
 const MENU_ROW =
-  'flex cursor-pointer items-center gap-2 rounded-[4px] py-[5.5px] pl-2.5 pr-3 text-[12.5px] leading-[18px] text-[#e2e2e0] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-white/[0.07]'
+  'flex cursor-pointer items-center gap-2 rounded-[4px] py-[5.5px] pl-2.5 pr-3 text-[12.5px] leading-[18px] text-foreground outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-foreground/[0.07]'
 
 /** The tab's name turns into a text box. Enter saves, Escape cancels, an empty name restores the default. */
 function RenameField({
@@ -46,7 +46,7 @@ function RenameField({
         if (e.key === 'Escape') finish(null)
       }}
       onBlur={(e) => finish(e.currentTarget.value)}
-      className="min-w-0 flex-1 rounded-[3px] bg-black/30 px-1 text-[12px] text-foreground outline-none ring-1 ring-[#3b82f6]/70"
+      className="min-w-0 flex-1 rounded-[3px] bg-scrim/30 px-1 text-[12px] text-scrim-foreground outline-none ring-1 ring-primary/70"
     />
   )
 }
@@ -73,6 +73,13 @@ export function TabStrip(): React.JSX.Element {
   const [renaming, setRenaming] = useState<string | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // tabs keep a readable width and the strip slides; the tab you pick or open is brought into view
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-tab-id="${activeId}"]`)
+    el?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
+  }, [activeId, tabs.length])
 
   const newTabItems: ActionMenuItem[] = TAB_DEFINITIONS.map((d) => ({
     id: d.kind,
@@ -91,9 +98,14 @@ export function TabStrip(): React.JSX.Element {
   const LayoutIcon = getLayout(layout).icon
 
   return (
-    <div className="app-no-drag flex h-[34px] shrink-0 items-center gap-1 border-b border-white/[0.06] px-2">
+    <div className="app-no-drag flex h-[34px] shrink-0 items-center gap-1 border-b border-border/50 px-2">
       <div
         role="tablist"
+        ref={listRef}
+        // the mouse wheel slides the strip sideways
+        onWheel={(e) => {
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY
+        }}
         className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab, index) => {
@@ -108,6 +120,7 @@ export function TabStrip(): React.JSX.Element {
               <ContextMenu.Trigger asChild>
                 <div
                   role="tab"
+                  data-tab-id={tab.id}
                   aria-selected={active}
                   tabIndex={0}
                   title={name}
@@ -141,13 +154,13 @@ export function TabStrip(): React.JSX.Element {
                   }}
                   onAuxClick={(e) => e.button === 1 && closeTab(tab.id)}
                   className={cn(
-                    'group relative flex h-6 min-w-[44px] max-w-[140px] shrink items-center gap-1.5 rounded-[5px] px-2 text-[12px] cursor-default outline-none transition-colors',
+                    'group relative flex h-6 min-w-[104px] max-w-[190px] shrink-0 items-center gap-1.5 rounded-[5px] px-2 text-[12px] cursor-default outline-none transition-colors',
                     active
-                      ? 'bg-white/[0.09] text-foreground'
-                      : 'text-muted-foreground hover:bg-white/[0.05] hover:text-foreground',
+                      ? 'bg-foreground/[0.09] text-foreground'
+                      : 'text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground',
                     dragging === tab.id && 'opacity-40',
                     over === tab.id &&
-                      'before:absolute before:-left-[3px] before:inset-y-1 before:w-[2px] before:rounded-full before:bg-[#3b82f6]'
+                      'before:absolute before:-left-[3px] before:inset-y-1 before:w-[2px] before:rounded-full before:bg-primary'
                   )}
                 >
                   {tab.kind === 'file' && /\.\w+/.test(name) ? (
@@ -175,7 +188,7 @@ export function TabStrip(): React.JSX.Element {
                         closeTab(tab.id)
                       }}
                       className={cn(
-                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] hover:bg-white/[0.12]',
+                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] hover:bg-foreground/[0.12]',
                         active ? 'opacity-70' : 'opacity-0 group-hover:opacity-70'
                       )}
                     >
@@ -187,31 +200,31 @@ export function TabStrip(): React.JSX.Element {
               <ContextMenu.Portal>
                 <ContextMenu.Content className={MENU}>
                   <ContextMenu.Item className={MENU_ROW} onSelect={() => setRenaming(tab.id)}>
-                    <Pencil className="h-3.5 w-3.5 text-[#a8a8a6]" /> Rename
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> Rename
                   </ContextMenu.Item>
-                  <ContextMenu.Separator className="my-0.5 h-px bg-white/[0.08]" />
+                  <ContextMenu.Separator className="my-0.5 h-px bg-foreground/[0.08]" />
                   {titles[tab.id] && (
                     <>
                       <ContextMenu.Item className={MENU_ROW} onSelect={() => renameTab(tab.id, '')}>
-                        <RotateCcw className="h-3.5 w-3.5 text-[#a8a8a6]" /> Use the original name
+                        <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" /> Use the original name
                       </ContextMenu.Item>
-                      <ContextMenu.Separator className="my-0.5 h-px bg-white/[0.08]" />
+                      <ContextMenu.Separator className="my-0.5 h-px bg-foreground/[0.08]" />
                     </>
                   )}
                   <ContextMenu.Item className={MENU_ROW} onSelect={() => moveBeside(tab.id)}>
-                    <Columns2 className="h-3.5 w-3.5 text-[#a8a8a6]" /> Show beside the current tab
+                    <Columns2 className="h-3.5 w-3.5 text-muted-foreground" /> Show beside the current tab
                   </ContextMenu.Item>
-                  <ContextMenu.Separator className="my-0.5 h-px bg-white/[0.08]" />
+                  <ContextMenu.Separator className="my-0.5 h-px bg-foreground/[0.08]" />
                   <ContextMenu.Item className={MENU_ROW} onSelect={() => closeTab(tab.id)}>
-                    <X className="h-3.5 w-3.5 text-[#a8a8a6]" /> Close
+                    <X className="h-3.5 w-3.5 text-muted-foreground" /> Close
                   </ContextMenu.Item>
-                  <ContextMenu.Separator className="my-0.5 h-px bg-white/[0.08]" />
+                  <ContextMenu.Separator className="my-0.5 h-px bg-foreground/[0.08]" />
                   <ContextMenu.Item
                     className={MENU_ROW}
                     disabled={tabs.length < 2}
                     onSelect={() => closeOthers(tab.id)}
                   >
-                    <XCircle className="h-3.5 w-3.5 text-[#a8a8a6]" /> Close the other tabs
+                    <XCircle className="h-3.5 w-3.5 text-muted-foreground" /> Close the other tabs
                   </ContextMenu.Item>
                 </ContextMenu.Content>
               </ContextMenu.Portal>

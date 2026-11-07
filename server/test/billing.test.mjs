@@ -55,7 +55,7 @@ const paystack = createServer((req, res) => {
 const paystackUrl = await listen(paystack)
 
 const SECRET = 'sk_test_secret'
-const env = { TOKEN_SECRET: 'test-secret', SIGNUPS_PER_HOUR: '500', APP_URL: 'https://morecode.test', PAYSTACK_SECRET_KEY: SECRET, PAYSTACK_BASE_URL: paystackUrl }
+const env = { TOKEN_SECRET: 'test-secret', SIGNUPS_PER_HOUR: '500', APP_URL: 'https://morecode.test', PAYSTACK_SECRET_KEY: SECRET, PAYSTACK_BASE_URL: paystackUrl, ANTHROPIC_API_KEY: 'sk-test' }
 const config = loadConfig(env)
 const repo = openRepo(':memory:')
 const app = createApp({ config, repo, mail: { send: async () => undefined } })

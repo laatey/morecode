@@ -19,7 +19,7 @@ export function useCountdown(seconds: number): [number, () => void] {
 }
 
 const inputClass =
-  'h-10 w-full rounded-[8px] border bg-white/[0.04] px-3 text-[14px] text-[#ececea] outline-none transition-colors placeholder:text-[#77776f] focus:bg-white/[0.06]'
+  'h-10 w-full rounded-[8px] border bg-foreground/[0.04] px-3 text-[14px] text-foreground outline-none transition-colors placeholder:text-faint-foreground focus:bg-foreground/[0.06]'
 
 export function Field({
   label,
@@ -38,7 +38,7 @@ export function Field({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <label htmlFor={id} className="text-[13px] text-[#c9c9c6]">
+        <label htmlFor={id} className="text-[13px] text-soft-foreground">
           {label}
         </label>
         {right}
@@ -50,16 +50,16 @@ export function Field({
         {...props}
         className={cn(
           inputClass,
-          error ? 'border-[#e5584f]/70' : 'border-white/[0.1] focus:border-[#3b82f6]/70',
+          error ? 'border-destructive/70' : 'border-border focus:border-primary/70',
           props.className
         )}
       />
       {error ? (
-        <p id={`${id}-e`} role="alert" className="mt-1.5 text-[12px] text-[#f0746c]">
+        <p id={`${id}-e`} role="alert" className="mt-1.5 text-[12px] text-destructive">
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1.5 text-[12px] text-[#77776f]">{hint}</p>
+        <p className="mt-1.5 text-[12px] text-faint-foreground">{hint}</p>
       ) : null}
     </div>
   )
@@ -77,10 +77,10 @@ export function passwordScore(pw: string): number {
 
 const STRENGTH = [
   ['', ''],
-  ['Too short', 'bg-[#e5584f]'],
-  ['Okay', 'bg-[#e5a54b]'],
-  ['Good', 'bg-[#a3c23f]'],
-  ['Strong', 'bg-[#3fb950]']
+  ['Too short', 'bg-destructive'],
+  ['Okay', 'bg-warning'],
+  ['Good', 'bg-success'],
+  ['Strong', 'bg-success']
 ] as const
 
 export function PasswordField({
@@ -114,7 +114,7 @@ export function PasswordField({
           aria-label={shown ? 'Hide password' : 'Show password'}
           onClick={() => setShown((s) => !s)}
           className={cn(
-            'absolute right-2 grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-[#8d8d8a] transition-colors hover:bg-white/[0.07] hover:text-[#ececea]',
+            'absolute right-2 grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground',
             // sits on the input itself (below the label row), with or without an error line under it
             'top-[31px]'
           )}
@@ -130,12 +130,12 @@ export function PasswordField({
                 key={i}
                 className={cn(
                   'h-1 flex-1 rounded-full transition-colors',
-                  i <= score ? STRENGTH[score][1] : 'bg-white/[0.1]'
+                  i <= score ? STRENGTH[score][1] : 'bg-foreground/[0.1]'
                 )}
               />
             ))}
           </div>
-          <span className="w-14 text-right text-[11.5px] text-[#8d8d8a]">{STRENGTH[score][0]}</span>
+          <span className="w-14 text-right text-[11.5px] text-muted-foreground">{STRENGTH[score][0]}</span>
         </div>
       )}
     </div>
@@ -204,8 +204,8 @@ export function CodeInput({
             if (e.key === 'ArrowRight') refs.current[Math.min(5, i + 1)]?.focus()
           }}
           className={cn(
-            'h-12 w-full min-w-0 rounded-[8px] border bg-white/[0.04] text-center text-[18px] font-medium tabular-nums text-[#ececea] outline-none transition-colors focus:bg-white/[0.07] disabled:opacity-50',
-            error ? 'border-[#e5584f]/70' : 'border-white/[0.1] focus:border-[#3b82f6]/70'
+            'h-12 w-full min-w-0 rounded-[8px] border bg-foreground/[0.04] text-center text-[18px] font-medium tabular-nums text-foreground outline-none transition-colors focus:bg-foreground/[0.07] disabled:opacity-50',
+            error ? 'border-destructive/70' : 'border-border focus:border-primary/70'
           )}
         />
       ))}
@@ -249,7 +249,7 @@ export function TextLink({
       type="button"
       {...props}
       className={cn(
-        'cursor-pointer text-[#7db1ff] underline-offset-2 transition-colors hover:text-[#a3c8ff] hover:underline focus-visible:outline-none focus-visible:underline disabled:cursor-not-allowed disabled:text-[#77776f] disabled:no-underline',
+        'cursor-pointer text-link underline-offset-2 transition-colors hover:text-link hover:underline focus-visible:outline-none focus-visible:underline disabled:cursor-not-allowed disabled:text-faint-foreground disabled:no-underline',
         className
       )}
     />
@@ -261,7 +261,7 @@ export function FormError({ children }: { children?: React.ReactNode }): React.J
   return (
     <div
       role="alert"
-      className="rounded-[8px] border border-[#e5584f]/40 bg-[#e5584f]/10 px-3 py-2 text-[13px] text-[#f4a39e]"
+      className="rounded-[8px] border border-destructive/40 bg-destructive/10 px-3 py-2 text-[13px] text-destructive"
     >
       {children}
     </div>
@@ -270,10 +270,10 @@ export function FormError({ children }: { children?: React.ReactNode }): React.J
 
 export function Divider({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="flex items-center gap-3 text-[12px] text-[#77776f]">
-      <span className="h-px flex-1 bg-white/[0.09]" />
+    <div className="flex items-center gap-3 text-[12px] text-faint-foreground">
+      <span className="h-px flex-1 bg-foreground/[0.09]" />
       {children}
-      <span className="h-px flex-1 bg-white/[0.09]" />
+      <span className="h-px flex-1 bg-foreground/[0.09]" />
     </div>
   )
 }
@@ -327,14 +327,14 @@ export function Checkbox({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px] leading-5 text-[#a8a8a6]">
+    <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px] leading-5 text-muted-foreground">
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         className="peer sr-only"
       />
-      <span className="mt-[1px] grid h-4 w-4 shrink-0 place-items-center rounded-[4px] border border-white/[0.25] text-transparent transition-colors peer-checked:border-[#3b82f6] peer-checked:bg-[#3b82f6] peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-[#3b82f6]/50">
+      <span className="mt-[1px] grid h-4 w-4 shrink-0 place-items-center rounded-[4px] border border-border-strong text-transparent transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50">
         <Check className="h-3 w-3 stroke-[3]" />
       </span>
       <span>{children}</span>

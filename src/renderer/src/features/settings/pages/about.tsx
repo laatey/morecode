@@ -43,18 +43,18 @@ function BugReport({ version }: { version: string }): React.JSX.Element {
           .finally(() => setBusy(false))
       }}
     >
-      <label className="block text-[13px] text-[#c9c9c6]">
+      <label className="block text-[13px] text-soft-foreground">
         What went wrong?
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={4}
           placeholder="Tell us what you were doing and what you expected to happen."
-          className="mt-1.5 w-full resize-none rounded-[8px] border border-white/[0.12] bg-white/[0.04] px-2.5 py-2 text-[13px] leading-5 text-[#ececea] outline-none placeholder:text-[#77776f] focus:border-[#3b82f6]/70"
+          className="mt-1.5 w-full resize-none rounded-[8px] border border-border bg-foreground/[0.04] px-2.5 py-2 text-[13px] leading-5 text-foreground outline-none placeholder:text-faint-foreground focus:border-primary/70"
         />
       </label>
       <div className="flex items-center justify-between gap-3">
-        <label className="flex cursor-pointer items-center gap-2.5 text-[12.5px] text-[#c9c9c6]">
+        <label className="flex cursor-pointer items-center gap-2.5 text-[12.5px] text-soft-foreground">
           <Toggle label="Include app details" checked={withInfo} onChange={setWithInfo} />
           Include app version and system
         </label>
@@ -82,7 +82,7 @@ export function AboutPage(): React.JSX.Element {
         <LogoMark size={44} />
         <div>
           <div className="font-display text-[16px] font-semibold">MoreCode</div>
-          <div className="text-[12.5px] text-[#8d8d8a]">Version {version}</div>
+          <div className="text-[12.5px] text-muted-foreground">Version {version}</div>
         </div>
       </div>
       <Group title="Get help">
@@ -144,10 +144,10 @@ export function AboutPage(): React.JSX.Element {
         {RELEASES.map((r) => (
           <div key={r.version} className="py-3.5">
             <div className="flex items-baseline justify-between">
-              <span className="text-[13.5px] text-[#ececea]">Version {r.version}</span>
-              <span className="text-[12px] text-[#77776f]">{r.date}</span>
+              <span className="text-[13.5px] text-foreground">Version {r.version}</span>
+              <span className="text-[12px] text-faint-foreground">{r.date}</span>
             </div>
-            <ul className="mt-2 list-disc space-y-1 pl-4 text-[12.5px] leading-5 text-[#a8a8a6] marker:text-[#55554f]">
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-[12.5px] leading-5 text-muted-foreground marker:text-faint-foreground">
               {r.items.map((i) => (
                 <li key={i}>{i}</li>
               ))}

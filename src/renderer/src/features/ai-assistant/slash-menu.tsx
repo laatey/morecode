@@ -10,7 +10,7 @@ function Name({ id, query }: { id: string; query: string }): React.JSX.Element {
   return (
     <>
       /{id.slice(0, at)}
-      <span className="font-semibold text-white">{id.slice(at, at + q.length)}</span>
+      <span className="font-semibold text-foreground">{id.slice(at, at + q.length)}</span>
       {id.slice(at + q.length)}
     </>
   )
@@ -40,12 +40,12 @@ export function SlashMenu({
     <div
       role="listbox"
       aria-label="Commands"
-      className="absolute bottom-full left-0 z-30 mb-2 flex w-[min(380px,100%)] flex-col overflow-hidden rounded-[11px] border border-white/[0.1] bg-[#2a2a29] shadow-[0_12px_36px_rgba(0,0,0,0.5)] animate-in fade-in-0 slide-in-from-bottom-1 duration-100"
+      className="absolute bottom-full left-0 z-30 mb-2 flex w-[min(380px,100%)] flex-col overflow-hidden rounded-[11px] border border-border bg-muted shadow-[0_12px_36px_rgba(0,0,0,0.5)] animate-in fade-in-0 slide-in-from-bottom-1 duration-100"
     >
       <div className="slim-scroll max-h-[min(320px,45vh)] overflow-y-auto p-1">
         {commands.length === 0 && (
-          <div className="px-2.5 py-3 text-[12px] text-[#8d8d8a]">
-            No command matches “/{query}”. Type <span className="text-[#c2c2bf]">/skills</span> to
+          <div className="px-2.5 py-3 text-[12px] text-muted-foreground">
+            No command matches “/{query}”. Type <span className="text-soft-foreground">/skills</span> to
             browse skills.
           </div>
         )}
@@ -58,7 +58,7 @@ export function SlashMenu({
               {heading && (
                 <div
                   className={cn(
-                    'px-2.5 pb-1 text-[10.5px] font-medium text-[#7d7d79]',
+                    'px-2.5 pb-1 text-[10.5px] font-medium text-faint-foreground',
                     i > 0 ? 'mt-1.5 pt-2' : 'pt-1.5'
                   )}
                 >
@@ -78,29 +78,29 @@ export function SlashMenu({
                 }}
                 className={cn(
                   'flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-[7px] px-2.5 text-left transition-colors',
-                  isSelected ? 'bg-white/[0.08]' : 'bg-transparent'
+                  isSelected ? 'bg-foreground/[0.08]' : 'bg-transparent'
                 )}
               >
                 <Icon
                   className={cn(
                     'h-3.5 w-3.5 shrink-0',
-                    isSelected ? 'text-white' : 'text-[#8f8f8b]'
+                    isSelected ? 'text-foreground' : 'text-muted-foreground'
                   )}
                 />
                 <span
                   className={cn(
                     'shrink-0 text-[12.5px]',
-                    isSelected ? 'text-white' : 'text-[#d4d4d0]'
+                    isSelected ? 'text-foreground' : 'text-soft-foreground'
                   )}
                 >
                   <Name id={c.id} query={query} />
                 </span>
                 {c.badge && (
-                  <span className="shrink-0 rounded-full bg-[#3b82f6]/20 px-1.5 text-[9.5px] leading-[15px] text-[#7db1ff]">
+                  <span className="shrink-0 rounded-full bg-primary/20 px-1.5 text-[9.5px] leading-[15px] text-link">
                     {c.badge}
                   </span>
                 )}
-                <span className="min-w-0 flex-1 truncate text-right text-[11.5px] text-[#80807b]">
+                <span className="min-w-0 flex-1 truncate text-right text-[11.5px] text-faint-foreground">
                   {c.description}
                 </span>
               </button>

@@ -1,25 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, FileText, Search, X } from '@/components/icons'
 import { FileIcon } from '@/components/file-icon'
 import { SegmentedSwitch } from '@/components/segmented-switch'
 import { Markdown } from '@/features/ai-assistant/message-parts'
 import { languageFor } from '@/lib/highlight'
 import { escapeCodeHtml, getCachedHighlight, highlightWithPierre } from '@/lib/pierre-highlight'
-import { takeFilePreviewRequest } from '../file-preview-request'
 import { useRightPanel } from '../store'
 import type { TabContentProps } from '../types'
 import {
-  BinaryMediaViewer,
   DocxViewer,
   HtmlPreview,
   JsonTreeViewer,
   NotebookViewer,
-  parseDelimited,
-  SpreadsheetViewer,
   SvgPreview,
   XlsxViewer
 } from './file-viewers'
 import { TabEmpty } from './tab-kit'
+
+// openviewkit pulls in PDF/3D/CAD/archive engines, so it only loads when a file needs it
+const OpenViewKitViewer = lazy(() => import('./openviewkit-viewer'))
+const OpenViewKitText = lazy(() => import('./openviewkit-viewer').then((m) => ({ default: m.OpenViewKitText })))
 
 const LINE = 19
 const baseName = (path: string): string => path.split('/').pop() ?? path
@@ -32,7 +32,6 @@ const extOf = (path: string): string => {
 const TEXT_FILE =
   /\.(?:[cm]?[jt]sx?|css|scss|sass|less|html?|xml|svg|mdx?|markdown|txt|csv|tsv|jsonc?|jsonl|ipynb|ya?ml|toml|ini|env|py|rb|php|go|rs|java|kt|kts|swift|c|cc|cpp|cxx|h|hpp|sh|bash|zsh|fish|ps1|sql|graphql|gql|vue|svelte|astro|prisma|lock|gitignore|dockerignore|editorconfig)$/i
 const RASTER_IMAGE_FILE = /\.(?:png|jpe?g|gif|webp)$/i
-const BINARY_DOC_FILE = /\.(?:docx|xlsx|xls|ods|pdf|mp3|wav|ogg|m4a|mp4|webm|mov)$/i
 
 const isTextFile = (path: string): boolean => {
   const b = baseName(path).toLowerCase()
@@ -66,9 +65,17 @@ const PREVIEW_LABELS: Record<NonNullable<PreviewKind>, [string, string]> = {
   html: ['Preview', 'Code']
 }
 
+/**
+ * Unsaved edits, per tab. A tab that is not on screen is unmounted, so without this, switching to
+ * another file tab and back would throw the edits away.
+ */
+const unsaved = new Map<string, { saved: string; draft: string }>()
+export const hasUnsavedDraft = (tabId: string): boolean => unsaved.has(tabId)
+export const forgetFileDraft = (tabId: string): void => void unsaved.delete(tabId)
+
 export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
-  const { setAutoTitle } = useRightPanel()
-  const [path, setPath] = useState<string | null>(() => takeFilePreviewRequest())
+  const { setAutoTitle, tabs } = useRightPanel()
+  const path = tabs.find((t) => t.id === tabId)?.path ?? null
   const [saved, setSaved] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -77,19 +84,12 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
   const [note, setNote] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview')
   const dirty = saved !== null && draft !== saved
-  const dirtyRef = useRef(false)
-  dirtyRef.current = dirty
 
+  // remember edits that are not saved yet, so they survive switching tabs
   useEffect(() => {
-    const open = (): void => {
-      const next = takeFilePreviewRequest()
-      if (!next) return
-      if (dirtyRef.current && !window.confirm('You have unsaved changes in this file. Open another file and discard them?')) return
-      setPath(next)
-    }
-    window.addEventListener('file-preview:open', open)
-    return () => window.removeEventListener('file-preview:open', open)
-  }, [])
+    if (saved !== null && draft !== saved) unsaved.set(tabId, { saved, draft })
+    else if (saved !== null) unsaved.delete(tabId)
+  }, [tabId, saved, draft])
 
   // the file's name lives on the tab itself, so there is no second header inside it
   useEffect(() => {
@@ -109,14 +109,15 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
 
     const textFile = isTextFile(path)
     const imageFile = RASTER_IMAGE_FILE.test(path)
-    const binaryFile = BINARY_DOC_FILE.test(path)
 
     if (textFile) {
       void window.api.workspace.readFile(path).then((result) => {
         if (stale) return
         if (result.ok) {
           setSaved(result.text)
-          setDraft(result.text)
+          // restore edits from before this tab was hidden, unless the file changed on disk meanwhile
+          const kept = unsaved.get(tabId)
+          setDraft(kept && kept.saved === result.text ? kept.draft : result.text)
         } else setError(result.error)
       })
     } else if (imageFile) {
@@ -125,19 +126,19 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
         if (result.ok) setImage(result.dataUrl)
         else setError(result.error)
       })
-    } else if (binaryFile && window.api.workspace.readBinary) {
+    } else if (window.api.workspace.readBinary) {
       void window.api.workspace.readBinary(path).then((result) => {
         if (stale) return
         if (result.ok) setBinary({ base64: result.base64, mime: result.mime })
         else setError(result.error)
       })
     } else {
-      setError('Preview is not available for this binary format. Open it in your default app below.')
+      setError('Preview is not available for this file. Open it in your default app below.')
     }
     return () => {
       stale = true
     }
-  }, [path])
+  }, [path, tabId])
 
   const save = useCallback(async (): Promise<void> => {
     if (!path || saved === null || draft === saved) return
@@ -159,7 +160,7 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
   const renderRichPreview = (): React.JSX.Element => {
     if (richKind === 'markdown') {
       return (
-        <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-6 py-5 text-[13px] text-[#dcdcd8]">
+        <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-6 py-5 text-[13px] text-soft-foreground">
           <div className="mx-auto max-w-[680px]">
             <Markdown text={draft} />
           </div>
@@ -167,8 +168,11 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
       )
     }
     if (richKind === 'csv' || richKind === 'tsv') {
-      const rows = parseDelimited(draft, richKind === 'tsv' ? '\t' : ',')
-      return <SpreadsheetViewer sheets={[{ name: baseName(path), rows }]} />
+      return (
+        <Suspense fallback={<p className="p-4 text-[12px] text-muted-foreground">Opening…</p>}>
+          <OpenViewKitText text={draft} path={path} />
+        </Suspense>
+      )
     }
     if (richKind === 'json' || richKind === 'jsonl') {
       return <JsonTreeViewer text={draft} jsonl={richKind === 'jsonl'} />
@@ -188,7 +192,7 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {richKind && saved !== null && !error && (
-        <div className="flex h-8 shrink-0 items-center justify-between border-b border-white/[0.07] px-3">
+        <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/50 px-3">
           <SegmentedSwitch
             options={[
               { value: 'preview', label: PREVIEW_LABELS[richKind][0] },
@@ -203,7 +207,7 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
             <button
               type="button"
               onClick={() => void save()}
-              className="cursor-pointer rounded-[5px] bg-[#2563eb] px-2 py-0.5 text-[11px] font-medium text-white hover:bg-[#2f6fe0]"
+              className="cursor-pointer rounded-[5px] bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground hover:bg-primary/90"
             >
               Save
             </button>
@@ -212,7 +216,7 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
       )}
 
       {error ? (
-        <p className="p-4 text-[12px] text-[#e8b365]">{error}</p>
+        <p className="p-4 text-[12px] text-warning">{error}</p>
       ) : isTextFile(path) && saved === null ? (
         <p className="p-4 text-[12px] text-muted-foreground">Opening…</p>
       ) : isTextFile(path) ? (
@@ -231,25 +235,27 @@ export function FilePreviewTab({ tabId }: TabContentProps): React.JSX.Element {
         ) : ext === '.xlsx' || ext === '.xls' || ext === '.ods' ? (
           <XlsxViewer base64={binary.base64} />
         ) : (
-          <BinaryMediaViewer base64={binary.base64} mime={binary.mime} path={path} />
+          <Suspense fallback={<p className="p-4 text-[12px] text-muted-foreground">Opening…</p>}>
+            <OpenViewKitViewer base64={binary.base64} mime={binary.mime} path={path} />
+          </Suspense>
         )
       ) : (
         <p className="p-4 text-[12px] text-muted-foreground">Opening…</p>
       )}
 
-      <div className="flex h-[26px] shrink-0 items-center gap-2 border-t border-white/[0.07] px-3 text-[11px] text-muted-foreground">
+      <div className="flex h-[26px] shrink-0 items-center gap-2 border-t border-border/50 px-3 text-[11px] text-muted-foreground">
         <FileIcon name={baseName(path)} className="h-3.5 w-3.5" />
         <span className="min-w-0 flex-1 truncate" title={path}>
           {path.split('/').join(' › ')}
         </span>
         {(note || dirty) && (
-          <span className={dirty && !note ? 'text-[#e8b365]' : 'text-[#5fd17a]'}>{note ?? 'Unsaved · Ctrl+S'}</span>
+          <span className={dirty && !note ? 'text-warning' : 'text-success'}>{note ?? 'Unsaved · Ctrl+S'}</span>
         )}
         <button
           type="button"
           title="Open in your editor"
           onClick={() => void window.api.workspace.openFile(path)}
-          className="grid h-4 w-4 place-items-center rounded-[3px] text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground"
+          className="grid h-4 w-4 place-items-center rounded-[3px] text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground"
         >
           <ExternalLink className="h-3 w-3" />
         </button>
@@ -386,7 +392,7 @@ function CodeEditor({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {findOpen && (
-        <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-white/[0.08] bg-[#252524] px-3 text-[11.5px]">
+        <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-border bg-card px-3 text-[11.5px]">
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <input
             ref={findInput}
@@ -406,7 +412,7 @@ function CodeEditor({
               }
             }}
             placeholder="Find in file…"
-            className="h-6 min-w-0 flex-1 rounded-[5px] border border-white/[0.1] bg-white/[0.04] px-2 text-[11.5px] text-[#ececea] outline-none placeholder:text-[#77776f] focus:border-white/[0.24]"
+            className="h-6 min-w-0 flex-1 rounded-[5px] border border-border bg-foreground/[0.04] px-2 text-[11.5px] text-foreground outline-none placeholder:text-faint-foreground focus:border-border-strong"
           />
           <span className="min-w-[48px] text-center tabular-nums text-muted-foreground">
             {matches.length ? `${(matchIdx % matches.length) + 1}/${matches.length}` : '0/0'}
@@ -417,7 +423,7 @@ function CodeEditor({
               setFindOpen(false)
               area.current?.focus()
             }}
-            className="grid h-5 w-5 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-white/[0.08] hover:text-foreground"
+            className="grid h-5 w-5 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground"
           >
             <X className="h-3 w-3" />
           </button>
@@ -428,17 +434,17 @@ function CodeEditor({
         <div className="flex min-h-full w-max min-w-full">
           <div
             aria-hidden
-            className="sticky left-0 z-10 shrink-0 select-none bg-background py-3 pl-3 pr-3 text-right text-[#5d5d5a]"
+            className="sticky left-0 z-10 shrink-0 select-none bg-background py-3 pl-3 pr-3 text-right text-faint-foreground"
             style={{ minWidth: `${gutter + 3}ch` }}
           >
             {Array.from({ length: lineCount }, (_, i) => (
-              <div key={i} className={i + 1 === caret.line ? 'text-[#a8a8a6]' : undefined}>
+              <div key={i} className={i + 1 === caret.line ? 'text-muted-foreground' : undefined}>
                 {i + 1}
               </div>
             ))}
           </div>
           <div className="relative min-w-0 flex-1 py-3 pr-6">
-            <pre className="pointer-events-none m-0 whitespace-pre text-[#d6d6d3]" aria-hidden>
+            <pre className="pointer-events-none m-0 whitespace-pre text-soft-foreground" aria-hidden>
               <code className="pierre-code" dangerouslySetInnerHTML={{ __html: html }} />
             </pre>
             <textarea
@@ -454,7 +460,7 @@ function CodeEditor({
               onKeyUp={where}
               onClick={where}
               onSelect={where}
-              className="absolute inset-0 h-full w-full resize-none overflow-hidden whitespace-pre bg-transparent py-3 pr-6 font-[inherit] text-transparent caret-[#ececea] outline-none selection:bg-[#3b82f6]/30"
+              className="absolute inset-0 h-full w-full resize-none overflow-hidden whitespace-pre bg-transparent py-3 pr-6 font-[inherit] text-transparent caret-foreground outline-none selection:bg-primary/30"
               style={{ lineHeight: `${LINE}px`, tabSize: 2 }}
             />
           </div>

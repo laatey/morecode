@@ -81,18 +81,18 @@ export function PermissionsPage(): React.JSX.Element {
         note="Commands in this list run without asking, even when “Run commands” is set to Ask me."
       >
         {settings.allowedCommands.length === 0 ? (
-          <p className="py-3 text-[12px] leading-5 text-[#8e8e8a]">
+          <p className="py-3 text-[12px] leading-5 text-muted-foreground">
             Nothing yet. When the AI asks to run a command, choose “Always allow” and it appears here.
           </p>
         ) : (
           settings.allowedCommands.map((c) => (
             <div key={c} className="flex items-center gap-3 py-2.5">
-              <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-[#d6d6d3]">{c}</code>
+              <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-soft-foreground">{c}</code>
               <button
                 type="button"
                 aria-label={`Remove ${c}`}
                 onClick={() => set({ allowedCommands: settings.allowedCommands.filter((x) => x !== c) })}
-                className="grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] text-[#8e8e8a] transition-colors hover:bg-white/[0.08] hover:text-[#ececea]"
+                className="grid h-6 w-6 cursor-pointer place-items-center rounded-[5px] text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </button>

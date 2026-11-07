@@ -102,7 +102,7 @@ export function ConnectorLogo({
     <span
       style={{ width: size, height: size }}
       className={cn(
-        'grid shrink-0 place-items-center overflow-hidden rounded-[8px] bg-[#222220] border border-[#333330] text-[#f1f1ef]',
+        'grid shrink-0 place-items-center overflow-hidden rounded-[8px] bg-card border border-border text-foreground',
         className
       )}
     >

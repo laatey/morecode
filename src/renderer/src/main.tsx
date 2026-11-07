@@ -6,6 +6,10 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import { ErrorBoundary } from './components/error-boundary'
 import { SECRET_NAMES, loadSecrets } from './lib/secrets'
+import { applyInitialTheme } from './theme/apply'
+
+// before anything renders, so the very first frame is already in the chosen theme
+applyInitialTheme()
 
 // Keys and sign-in sessions are read from the computer's encrypted store first, so nothing flashes signed-out.
 // Older versions kept the sessions and account keys as plain text in this window's storage: those are moved over.

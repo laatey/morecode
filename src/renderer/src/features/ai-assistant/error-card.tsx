@@ -1,3 +1,4 @@
+import { useAuth } from '@/features/auth/auth-store'
 import React, { useEffect, useState } from 'react'
 import { AlertCircle, WifiOff } from '@/components/icons'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,9 @@ export function ErrorCard({ part, agentId }: { part: ErrorPart; agentId: string 
   const { choices, choose } = useModelChoices(setModel)
   const online = useOnline()
   const wait = useCountdown(part.retryAfter, part.at)
+  const { openPlanDialog, account } = useAuth()
+  // a wait of more than a quarter of an hour is not a busy moment: it is a usage limit (5-hour or weekly) being full
+  const planLimit = part.kind === 'rate_limit' && (part.retryAfter ?? 0) > 900 && !account?.apiKey
 
   // a run that already did work is continued, not started over
   const worked = messages.some(
@@ -65,7 +69,9 @@ export function ErrorCard({ part, agentId }: { part: ErrorPart; agentId: string 
   const onScope = sourceOf(model) === 'modelscope'
 
   const title =
-    part.kind === 'rate_limit'
+    planLimit
+      ? 'Usage limit reached'
+      : part.kind === 'rate_limit'
       ? 'Too many requests'
       : part.kind === 'offline'
         ? 'No internet connection'
@@ -73,7 +79,9 @@ export function ErrorCard({ part, agentId }: { part: ErrorPart; agentId: string 
           ? 'The connection dropped'
           : 'That did not work'
   const detail =
-    part.kind === 'rate_limit'
+    planLimit
+      ? part.message
+      : part.kind === 'rate_limit'
       ? wait > 0
         ? `Try again in ${wait}s.${onFree ? ' Free models share one limit between everyone.' : onScope ? ' Or pick another ModelScope model.' : canSwitch ? ' Or switch to a lighter model.' : ''}`
         : onScope
@@ -91,21 +99,21 @@ export function ErrorCard({ part, agentId }: { part: ErrorPart; agentId: string 
             : 'Nothing was lost. Try again to send it once more.'
           : part.message
 
-  const blocked = (part.kind === 'rate_limit' && wait > 0) || (part.kind === 'offline' && !online)
+  const blocked = (part.kind === 'rate_limit' && !planLimit && wait > 0) || (part.kind === 'offline' && !online)
 
   return (
     <div
       role="alert"
-      className="my-1.5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-white/[0.08] bg-[#242423] px-3 py-2"
+      className="my-1.5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-card px-3 py-2"
     >
       {part.kind === 'offline' ? (
-        <WifiOff className="h-3.5 w-3.5 shrink-0 text-[#f4a39e]" />
+        <WifiOff className="h-3.5 w-3.5 shrink-0 text-destructive" />
       ) : (
-        <AlertCircle className="h-3.5 w-3.5 shrink-0 text-[#f4a39e]" />
+        <AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />
       )}
       <div className="min-w-0 flex-1 basis-48">
-        <div className="text-[12.5px] font-medium leading-5 text-[#ededeb]">{title}</div>
-        <div className="text-[12px] leading-4 text-[#8e8e8a]">{detail}</div>
+        <div className="text-[12.5px] font-medium leading-5 text-foreground">{title}</div>
+        <div className="text-[12px] leading-4 text-muted-foreground">{detail}</div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {canSwitch && fallback && (
@@ -117,6 +125,11 @@ export function ErrorCard({ part, agentId }: { part: ErrorPart; agentId: string 
             }}
           >
             Use {modelName(FALLBACK_MODEL)}
+          </Button>
+        )}
+        {planLimit && (
+          <Button variant="secondary" size="xs" onClick={() => openPlanDialog('upgrade')}>
+            See plans
           </Button>
         )}
         {part.kind === 'failed' && (

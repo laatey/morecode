@@ -44,7 +44,7 @@ function FileCard({
   const undone = file.review === 'discarded'
 
   return (
-    <section className="group overflow-hidden rounded-[8px] border border-white/[0.08] bg-white/[0.02]">
+    <section className="group overflow-hidden rounded-[8px] border border-border bg-foreground/[0.02]">
       <header className="flex items-center gap-2 px-2.5 py-1.5">
         <button
           type="button"
@@ -57,7 +57,7 @@ function FileCard({
           />
           <FileIcon name={name} />
           <span className="min-w-0 truncate text-[12.5px]">
-            <span className={cn('font-medium text-[#ececea]', undone && 'text-muted-foreground line-through')}>
+            <span className={cn('font-medium text-foreground', undone && 'text-muted-foreground line-through')}>
               {name}
             </span>
             {showFolder && <span className="ml-1.5 text-[11.5px] text-muted-foreground">{dir}</span>}
@@ -73,7 +73,7 @@ function FileCard({
       </header>
 
       {file.review === 'pending' && (
-        <div className="flex items-center justify-end gap-1 border-t border-white/[0.06] px-2 py-1">
+        <div className="flex items-center justify-end gap-1 border-t border-border/50 px-2 py-1">
           <TabButton onClick={onUndo}>
             <Undo2 className="h-3 w-3" /> Undo
           </TabButton>
@@ -84,7 +84,7 @@ function FileCard({
       )}
 
       {open && !undone && (
-        <div className="border-t border-white/[0.06] text-[11.5px]">
+        <div className="border-t border-border/50 text-[11.5px]">
           <DiffView file={file.diff} />
         </div>
       )}
@@ -166,8 +166,8 @@ function ReviewView({ tree }: { tree: boolean }): React.JSX.Element {
             className={cn(
               'cursor-pointer rounded-[6px] px-2 py-0.5 text-[12px] transition-colors',
               filter === id
-                ? 'bg-white/[0.09] text-[#ececea]'
-                : 'text-muted-foreground hover:bg-white/[0.05] hover:text-foreground'
+                ? 'bg-foreground/[0.09] text-foreground'
+                : 'text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground'
             )}
           >
             {label}
@@ -228,7 +228,7 @@ export function DiffTab(): React.JSX.Element {
               onClick={() => setMode(id)}
               className={cn(
                 'cursor-pointer rounded-[6px] px-2 py-0.5 text-[12px] transition-colors',
-                mode === id ? 'bg-white/[0.09] text-[#ececea]' : 'text-muted-foreground hover:text-foreground'
+                mode === id ? 'bg-foreground/[0.09] text-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               {label}

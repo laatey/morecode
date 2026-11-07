@@ -1,4 +1,5 @@
 import { getSharedHighlighter } from '@pierre/diffs'
+import { PIERRE_THEME } from './pierre-theme'
 
 const cache = new Map<string, string>()
 const MAX_CACHE_ENTRIES = 120
@@ -12,7 +13,8 @@ export function getCachedHighlight(code: string, language: string | null): strin
 }
 
 /**
- * Use Pierre/Shiki for token colours only. The app continues to own the code surface, spacing,
+ * Use Pierre/Shiki for token colours only. The theme is the app's CSS-variable theme, so the HTML it returns
+ * is the same for every colour theme (and stays valid in the cache when the person switches). The app continues to own the code surface, spacing,
  * and controls instead of inheriting Pierre's file-view UI.
  */
 export async function highlightWithPierre(code: string, language: string | null): Promise<string> {
@@ -22,8 +24,8 @@ export async function highlightWithPierre(code: string, language: string | null)
   if (cached !== undefined) return cached
 
   try {
-    const highlighter = await getSharedHighlighter({ themes: ['pierre-dark'], langs: [lang] })
-    const rendered = highlighter.codeToHtml(code, { lang, theme: 'pierre-dark' })
+    const highlighter = await getSharedHighlighter({ themes: [PIERRE_THEME], langs: [lang] })
+    const rendered = highlighter.codeToHtml(code, { lang, theme: PIERRE_THEME })
     // Pierre's outer <pre> sets its own background. Keep only its syntax-token markup.
     const html = rendered
       .replace(/^<pre[^>]*><code>/, '')

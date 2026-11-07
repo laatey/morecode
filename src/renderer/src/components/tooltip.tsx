@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils'
 
 const TIP_SURFACE = cn(
   'app-no-drag pointer-events-none z-[100] inline-flex max-w-[260px] items-center gap-1.5',
-  'rounded-[6px] border border-white/[0.1] bg-[#1c1c1b] px-2 py-1',
-  'text-[11.5px] font-medium leading-4 tracking-[-0.01em] text-[#ececea]',
+  'rounded-[6px] border border-border bg-inset px-2 py-1',
+  'text-[11.5px] font-medium leading-4 tracking-[-0.01em] text-foreground',
   'shadow-[0_4px_12px_rgba(0,0,0,0.45)] select-none',
   'animate-in fade-in-0 zoom-in-95 duration-100'
 )
@@ -178,7 +178,7 @@ export const Tip = React.forwardRef<HTMLElement, TipProps>(function Tip(
         >
           <span className="truncate">{label}</span>
           {shortcut && (
-            <kbd className="rounded-[3px] border border-white/[0.1] bg-white/[0.06] px-1 py-px font-sans text-[10px] leading-3.5 text-[#9e9e99]">
+            <kbd className="rounded-[3px] border border-border bg-foreground/[0.06] px-1 py-px font-sans text-[10px] leading-3.5 text-muted-foreground">
               {shortcut}
             </kbd>
           )}

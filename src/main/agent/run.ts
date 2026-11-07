@@ -2,13 +2,14 @@ import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import { ApiFailure, streamMessage, type ApiMessage, type ContentBlock } from './anthropic'
-import { slimBrowserResults } from './history'
+import { slimBrowserResults, dropCutOffCalls, cutOffInfo, cutOffNudgeFor, pushUser, saveUnfinished, takeUnfinished, resumeWith, CUT_OFF_NOTICE, STEPS_NOTICE } from './history'
 import { usesOpenAIFormat } from './openai-format'
 import { streamOpenAI } from './openai-compat'
 import { openRuntime, type McpRuntime } from '../mcp/manager'
 import type { McpConfig } from '../mcp/client'
 import { BROWSER_TOOL_DEFS } from './browser'
 import { DESIGN_POINTER, designSection } from './design'
+import { memoryPrompt, type MemoryRuntime } from './memory'
 import { executeTool, projectTree, TOOL_DEFS, type Decision, type PermissionRequest, type SkillData } from './tools'
 import type { QuestionAnswer, QuestionItem } from '../../shared/question'
 
@@ -32,6 +33,8 @@ export type OutEvent =
   | { type: 'text'; delta: string }
   | { type: 'project'; name: string; path: string }
   | { type: 'usage'; tokens: number; detail: UsageDetail }
+  /** Running estimate of the tokens the AI has produced so far in the reply being written. */
+  | { type: 'live'; tokens: number }
 
 export interface RunInput {
   apiKey: string
@@ -55,8 +58,15 @@ export interface RunInput {
   connectors?: McpConfig[]
   /** Skills the person switched on, so the AI knows their names/descriptions and can read their files with read_skill. */
   skills?: SkillInput[]
+  /** Where skills are unpacked when read, so their scripts can run. Filled in by the main process. */
+  skillsDir?: string
   /** The person's routines, so the AI can tell them what is already scheduled and not repeat it. */
   routines?: { title: string; cadence: string; time: string; enabled: boolean }[]
+  /**
+   * Memory for this chat. Absent when the person switched it off (a fresh chat) or turned memory off in
+   * settings; then the AI gets no notes and no memory tools at all. `dir` is filled in by the main process.
+   */
+  memory?: { mode: 'ask' | 'auto'; dir?: string }
   runId: string
   /** Extra headers for the MoreCode server (never sent to anyone else). */
   headers?: Record<string, string>
@@ -71,8 +81,14 @@ export interface RunIo {
   fetchImpl?: typeof fetch
 }
 
-const MAX_STEPS = 40
+/** Safety net against an AI that loops forever. Big jobs need many steps, so this is generous. */
+const MAX_STEPS = 150
+/** How many replies in a row may hit the length limit before the person is asked to continue (resets after any reply that finishes). */
+const MAX_CUT_OFF_RECOVERIES = 6
+/** Longest single reply asked for. Services with a lower ceiling cap it themselves. */
+const REPLY_TOKENS = 32768
 const MAX_HISTORY = 30
+let thinkSeq = 0
 
 const VOICE: Record<Style, string> = {
   new: 'The person is new to coding. Use plain language, avoid jargon, and say what a change does for them rather than how it works. Keep explanations short and kind.',
@@ -106,6 +122,12 @@ How to work:
 - Make the smallest change that does the job. Prefer edit_file over rewriting whole files. Keep the existing style of the code.
 - For anything with more than a couple of steps, call todo_write first and keep it updated.
 - After changing code, check your work when a check exists (tests, type check, lint) with run_command.
+- Think briefly. For routine steps (a read, a search, a simple edit) go straight to the tool call with at most a line or two of reasoning. Save longer reasoning for a real design decision or a bug you cannot explain.\n- Every tool call re-sends the whole conversation, so fewer calls is cheaper than many small ones. Make independent reads in one step, and make all the changes to a file in one edit_file or write_file call instead of a string of tiny edits.
+- Research is a means, not the goal. After about five research calls, start producing the deliverable with what you know and correct it later. Never repeat a failed tool call unchanged: change the approach or tell the person what is blocked. For common hardware (such as a Raspberry Pi board) use the well-known dimensions you already have instead of reverse-engineering a drawing.
+- Do not re-read a file you already read or edited in this run: you know what it contains. Re-read only if a command may have changed it.
+- Check code once: run the build or test command (a build usually type-checks too). Do not run the type check and the build separately, and do not check again when nothing changed.
+- Screenshots cost more than other tools, so use browser_snapshot for text and structure and take a screenshot only when how something looks matters. When you are matching a design, a few screenshots to compare and fix real visual differences are worth it; stop once it matches, and do not repeat one when nothing changed.
+- Minified or generated files (CSS or JS on one huge line) cannot be searched with findstr or grep: they return the whole file. Extract only what you need with a single precise regex command, and fetch only the reference files you actually need.
 - ${shellNote()}
 - If the person asks for a plan, or the change is large or risky, call present_plan and stop. Do not change files until they approve.
 - You can read files and list folders anywhere on the computer, including outside the project (use full paths). If the person points you at other code to copy from, read it directly.
@@ -159,12 +181,61 @@ async function streamWithRetry(
   for (let attempt = 0; ; attempt++) {
     try {
       const stream = usesOpenAIFormat(args.baseUrl) ? streamOpenAI : streamMessage
+      let chars = 0
+      let lastLive = 0
+      // the AI's hidden reasoning, shown as a "Thinking 15s" row that becomes "Thought for 15s" when it moves on
+      let thinkId = ''
+      let thinkText = ''
+      let thinkStart = 0
+      let thinkEmit = 0
+      // short thoughts (under 2 seconds) never get a row: a row per step made the chat jumpy
+      let thinkShown = false
+      const showThink = (status: 'running' | 'done'): void => {
+        thinkShown = true
+        io.emit({
+          type: 'tool',
+          tool: { kind: 'thinking', id: thinkId, text: thinkText.slice(-30000), status, startedAt: thinkStart, ...(status === 'done' ? { durationMs: Date.now() - thinkStart } : {}) }
+        })
+      }
+      const endThink = (): void => {
+        if (!thinkId) return
+        if (thinkShown) showThink('done')
+        thinkId = ''
+        thinkText = ''
+        thinkShown = false
+      }
+      try {
       return await stream(args, {
+        thinking: (delta) => {
+          if (!thinkId) {
+            thinkId = `think-${++thinkSeq}`
+            thinkStart = Date.now()
+            thinkEmit = 0
+          }
+          thinkText += delta
+          const t = Date.now()
+          if (t - thinkStart >= 2000 && (thinkEmit === 0 || t - thinkEmit > 400)) {
+            thinkEmit = t
+            showThink('running')
+          }
+        },
         text: (delta) => {
+          endThink()
           spoke = true
           io.emit({ type: 'text', delta })
+        },
+        progress: (n, thinking) => {
+          if (!thinking) endThink()
+          chars += n
+          const now = Date.now()
+          if (now - lastLive < 250) return
+          lastLive = now
+          io.emit({ type: 'live', tokens: Math.ceil(chars / 3.5) })
         }
       })
+      } finally {
+        endThink()
+      }
     } catch (err) {
       const f = err instanceof ApiFailure ? err : null
       const transient = !!f && (f.kind === 'interrupted' || f.kind === 'rate_limit' || (f.status ?? 0) >= 500)
@@ -216,20 +287,24 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
             const fileHint = files.length > 0 ? ` (files: ${files.slice(0, 12).join(', ')})` : ''
             return `- ${s.id} (${s.name}): ${s.description}${fileHint}`
           })
-          .join('\n')}\nIf a skill is relevant to the person's task, call read_skill with its id (and an optional file path from its files list, such as "skills/analyze/SKILL.md") to read its instructions before proceeding.`
+          .join('\n')}\nIf a skill is relevant to the person's task, call read_skill with its id (and an optional file path from its files list, such as "skills/analyze/SKILL.md") to read its instructions before proceeding. Reading a skill also tells you the folder it was unpacked to; use that folder only to run scripts the skill names, and keep using read_skill to read anything in it.`
       : ''
   const routinesSection =
     !input.noTools && input.routines?.length
       ? `\n\nThe person's routines already scheduled:\n${input.routines.slice(0, 30).map((r) => `- ${r.title} (${r.cadence}${r.cadence === 'hourly' ? '' : ` at ${r.time}`}${r.enabled ? '' : ', paused'})`).join('\n')}\nDo not draft a routine that repeats one of these.`
       : ''
+  const memoryRt: MemoryRuntime | undefined =
+    !input.noTools && input.memory?.dir ? { dir: input.memory.dir, mode: input.memory.mode, projectPath: input.projectPath, chat: input.chatId } : undefined
   const system =
     buildSystem(input.cwd, input.style, hasProject, input.progress ?? '') +
     skillsSection +
     routinesSection +
+    (memoryRt ? memoryPrompt(memoryRt) : '') +
     designSection({ prompt: input.prompt, images: input.images, history: input.history }) +
     (mcp ? `\n\nConnected connectors: ${mcp.names.join(', ')}. Their tools start with mcp__. Use them when the task needs that service's data or actions, and say which one you used. When a connector tool saves a file (such as a screenshot), pass a path inside the working folder (${input.cwd}) unless the person asked for another place.` : '')
   const baseTools = activeSkills.length > 0 ? TOOL_DEFS : TOOL_DEFS.filter((t) => t.name !== 'read_skill')
-  const tools = input.noTools ? [] : [...baseTools, ...BROWSER_TOOL_DEFS, ...(mcp?.defs ?? [])]
+  const withoutMemory = memoryRt ? baseTools : baseTools.filter((t) => !t.name.startsWith('memory_'))
+  const tools = input.noTools ? [] : [...withoutMemory, ...BROWSER_TOOL_DEFS, ...(mcp?.defs ?? [])]
   if (mcp?.failedAuth?.length) {
     for (const f of mcp.failedAuth) {
       io.emit({
@@ -253,7 +328,9 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
   // two person turns in a row are not allowed, so a trailing one (a summary, or a message that never got a reply) rides along with the new prompt
   const carried = past.length && past[past.length - 1].role === 'user' ? (past.pop() as ApiMessage) : null
   if (carried && typeof carried.content === 'string') next.unshift({ type: 'text', text: `${carried.content}\n\n` })
-  const messages: ApiMessage[] = [...past, { role: 'user', content: next }]
+  // when the last request stopped early, carry on from its real work (files read, results) instead of only its text
+  const saved = takeUnfinished(input.chatId, input.history)
+  const messages: ApiMessage[] = saved ? resumeWith(saved, userContent(input)) : [...past, { role: 'user', content: next }]
   let delegations = 0
   const delegate = async (id: string, task: string): Promise<string> => {
     if (delegations >= 3) throw new Error('You already used 3 helpers for this request. Do the rest yourself.')
@@ -307,12 +384,16 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
     emit: (tool: Record<string, unknown>) => io.emit({ type: 'tool', tool }),
     ask: io.ask,
     askQuestion: io.askQuestion,
+    memory: memoryRt,
     delegate,
     mcp,
     skills: activeSkills,
+    skillsDir: activeSkills.length > 0 ? input.skillsDir : undefined,
+    skillDirsShown: new Set<string>(),
     editFailures: new Map<string, number>()
   }
 
+  let recoveries = 0
   for (let step = 0; step < MAX_STEPS; step++) {
     if (io.signal.aborted) return
     const started = Date.now()
@@ -324,6 +405,7 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
         system,
         messages: slimBrowserResults(messages),
         tools,
+        maxTokens: REPLY_TOKENS,
         signal: io.signal,
         headers: input.headers,
         fetchImpl: io.fetchImpl
@@ -346,16 +428,24 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
       }
     })
 
-    if (result.content.length) messages.push({ role: 'assistant', content: result.content })
-    if (result.stopReason === 'max_tokens') {
-      io.emit({ type: 'text', delta: '\n\n(I ran out of room for this answer. Ask me to continue and I will pick up where I stopped.)' })
+    const cutOff = result.stopReason === 'max_tokens'
+    const cutInfo = cutOff ? cutOffInfo(result.content) : null
+    const content = cutOff ? dropCutOffCalls(result.content) : result.content
+    if (!cutOff) recoveries = 0
+    if (cutOff && recoveries >= MAX_CUT_OFF_RECOVERIES) {
+      // still too long after several tries: keep the text, keep the work for "continue", and tell the person
+      const text = content.filter((b) => b.type === 'text')
+      if (text.length) messages.push({ role: 'assistant', content: text })
+      saveUnfinished(input.chatId, messages)
+      io.emit({ type: 'text', delta: `\n\n${CUT_OFF_NOTICE}` })
       return
     }
-    if (result.stopReason !== 'tool_use') return
+    if (content.length) messages.push({ role: 'assistant', content })
+    if (!cutOff && result.stopReason !== 'tool_use') return
 
     const results: ContentBlock[] = []
     let stop = false
-    for (const block of result.content) {
+    for (const block of content) {
       if (block.type !== 'tool_use') continue
       if (io.signal.aborted) return
       const r = await executeTool(block.name, block.id, block.input, ctx)
@@ -366,9 +456,16 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
       if (r.stop) stop = true
     }
     if (stop) return
+    if (cutOff) {
+      // the reply hit the length limit: quietly ask the AI to carry on, with everything it has read still in view
+      recoveries++
+      pushUser(messages, [...results, { type: 'text', text: cutOffNudgeFor(cutInfo!) }])
+      continue
+    }
     messages.push({ role: 'user', content: results })
   }
-  io.emit({ type: 'text', delta: '\n\n(I stopped after many steps. Tell me to keep going if you want me to continue.)' })
+  saveUnfinished(input.chatId, messages)
+  io.emit({ type: 'text', delta: `\n\n${STEPS_NOTICE}` })
 }
 
 export { ApiFailure }

@@ -13,7 +13,13 @@ import {
   LEFT_MIN_PX,
   RIGHT_DEFAULT_PX,
   RIGHT_MIN_PX,
-  sidebarNeedsOverlay
+  layoutOf,
+  layoutSides,
+  minContentWidth,
+  sidebarNeedsOverlay,
+  widthToDock,
+  type LayoutId,
+  type LayoutState
 } from '@/lib/sidebar-layout'
 
 export { CENTER_MIN_PX, LEFT_DEFAULT_PX, LEFT_MIN_PX, RIGHT_DEFAULT_PX, RIGHT_MIN_PX }
@@ -34,6 +40,26 @@ function loadCollapsed(): Record<Side, boolean> {
   } catch {
     return { left: false, right: true }
   }
+}
+
+/** Resolves once the page itself is `target` px wide (the window can finish resizing before the page hears of it). */
+function widthReaches(target: number, timeoutMs = 700): Promise<void> {
+  return new Promise((resolve) => {
+    if (window.innerWidth >= target - 1) {
+      resolve()
+      return
+    }
+    const check = (): void => {
+      if (window.innerWidth >= target - 1) done()
+    }
+    const timer = setTimeout(() => done(), timeoutMs)
+    function done(): void {
+      window.removeEventListener('resize', check)
+      clearTimeout(timer)
+      resolve()
+    }
+    window.addEventListener('resize', check)
+  })
 }
 
 function loadWidths(): Record<Side, number> {
@@ -57,7 +83,8 @@ function loadWidths(): Record<Side, number> {
  * - A sidebar auto-collapsed because the window is too narrow comes back, at its
  *   remembered width, once the window is wide enough again (either resize direction).
  * - Thresholds are evaluated on mount and on every resize.
- * - Opening a sidebar in a tight window makes the other one yield.
+ * - Opening a sidebar when both will not fit floats the new one over the chat; the open one is left alone.
+ *   Only the layout switcher ever widens the window.
  */
 export function useResponsiveSidebars(): {
   leftRef: ReturnType<typeof usePanelRef>
@@ -74,6 +101,11 @@ export function useResponsiveSidebars(): {
   /** Width the sidebar last had while docked, so the floating copy matches it. */
   overlayWidth: number
   closeOverlay: () => void
+  /** What is on screen right now, for the layout switcher's icon. */
+  layout: LayoutState
+  setLayout: (layout: LayoutId) => void
+  /** True for a moment after a layout change, so the panels glide instead of jumping. */
+  animating: boolean
 } {
   const leftRef = usePanelRef()
   const rightRef = usePanelRef()
@@ -84,6 +116,9 @@ export function useResponsiveSidebars(): {
   // comes back the way the person left it.
   const [rightCollapsed, setRightCollapsed] = useState(saved.right)
   const pref = useRef<Record<Side, boolean>>({ ...saved })
+  const [settled, setSettled] = useState(false)
+  const [animating, setAnimating] = useState(false)
+  const animTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [overlay, setOverlayState] = useState<Side | null>(null)
   const overlayRef = useRef<Side | null>(null)
   const setOverlay = useCallback((side: Side | null) => {
@@ -93,7 +128,10 @@ export function useResponsiveSidebars(): {
   // ignore the sizes the panels report while they are first laid out
   const ready = useRef(false)
   useEffect(() => {
-    const t = setTimeout(() => (ready.current = true), 700)
+    const t = setTimeout(() => {
+      ready.current = true
+      setSettled(true)
+    }, 700)
     return () => clearTimeout(t)
   }, [])
   const remember = useCallback((side: Side, closed: boolean) => {
@@ -110,6 +148,8 @@ export function useResponsiveSidebars(): {
   const auto = useRef<Record<Side, boolean>>({ left: false, right: false })
   // timestamp until which onResize should ignore programmatic panel layout changes
   const busyUntil = useRef(0)
+  // true while the layout switcher is resizing the window: nothing may collapse or re-open a sidebar meanwhile
+  const layoutBusy = useRef(false)
   const prevWin = useRef({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
     screenX: typeof window !== 'undefined' ? window.screenX : 0
@@ -118,6 +158,8 @@ export function useResponsiveSidebars(): {
   const markBusy = useCallback(() => {
     busyUntil.current = performance.now() + 90
   }, [])
+
+  const dockWidth = useCallback((left: boolean, right: boolean) => widthToDock(left, right, widths.current.left), [])
 
   const refFor = useCallback((s: Side) => (s === 'left' ? leftRef : rightRef), [leftRef, rightRef])
 
@@ -151,24 +193,23 @@ export function useResponsiveSidebars(): {
     const deltaW = width - prevWin.current.width
     const deltaX = Math.abs(screenX - prevWin.current.screenX)
     prevWin.current = { width, screenX }
+    if (layoutBusy.current) return
 
     const left = leftRef.current
     const right = rightRef.current
 
-    // 0. a floating sidebar docks again once the window has room for it
+    // 0. a floating sidebar docks again once the window has room for it beside the chat and the other
+    // sidebar. It never pushes the other one away: it stays floating until both fit.
     const floating = overlayRef.current
-    if (floating && !sidebarNeedsOverlay(width, floating)) {
-      setOverlay(null)
+    if (floating) {
       const other: Side = floating === 'left' ? 'right' : 'left'
       const otherPanel = refFor(other).current
-      if (
-        width < LEFT_MIN_PX + CENTER_MIN_PX + RIGHT_MIN_PX &&
-        otherPanel &&
-        !otherPanel.isCollapsed()
-      ) {
-        setCollapsed(other, true, true)
+      const otherDocked = Boolean(otherPanel && !otherPanel.isCollapsed())
+      const bothFit = width >= dockWidth(true, true)
+      if (!sidebarNeedsOverlay(width, floating) && (!otherDocked || bothFit)) {
+        setOverlay(null)
+        setCollapsed(floating, false, false)
       }
-      setCollapsed(floating, false, false)
     }
 
     // 1. left sidebar: it needs its own width plus the chat's minimum
@@ -216,7 +257,7 @@ export function useResponsiveSidebars(): {
         }
       }
     }
-  }, [leftRef, rightRef, refFor, setOverlay, setCollapsed, markBusy, persist])
+  }, [leftRef, rightRef, refFor, setOverlay, setCollapsed, markBusy, persist, dockWidth])
 
   useEffect(() => {
     reconcile()
@@ -224,6 +265,68 @@ export function useResponsiveSidebars(): {
     return () => window.removeEventListener('resize', reconcile)
   }, [reconcile])
 
+  const flashAnimation = useCallback(() => {
+    setAnimating(true)
+    busyUntil.current = Math.max(busyUntil.current, performance.now() + 360)
+    clearTimeout(animTimer.current)
+    animTimer.current = setTimeout(() => setAnimating(false), 340)
+  }, [])
+  useEffect(() => () => clearTimeout(animTimer.current), [])
+
+  /**
+   * The layout switcher: show exactly the sidebars asked for. This is the only thing that widens the window.
+   * One click does everything: it widens the window, waits until the page really has the new width AND the
+   * panels have measured it (docking before that used the old width, so the sidebar snapped shut again and
+   * a second click was needed), then docks and checks that the sidebars stayed the way they were asked for.
+   * Only when the window cannot grow (maximized, small screen) does a sidebar float over the chat instead.
+   */
+  const applyLayout = useCallback(
+    async (wantLeft: boolean, wantRight: boolean) => {
+      setOverlay(null)
+      flashAnimation()
+      layoutBusy.current = true
+      const nextFrame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()))
+      const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+      try {
+        const need = dockWidth(wantLeft, wantRight)
+        const fit = await window.api?.window?.fit(need, true).catch(() => null)
+        await widthReaches(Math.min(need, fit?.contentWidth ?? need))
+        // the panel group measures its new width on the next frames; wait for that before docking anything
+        await nextFrame()
+        await nextFrame()
+        const width = window.innerWidth
+        let left = wantLeft
+        let right = wantRight
+        let float: Side | null = null
+        if (width < need) {
+          left = wantLeft && width >= dockWidth(true, false)
+          right = wantRight && width >= dockWidth(left, true)
+          if (wantRight && !right) float = 'right'
+          if (wantLeft && !left) float = 'left'
+        }
+        for (let attempt = 0; attempt < 5; attempt++) {
+          setCollapsed('left', !left, false)
+          setCollapsed('right', !right, false)
+          await pause(attempt === 0 ? 120 : 160)
+          const l = leftRef.current
+          const r = rightRef.current
+          // done when both panels are in the state that was asked for; otherwise something reverted it: do it again
+          if (l && r && l.isCollapsed() === !left && r.isCollapsed() === !right) break
+        }
+        if (float) setOverlay(float)
+      } finally {
+        layoutBusy.current = false
+        prevWin.current = { width: window.innerWidth, screenX: window.screenX }
+        requestAnimationFrame(reconcile)
+      }
+    },
+    [setOverlay, flashAnimation, setCollapsed, reconcile, dockWidth, leftRef, rightRef]
+  )
+
+  /**
+   * A sidebar button, shortcut or "open this tab": never resizes the window. If the sidebar fits beside the chat
+   * (and the other sidebar, when it is open) it docks; otherwise it floats over the chat and the open one stays.
+   */
   const toggle = useCallback(
     (side: Side) => {
       const panel = refFor(side).current
@@ -232,25 +335,41 @@ export function useResponsiveSidebars(): {
         setOverlay(null)
         return
       }
-      const opening = panel.isCollapsed()
-      // no room to dock it beside the chat: float it over the chat instead of quietly doing nothing
-      if (opening && sidebarNeedsOverlay(window.innerWidth, side)) {
-        setOverlay(side)
-        return
-      }
-      setOverlay(null)
-      setCollapsed(side, !opening, false)
-
-      // opening one in a tight window: the other yields so the chat keeps its minimum width
-      if (opening && window.innerWidth < LEFT_MIN_PX + CENTER_MIN_PX + RIGHT_MIN_PX) {
+      if (panel.isCollapsed()) {
         const other: Side = side === 'left' ? 'right' : 'left'
         const otherPanel = refFor(other).current
-        if (otherPanel && !otherPanel.isCollapsed()) setCollapsed(other, true, true)
+        const otherDocked = Boolean(otherPanel && !otherPanel.isCollapsed())
+        const wantLeft = side === 'left' || (otherDocked && other === 'left')
+        const wantRight = side === 'right' || (otherDocked && other === 'right')
+        setOverlay(null)
+        if (window.innerWidth >= dockWidth(wantLeft, wantRight)) {
+          flashAnimation()
+          setCollapsed(side, false, false)
+          requestAnimationFrame(reconcile)
+        } else setOverlay(side)
+        return
       }
+      flashAnimation()
+      setOverlay(null)
+      setCollapsed(side, true, false)
       requestAnimationFrame(reconcile)
     },
-    [refFor, setCollapsed, setOverlay, reconcile]
+    [refFor, setCollapsed, setOverlay, reconcile, flashAnimation, dockWidth]
   )
+
+  const setLayout = useCallback(
+    (layout: LayoutId) => {
+      const { left, right } = layoutSides(layout)
+      void applyLayout(left, right)
+    },
+    [applyLayout]
+  )
+
+  // The window's minimum width follows the layout that is docked, so nothing can be squeezed below its minimum.
+  useEffect(() => {
+    if (!settled) return
+    void window.api?.window?.fit(minContentWidth(!leftCollapsed, !rightCollapsed), false)
+  }, [settled, leftCollapsed, rightCollapsed])
 
   const onResize = useCallback(
     (side: Side, px: number) => {
@@ -282,6 +401,9 @@ export function useResponsiveSidebars(): {
     toggleRight: () => toggle('right'),
     overlay,
     overlayWidth: overlay ? widths.current[overlay] : 0,
-    closeOverlay: () => setOverlay(null)
+    closeOverlay: () => setOverlay(null),
+    layout: layoutOf(!leftCollapsed || overlay === 'left', !rightCollapsed || overlay === 'right'),
+    setLayout,
+    animating
   }
 }

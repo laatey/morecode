@@ -35,10 +35,10 @@ const LABEL: Record<string, [string, string]> = {
 }
 
 const STATE: Record<string, { letter: string; tone: string }> = {
-  modified: { letter: 'M', tone: 'text-amber-300/90' },
+  modified: { letter: 'M', tone: 'text-warning/90' },
   added: { letter: 'A', tone: 'text-[var(--diff-add)]' },
   deleted: { letter: 'D', tone: 'text-[var(--diff-del)]' },
-  renamed: { letter: 'R', tone: 'text-[#6ea8fe]' },
+  renamed: { letter: 'R', tone: 'text-link' },
   untracked: { letter: 'U', tone: 'text-[var(--diff-add)]' }
 }
 
@@ -54,7 +54,7 @@ function Chip({
   return (
     <span
       className={cn(
-        'min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]',
+        'min-w-0 truncate rounded-[4px] bg-foreground/[0.05] px-1.5 text-[12px] leading-[18px] text-foreground',
         mono && 'font-mono text-[11.5px]',
         className
       )}
@@ -104,7 +104,7 @@ function FileLine({
       <span className={cn('w-3 shrink-0 text-center font-mono text-[11px]', tone)}>{letter}</span>
       <span className={cn('min-w-0 truncate', dim && 'opacity-60')}>
         <span className="text-muted-foreground">{dir}</span>
-        <span className="text-[#e2e2e0]">{name}</span>
+        <span className="text-foreground">{name}</span>
       </span>
       <span className="flex-1" />
       {added || removed ? <Stats added={added ?? 0} removed={removed ?? 0} /> : null}
@@ -134,10 +134,10 @@ function Card({
   children?: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="my-1 rounded-[10px] border border-white/[0.08] px-3 py-2">
+    <div className="my-1 rounded-[10px] border border-border px-3 py-2">
       <div className="flex min-w-0 items-center gap-2">
         {icon}
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#ededeb]">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
           {title}
         </span>
         {right}
@@ -158,7 +158,7 @@ function HashChip({ hash, short }: { hash: string; short: string }): React.JSX.E
       onClick={() =>
         void navigator.clipboard.writeText(hash).then(() => toast.success('Hash copied'))
       }
-      className="group flex shrink-0 cursor-pointer items-center gap-1 rounded-[4px] bg-white/[0.05] px-1.5 font-mono text-[11.5px] leading-[18px] text-[#c9c9c6] transition-colors hover:bg-white/[0.1] hover:text-[#ededeb]"
+      className="group flex shrink-0 cursor-pointer items-center gap-1 rounded-[4px] bg-foreground/[0.05] px-1.5 font-mono text-[11.5px] leading-[18px] text-soft-foreground transition-colors hover:bg-foreground/[0.1] hover:text-foreground"
     >
       {short}
       <Copy className="h-2.5 w-2.5 opacity-0 transition-opacity group-hover:opacity-70" />
@@ -177,7 +177,7 @@ function CommitCard({ v }: { v: Of<'commit'> }): React.JSX.Element {
         <>
           <span className="flex items-center gap-1">
             <GitBranch className="h-3 w-3" />
-            <span className="max-w-[160px] truncate font-mono text-[11px] text-[#c9c9c6]">
+            <span className="max-w-[160px] truncate font-mono text-[11px] text-soft-foreground">
               {v.branch}
             </span>
           </span>
@@ -201,10 +201,10 @@ function CommitCard({ v }: { v: Of<'commit'> }): React.JSX.Element {
             <FileLine key={p} path={p} tone="text-muted-foreground" letter="·" />
           ))}
           {v.skipped.map((p) => (
-            <FileLine key={p} path={p} tone="text-amber-300/80" letter="!" dim />
+            <FileLine key={p} path={p} tone="text-warning/80" letter="!" dim />
           ))}
           {v.skipped.length > 0 && (
-            <li className="pl-5 text-[11px] text-amber-300/70">Left out: may hold secrets</li>
+            <li className="pl-5 text-[11px] text-warning/70">Left out: may hold secrets</li>
           )}
         </ul>
       )}
@@ -215,7 +215,7 @@ function CommitCard({ v }: { v: Of<'commit'> }): React.JSX.Element {
 function PullRequestCard({ v }: { v: Of<'pr'> }): React.JSX.Element {
   return (
     <Card
-      icon={<GitPullRequest className="h-3.5 w-3.5 shrink-0 text-[#a78bfa]" />}
+      icon={<GitPullRequest className="h-3.5 w-3.5 shrink-0 text-chart-5" />}
       title={v.title}
       right={
         <Button variant="secondary" size="xs" onClick={() => openUrl(v.url)} className="gap-1">
@@ -225,11 +225,11 @@ function PullRequestCard({ v }: { v: Of<'pr'> }): React.JSX.Element {
       }
       meta={
         <>
-          <span className="max-w-[140px] truncate font-mono text-[11px] text-[#c9c9c6]">
+          <span className="max-w-[140px] truncate font-mono text-[11px] text-soft-foreground">
             {v.branch}
           </span>
           <ArrowRight className="h-3 w-3" />
-          <span className="max-w-[140px] truncate font-mono text-[11px] text-[#c9c9c6]">
+          <span className="max-w-[140px] truncate font-mono text-[11px] text-soft-foreground">
             {v.base}
           </span>
           <span className="flex-1" />
@@ -274,7 +274,7 @@ function DiffBody({ v }: { v: Of<'diff'> }): React.JSX.Element {
             <button
               type="button"
               onClick={() => setShown(on ? null : f.path)}
-              className="flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-[4px] px-1 py-0.5 text-left text-[12px] hover:bg-white/[0.04]"
+              className="flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-[4px] px-1 py-0.5 text-left text-[12px] hover:bg-foreground/[0.04]"
             >
               <ChevronRight
                 className={cn(
@@ -284,13 +284,13 @@ function DiffBody({ v }: { v: Of<'diff'> }): React.JSX.Element {
               />
               <span className="min-w-0 truncate">
                 <span className="text-muted-foreground">{dir}</span>
-                <span className="text-[#e2e2e0]">{name}</span>
+                <span className="text-foreground">{name}</span>
               </span>
               <span className="flex-1" />
               <Stats added={f.additions} removed={f.deletions} />
             </button>
             {on && (
-              <div className="my-1 overflow-hidden rounded-[6px] border border-white/[0.08] text-[11.5px]">
+              <div className="my-1 overflow-hidden rounded-[6px] border border-border text-[11.5px]">
                 {f.hunks.length ? (
                   <DiffView file={f} />
                 ) : (
@@ -311,17 +311,17 @@ function DiffBody({ v }: { v: Of<'diff'> }): React.JSX.Element {
 function LogBody({ v }: { v: Of<'log'> }): React.JSX.Element {
   return (
     <ol className="relative ml-[22px] mt-1 mb-1.5 space-y-1.5 pr-1">
-      <span className="absolute bottom-1.5 left-[3px] top-1.5 w-px bg-white/[0.1]" aria-hidden />
+      <span className="absolute bottom-1.5 left-[3px] top-1.5 w-px bg-foreground/[0.1]" aria-hidden />
       {v.commits.map((c) => (
         <li
           key={c.hash}
           className="relative flex min-w-0 items-baseline gap-2 pl-4 text-[12px] leading-5"
         >
           <span
-            className="absolute left-0 top-[7px] h-[7px] w-[7px] rounded-full border border-[#5a5a54] bg-[#1e1e1d]"
+            className="absolute left-0 top-[7px] h-[7px] w-[7px] rounded-full border border-border-strong bg-inset"
             aria-hidden
           />
-          <span className="min-w-0 truncate text-[#e2e2e0]">{c.subject}</span>
+          <span className="min-w-0 truncate text-foreground">{c.subject}</span>
           <span className="flex-1" />
           <span className="shrink-0 font-mono text-[11px] text-muted-foreground/80">{c.short}</span>
           <span className="w-[62px] shrink-0 text-right text-[11px] text-muted-foreground/70">
@@ -346,7 +346,7 @@ function BranchBody({ v }: { v: Of<'branch'> }): React.JSX.Element {
           <span
             className={cn(
               'min-w-0 truncate font-mono text-[11.5px]',
-              b === v.current ? 'text-[#ededeb]' : 'text-muted-foreground'
+              b === v.current ? 'text-foreground' : 'text-muted-foreground'
             )}
           >
             {b}
@@ -373,7 +373,7 @@ export function GitRow({ tool }: { tool: Git }): React.JSX.Element {
           </span>
         </Row>
         {open && tool.error && (
-          <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-red-400/25 bg-red-950/30 p-2 text-[12px] leading-5 text-red-100">
+          <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-destructive/25 bg-destructive/30 p-2 text-[12px] leading-5 text-destructive">
             {tool.error}
           </p>
         )}

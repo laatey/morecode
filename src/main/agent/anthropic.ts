@@ -19,6 +19,19 @@ export interface ApiMessage {
   content: string | ContentBlock[]
 }
 
+/**
+ * Marks the end of the conversation as a cache breakpoint. Without it only the system prompt and tools are
+ * cached, so every step of a long task pays full price for all the tool results gathered so far.
+ */
+function withCacheBreakpoint(messages: ApiMessage[]): ApiMessage[] {
+  const last = messages[messages.length - 1]
+  if (!last) return messages
+  const blocks: ContentBlock[] = typeof last.content === 'string' ? (last.content ? [{ type: 'text', text: last.content }] : []) : last.content.slice()
+  if (!blocks.length) return messages
+  blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral' } } as unknown as ContentBlock
+  return [...messages.slice(0, -1), { ...last, content: blocks }]
+}
+
 export interface ToolDef {
   name: string
   description: string
@@ -118,7 +131,7 @@ export async function* frames(body: ReadableStream<Uint8Array>): AsyncGenerator<
 
 export async function streamMessage(
   req: StreamRequest,
-  on: { text?: (delta: string) => void }
+  on: { text?: (delta: string) => void; progress?: (chars: number, thinking?: boolean) => void; thinking?: (delta: string) => void }
 ): Promise<StreamResult> {
   const doFetch = req.fetchImpl ?? fetch
   const isOpenRouter = req.baseUrl?.replace(/\/$/, '') === 'https://openrouter.ai/api'
@@ -152,7 +165,7 @@ export async function streamMessage(
                 )
             }
           : {}),
-        messages: req.messages
+        messages: isOpenRouter ? req.messages : withCacheBreakpoint(req.messages)
       })
     })
   } catch (err) {
@@ -198,8 +211,13 @@ export async function streamMessage(
         if (d.type === 'text_delta' && b.type === 'text') {
           b.text += d.text
           on.text?.(d.text)
+          on.progress?.(d.text.length)
         } else if (d.type === 'input_json_delta' && b.type === 'tool_use') {
           b.raw = (b.raw ?? '') + d.partial_json
+          on.progress?.(String(d.partial_json ?? '').length)
+        } else if (d.type === 'thinking_delta') {
+          on.thinking?.(String(d.thinking ?? ''))
+          on.progress?.(String(d.thinking ?? '').length, true)
         }
         break
       }

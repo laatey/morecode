@@ -23,7 +23,7 @@ export function MentionMenu({
     <div
       role="listbox"
       aria-label="Files"
-      className="absolute bottom-full left-0 z-30 mb-1.5 w-[220px] max-w-full overflow-hidden rounded-[8px] border border-white/[0.1] bg-[#262625] p-1 shadow-[0_12px_36px_rgba(0,0,0,0.5)]"
+      className="absolute bottom-full left-0 z-30 mb-1.5 w-[220px] max-w-full overflow-hidden rounded-[8px] border border-border bg-card p-1 shadow-[0_12px_36px_rgba(0,0,0,0.5)]"
     >
       <div className="slim-scroll max-h-[160px] overflow-y-auto">
         {files.length === 0 && (
@@ -33,7 +33,7 @@ export function MentionMenu({
           const cut = f.lastIndexOf('/')
           return (
             <React.Fragment key={f}>
-              {i > 0 && <div className="my-0.5 h-px bg-white/[0.08]" />}
+              {i > 0 && <div className="my-0.5 h-px bg-foreground/[0.08]" />}
               <button
                 ref={i === index ? active : undefined}
                 role="option"
@@ -46,12 +46,12 @@ export function MentionMenu({
                 }}
                 className={cn(
                   'flex h-[28px] w-full cursor-pointer items-center gap-2 rounded-[5px] px-1.5 text-left text-[12px] transition-colors',
-                  i === index ? 'bg-white/[0.1]' : 'bg-transparent hover:bg-white/[0.07]'
+                  i === index ? 'bg-foreground/[0.1]' : 'bg-transparent hover:bg-foreground/[0.07]'
                 )}
               >
                 <FileIcon name={f.slice(cut + 1)} />
-                <span className="min-w-0 flex-1 truncate text-[#e2e2e0]" title={f}>{f.slice(cut + 1)}</span>
-                {cut > 0 && <span className="max-w-[80px] shrink-0 truncate text-[10.5px] text-[#77776f]">{f.slice(0, cut)}</span>}
+                <span className="min-w-0 flex-1 truncate text-foreground" title={f}>{f.slice(cut + 1)}</span>
+                {cut > 0 && <span className="max-w-[80px] shrink-0 truncate text-[10.5px] text-faint-foreground">{f.slice(0, cut)}</span>}
               </button>
             </React.Fragment>
           )

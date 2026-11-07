@@ -1,9 +1,32 @@
-import { app, BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 
 export const MIN_WIDTH = 460
 export const MIN_HEIGHT = 500
+
+/**
+ * The renderer says how wide its content must be for the layout in use. The window's minimum follows it, so
+ * the chat and the open sidebars can never be squeezed below their own minimums, and with `grow` the window
+ * is widened (inside the screen it is on) when a layout needs more room than it has.
+ */
+export function registerWindowFitIpc(): void {
+  ipcMain.handle('window:fit', (event, minContentWidth: unknown, grow: unknown) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || win.isDestroyed()) return { contentWidth: 0 }
+    const need = typeof minContentWidth === 'number' && Number.isFinite(minContentWidth) ? Math.round(Math.min(Math.max(minContentWidth, 0), 4000)) : 0
+    const frame = win.getSize()[0] - win.getContentSize()[0]
+    win.setMinimumSize(Math.max(MIN_WIDTH, need + frame), MIN_HEIGHT)
+    if (grow === true && need > 0 && !win.isMaximized() && !win.isFullScreen() && win.getContentSize()[0] < need) {
+      const bounds = win.getBounds()
+      const area = screen.getDisplayMatching(bounds).workArea
+      const width = Math.min(need + frame, area.width)
+      const x = Math.max(area.x, Math.min(bounds.x, area.x + area.width - width))
+      win.setBounds({ x, y: bounds.y, width, height: bounds.height }, true)
+    }
+    return { contentWidth: win.getContentSize()[0] }
+  })
+}
 
 export interface WindowState {
   x?: number

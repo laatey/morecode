@@ -27,7 +27,9 @@ function ensureSprite(): void {
 
 // Pierre colours its icons inside the tree only. Outside the tree we set the colour ourselves:
 // Pierre's own variable wins if it is defined, otherwise the fallback below is used.
-const colours: Record<string, string> = {
+// Brand colours are deliberately not themed; on a light theme they are made a little deeper (lightness only, the colour itself is kept) so the pale ones stay legible without going muddy.
+const legible = (c: string): string => (c.startsWith('#') ? `light-dark(oklch(from ${c} calc(l * 0.8) calc(c * 1.05) h), ${c})` : c)
+const brand: Record<string, string> = {
   typescript: '#3b82f6',
   javascript: '#e5c07b',
   react: '#38bdf8',
@@ -44,7 +46,7 @@ const colours: Record<string, string> = {
   vue: '#41b883',
   svelte: '#ff5a1f',
   astro: '#a78bfa',
-  nextjs: '#e5e7eb',
+  nextjs: 'var(--foreground)',
   docker: '#38a3ee',
   git: '#f1502f',
   npm: '#e5484d',
@@ -70,7 +72,7 @@ function tokenFor(name: string): string {
 export function FileIcon({ name, className }: { name: string; className?: string }): React.JSX.Element {
   ensureSprite()
   const token = tokenFor(name)
-  const fallback = colours[token] ?? 'var(--muted-foreground, #8b8f98)'
+  const fallback = legible(brand[token] ?? 'var(--soft-foreground)')
   return (
     <span
       aria-hidden
@@ -87,7 +89,7 @@ export function FileIcon({ name, className }: { name: string; className?: string
 /** The icon for a folder. */
 export function FolderIcon({ className }: { name?: string; className?: string }): React.JSX.Element {
   return (
-    <span aria-hidden className={cn(box, className)} style={{ color: 'var(--muted-foreground, #8b8f98)' }}>
+    <span aria-hidden className={cn(box, className)} style={{ color: 'var(--soft-foreground)' }}>
       <Folder strokeWidth={1.6} />
     </span>
   )

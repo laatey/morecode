@@ -12,12 +12,13 @@ const SAMPLE = [
 ]
 
 /** Every file in the project (skipping node_modules and the like), as relative paths. */
-export function useWorkspaceFiles(projectKey: string): string[] {
+export function useWorkspaceFiles(projectKey: string, chatId = ''): string[] {
   const [files, setFiles] = useState<string[]>([])
   useEffect(() => {
     let stale = false
     const api = window.api?.workspace
-    if (!projectKey) {
+    // a chat with no project lists its own private folder
+    if (!projectKey && !chatId) {
       setFiles([])
       return
     }
@@ -27,8 +28,8 @@ export function useWorkspaceFiles(projectKey: string): string[] {
     }
     setFiles([]) // never show the previous project's files while the new list loads
     const load = (): void => {
-      api
-        .open(projectKey)
+      const opened = projectKey ? api.open(projectKey) : api.openChat(chatId)
+      opened
         .then(() => api.files())
         .then((list) => !stale && setFiles(list))
         .catch(() => !stale && setFiles([]))
@@ -39,7 +40,7 @@ export function useWorkspaceFiles(projectKey: string): string[] {
       stale = true
       window.removeEventListener('workspace:changed', load)
     }
-  }, [projectKey])
+  }, [projectKey, chatId])
   return files
 }
 

@@ -6,6 +6,8 @@ import { SegmentedSwitch, SegmentedSwitchOption } from './components/segmented-s
 import { ActionMenu } from './components/action-menu'
 import { IconButton } from './components/layout/icon-button'
 import { ShareIcon, SidebarLeftIcon, SidebarRightIcon } from './components/layout/icons'
+import { LayoutSwitcher } from './components/layout/layout-switcher'
+import type { LayoutId, LayoutState } from '@/lib/sidebar-layout'
 import {
   CENTER_MIN_PX,
   LEFT_MIN_PX,
@@ -66,6 +68,8 @@ function NavControls(props: {
   onModeChange: (mode: Mode) => void
   onToggleSidebar: () => void
   sidebarTitle: string
+  layout: LayoutState
+  onLayout: (layout: LayoutId) => void
   canBack: boolean
   canForward: boolean
   onBack: () => void
@@ -78,6 +82,8 @@ function NavControls(props: {
     onModeChange,
     onToggleSidebar,
     sidebarTitle,
+    layout,
+    onLayout,
     canBack,
     canForward,
     onBack,
@@ -96,9 +102,10 @@ function NavControls(props: {
         >
           <i className="codicon codicon-menu text-[16px]" />
         </IconButton>
-        <IconButton title={sidebarTitle} onClick={onToggleSidebar}>
+        <IconButton title={sidebarTitle} data-tour="left-toggle" onClick={onToggleSidebar}>
           <SidebarLeftIcon />
         </IconButton>
+        <LayoutSwitcher layout={layout} onChange={onLayout} />
         <IconButton
           title="Back"
           className={cn(arrowsClass, !canBack && 'opacity-30 pointer-events-none')}
@@ -149,7 +156,7 @@ function RightControls({
         aria-pressed={docActive}
         className={cn(
           docClass,
-          docActive && 'bg-[#032042] text-[#5aa6ff] hover:bg-[#032042] hover:text-[#7dbaff]'
+          docActive && 'bg-primary/15 text-link hover:bg-primary/15 hover:text-link'
         )}
         onClick={onDocument}
       >
@@ -176,7 +183,10 @@ function AppShell(): React.JSX.Element {
     toggleRight,
     overlay,
     overlayWidth,
-    closeOverlay
+    closeOverlay,
+    layout,
+    setLayout,
+    animating
   } = useResponsiveSidebars()
   useEffect(() => {
     if (!overlay) return
@@ -296,7 +306,7 @@ function AppShell(): React.JSX.Element {
     return () => window.removeEventListener('workspace:project-created', onCreated)
   }, [openProject, ws])
 
-  const { openTab, closeTab, tabs, paneTabs, layout } = useRightPanel()
+  const { openTab, closeTab, tabs, paneTabs, layout: panelLayout } = useRightPanel()
 
   // the AI asked for a Browser tab and none is open
   const hasBrowserTab = tabs.some((t) => t.kind === 'browser')
@@ -310,7 +320,7 @@ function AppShell(): React.JSX.Element {
       }),
     [openTab]
   )
-  const visibleTabIds = paneTabs.slice(0, getLayout(layout).panes)
+  const visibleTabIds = paneTabs.slice(0, getLayout(panelLayout).panes)
   const rightVisible = !rightCollapsed || overlay === 'right'
   const docsOpen =
     rightVisible && tabs.some((t) => t.kind === 'docs' && visibleTabIds.includes(t.id))
@@ -345,6 +355,21 @@ function AppShell(): React.JSX.Element {
   useShortcut('toggle-panel', toggleRight)
   useShortcut('palette', () => ws.setSearchOpen(true))
   useShortcut('new-chat', () => ws.newChat())
+  // "Try in chat" on a skill: open a fresh chat with the skill command already typed
+  useEffect(() => {
+    const onTry = (e: Event): void => {
+      const text = (e as CustomEvent<string>).detail ?? ''
+      closeSettings()
+      setPage('chat')
+      setMode('chat')
+      ws.newChat()
+      // wait for the new chat and its message box to mount, then fill it
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent('assistant:prefill', { detail: text })), 180)
+    }
+    window.addEventListener('skill:try-in-chat', onTry)
+    return () => window.removeEventListener('skill:try-in-chat', onTry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws.newChat])
   useShortcut('settings', () => openSettings('general'))
   useShortcut('shortcuts', () => openSettings('shortcuts'))
   useShortcut('open-terminal', () => openTab('terminal'))
@@ -435,7 +460,7 @@ function AppShell(): React.JSX.Element {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground select-none">
       <RoutineScheduler />
-      <ResizablePanelGroup orientation="horizontal" className="h-full w-full">
+      <ResizablePanelGroup orientation="horizontal" className={cn('h-full w-full', animating && 'layout-animating')}>
         {/* Left sidebar */}
         <ResizablePanel
           id="sidebar-left"
@@ -458,6 +483,8 @@ function AppShell(): React.JSX.Element {
               onModeChange={handleModeChange}
               onToggleSidebar={toggleLeft}
               sidebarTitle="Collapse sidebar"
+              layout={layout}
+              onLayout={setLayout}
               {...nav}
               arrowsClass="@max-[200px]:hidden"
             />
@@ -500,10 +527,12 @@ function AppShell(): React.JSX.Element {
                     onModeChange={handleModeChange}
                     onToggleSidebar={toggleLeft}
                     sidebarTitle="Expand sidebar"
+                    layout={layout}
+                    onLayout={setLayout}
                     {...nav}
                     arrowsClass="@max-[480px]:hidden"
                   />
-                  <span className="h-3.5 w-px bg-white/[0.08] mx-1 shrink-0" />
+                  <span className="h-3.5 w-px bg-foreground/[0.08] mx-1 shrink-0" />
                 </div>
               )}
 
@@ -543,7 +572,7 @@ function AppShell(): React.JSX.Element {
                           <button
                             type="button"
                             title="Switch project folder"
-                            className="app-no-drag @max-[380px]:hidden px-1.5 py-0.5 rounded text-[13.5px] text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors truncate max-w-[160px] tracking-tight cursor-pointer focus:outline-none min-w-0"
+                            className="app-no-drag @max-[380px]:hidden px-1.5 py-0.5 rounded text-[13.5px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors truncate max-w-[160px] tracking-tight cursor-pointer focus:outline-none min-w-0"
                           >
                             {folder}
                           </button>
@@ -556,16 +585,16 @@ function AppShell(): React.JSX.Element {
                   </>
                 )}
                 {showSettings ? (
-                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-[#e2e2e0]">
-                    <Settings className="h-3.5 w-3.5 text-white" /> Settings
+                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-foreground">
+                    <Settings className="h-3.5 w-3.5 text-foreground" /> Settings
                   </div>
                 ) : showRoutines ? (
-                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-[#e2e2e0]">
-                    <CalendarClock className="h-3.5 w-3.5 text-white" /> Routines
+                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-foreground">
+                    <CalendarClock className="h-3.5 w-3.5 text-foreground" /> Routines
                   </div>
                 ) : showCustomize ? (
-                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-[#e2e2e0]">
-                    <Briefcase className="h-3.5 w-3.5 text-white" /> Customize
+                  <div className="flex items-center gap-2 px-1.5 text-[13.5px] font-medium text-foreground">
+                    <Briefcase className="h-3.5 w-3.5 text-foreground" /> Customize
                   </div>
                 ) : <div className="flex items-center gap-0.5 min-w-0">
                   {ws.renamingId === active.id ? (
@@ -579,7 +608,7 @@ function AppShell(): React.JSX.Element {
                     <button
                       type="button"
                       onDoubleClick={() => ws.startRename(active.id)}
-                      className="app-no-drag px-1.5 py-0.5 rounded text-[13.5px] font-medium text-[#e2e2e0] hover:text-white hover:bg-white/[0.04] transition-colors truncate max-w-[320px] tracking-tight cursor-default focus:outline-none min-w-0"
+                      className="app-no-drag px-1.5 py-0.5 rounded text-[13.5px] font-medium text-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors truncate max-w-[320px] tracking-tight cursor-default focus:outline-none min-w-0"
                     >
                       {title}
                     </button>
@@ -592,8 +621,8 @@ function AppShell(): React.JSX.Element {
                         type="button"
                         title="More options"
                         className={cn(
-                          'app-no-drag w-[20px] h-[20px] rounded-[5px] text-muted-foreground/75 hover:text-foreground hover:bg-white/[0.06] transition-colors flex items-center justify-center cursor-pointer focus:outline-none shrink-0',
-                          isOpen && 'bg-white/[0.08] text-foreground'
+                          'app-no-drag w-[20px] h-[20px] rounded-[5px] text-muted-foreground/75 hover:text-foreground hover:bg-foreground/[0.06] transition-colors flex items-center justify-center cursor-pointer focus:outline-none shrink-0',
+                          isOpen && 'bg-foreground/[0.08] text-foreground'
                         )}
                       >
                         <ChevronDown className="w-[13px] h-[13px] stroke-[2]" />
@@ -612,7 +641,7 @@ function AppShell(): React.JSX.Element {
                 docActive={docsOpen}
                 onDocument={openDocs}
               >
-                <IconButton title="Expand secondary sidebar" onClick={toggleRight}>
+                <IconButton title="Expand secondary sidebar" data-tour="right-toggle" onClick={toggleRight}>
                   <SidebarRightIcon />
                 </IconButton>
               </RightControls>
@@ -665,12 +694,12 @@ function AppShell(): React.JSX.Element {
             type="button"
             aria-label="Close sidebar"
             onClick={closeOverlay}
-            className="absolute inset-0 cursor-default bg-black/45 animate-in fade-in-0"
+            className="absolute inset-0 cursor-default bg-scrim/45 animate-in fade-in-0"
           />
           <aside
             aria-label={overlay === 'left' ? 'Sidebar' : 'Secondary sidebar'}
             className={cn(
-              'relative flex h-full max-w-[calc(100vw-48px)] flex-col border-white/[0.08] bg-background shadow-[0_0_60px_rgba(0,0,0,0.5)] animate-in duration-150',
+              'relative flex h-full max-w-[calc(100vw-48px)] flex-col border-border bg-background shadow-[0_0_60px_rgba(0,0,0,0.5)] animate-in duration-150',
               overlay === 'left' ? 'border-r slide-in-from-left-4' : 'ml-auto border-l slide-in-from-right-4'
             )}
             style={{ width: overlayWidth }}
@@ -685,6 +714,8 @@ function AppShell(): React.JSX.Element {
                   onModeChange={(m) => { handleModeChange(m); closeOverlay() }}
                   onToggleSidebar={closeOverlay}
                   sidebarTitle="Close sidebar"
+                  layout={layout}
+                  onLayout={setLayout}
                   {...nav}
                   arrowsClass="@max-[200px]:hidden"
                 />

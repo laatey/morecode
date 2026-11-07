@@ -41,7 +41,7 @@ function PlanEditor({ plan }: { plan: Plan }): React.JSX.Element {
       <div className="space-y-4 p-4">
         <header>
           <div className="mb-1 flex items-center gap-2">
-            <h2 className="min-w-0 flex-1 text-[14px] font-medium leading-5 text-[#ececea]">
+            <h2 className="min-w-0 flex-1 text-[14px] font-medium leading-5 text-foreground">
               {plan.title}
             </h2>
             <Chip tone={approved ? 'good' : 'warn'}>{approved ? 'Approved' : 'Waiting for you'}</Chip>
@@ -50,15 +50,15 @@ function PlanEditor({ plan }: { plan: Plan }): React.JSX.Element {
         </header>
 
         <section>
-          <h3 className="mb-1.5 text-[12px] font-medium text-[#a8a8a6]">Steps</h3>
+          <h3 className="mb-1.5 text-[12px] font-medium text-muted-foreground">Steps</h3>
           <ol className="space-y-1.5">
             {steps.map((step, i) => (
               <li key={i} className="group flex items-start gap-2.5">
-                <span className="mt-[5px] grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/[0.07] text-[11px] tabular-nums text-[#c9c9c6]">
-                  {approved ? <Check className="h-3 w-3 stroke-[3] text-[#5fd17a]" /> : i + 1}
+                <span className="mt-[5px] grid h-5 w-5 shrink-0 place-items-center rounded-full bg-foreground/[0.07] text-[11px] tabular-nums text-soft-foreground">
+                  {approved ? <Check className="h-3 w-3 stroke-[3] text-success" /> : i + 1}
                 </span>
                 {approved ? (
-                  <span className="py-1 text-[12.5px] leading-5 text-[#d6d6d3]">{step}</span>
+                  <span className="py-1 text-[12.5px] leading-5 text-soft-foreground">{step}</span>
                 ) : (
                   <>
                     <textarea
@@ -66,13 +66,13 @@ function PlanEditor({ plan }: { plan: Plan }): React.JSX.Element {
                       value={step}
                       rows={Math.max(1, Math.ceil(step.length / 46))}
                       onChange={(e) => update(i, e.target.value)}
-                      className="min-w-0 flex-1 resize-none rounded-[6px] border border-transparent bg-transparent px-1.5 py-1 text-[12.5px] leading-5 text-[#d6d6d3] outline-none transition-colors hover:border-white/[0.1] focus:border-[#3b82f6]/60 focus:bg-white/[0.03]"
+                      className="min-w-0 flex-1 resize-none rounded-[6px] border border-transparent bg-transparent px-1.5 py-1 text-[12.5px] leading-5 text-soft-foreground outline-none transition-colors hover:border-border focus:border-primary/60 focus:bg-foreground/[0.03]"
                     />
                     <button
                       type="button"
                       aria-label={`Remove step ${i + 1}`}
                       onClick={() => setSteps((l) => l.filter((_, j) => j !== i))}
-                      className="mt-[5px] grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded-[4px] text-muted-foreground opacity-0 transition-opacity hover:bg-white/[0.08] hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                      className="mt-[5px] grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded-[4px] text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/[0.08] hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -89,7 +89,7 @@ function PlanEditor({ plan }: { plan: Plan }): React.JSX.Element {
         </section>
 
         {!approved && (
-          <section className="border-t border-white/[0.07] pt-3.5">
+          <section className="border-t border-border/50 pt-3.5">
             {asking ? (
               <div>
                 <textarea
@@ -104,7 +104,7 @@ function PlanEditor({ plan }: { plan: Plan }): React.JSX.Element {
                   }}
                   rows={3}
                   placeholder="What should be different?"
-                  className="w-full resize-none rounded-[8px] border border-white/[0.1] bg-transparent px-2.5 py-2 text-[12.5px] leading-5 outline-none placeholder:text-muted-foreground focus:border-[#3b82f6]/60"
+                  className="w-full resize-none rounded-[8px] border border-border bg-transparent px-2.5 py-2 text-[12.5px] leading-5 outline-none placeholder:text-muted-foreground focus:border-primary/60"
                 />
                 <div className="mt-2 flex justify-end gap-1.5">
                   <TabButton onClick={() => setAsking(false)}>Cancel</TabButton>
@@ -145,7 +145,7 @@ function HistoryDetail({ plan, onBack }: { plan: SavedPlan; onBack: () => void }
         <IconButton title="All plans" onClick={onBack}>
           <ArrowLeft className="h-3.5 w-3.5" />
         </IconButton>
-        <span className="min-w-0 flex-1 truncate text-[12.5px] text-[#ececea]">{plan.title}</span>
+        <span className="min-w-0 flex-1 text-[12px] text-muted-foreground">Saved plan</span>
         <IconButton
           title="Copy steps"
           onClick={() => {
@@ -166,33 +166,38 @@ function HistoryDetail({ plan, onBack }: { plan: SavedPlan; onBack: () => void }
         </IconButton>
       </TabToolbar>
       <div className="slim-scroll min-h-0 flex-1 overflow-y-auto">
-        <div className="space-y-4 p-4">
-          <div>
-            <p className="text-[12.5px] leading-5 text-muted-foreground">{plan.summary}</p>
-            <p className="mt-1 text-[11.5px] text-[#77776f]">
-              Made {formatDistanceToNow(plan.at, { addSuffix: true })}
+        <div className="space-y-5 p-4">
+          <header>
+            <h2 className="break-words text-[15px] font-medium leading-snug text-foreground">{plan.title}</h2>
+            <p className="mt-1 text-[11.5px] text-faint-foreground">
+              {plan.steps.length} {plan.steps.length === 1 ? 'step' : 'steps'} · made{' '}
+              {formatDistanceToNow(plan.at, { addSuffix: true })}
             </p>
-          </div>
-          <ol className="space-y-1.5">
-            {plan.steps.map((step, i) => (
-              <li key={i} className="flex items-start gap-2.5">
-                <span className="mt-[2px] grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/[0.07] text-[11px] tabular-nums text-[#c9c9c6]">
-                  {i + 1}
-                </span>
-                <span className="text-[12.5px] leading-5 text-[#d6d6d3]">{step}</span>
-              </li>
-            ))}
-          </ol>
-          <div className="border-t border-white/[0.07] pt-3.5">
+            {plan.summary && <p className="mt-2.5 text-[12.5px] leading-5 text-muted-foreground">{plan.summary}</p>}
+          </header>
+          <section>
+            <h3 className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.06em] text-faint-foreground">Steps</h3>
+            <ol className="divide-y divide-border/50 overflow-hidden rounded-[8px] border border-border">
+              {plan.steps.map((step, i) => (
+                <li key={i} className="flex items-start gap-3 px-3 py-2.5">
+                  <span className="mt-[1px] grid h-5 w-5 shrink-0 place-items-center rounded-full bg-foreground/[0.07] text-[11px] font-medium tabular-nums text-soft-foreground">
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 text-[12.5px] leading-5 text-soft-foreground">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+          <div>
             <TabButton
               tone="primary"
               disabled={running}
               onClick={() => ask(planPrompt(plan.steps))}
-              className="h-8 px-3.5"
+              className="h-8 w-full justify-center"
             >
               <Play className="h-3 w-3 fill-current" /> Run this plan again
             </TabButton>
-            <p className="mt-2.5 text-[11.5px] text-muted-foreground">
+            <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
               The AI starts on these steps right away, using your project as it is now.
             </p>
           </div>
@@ -218,15 +223,15 @@ function HistoryList({ onPick }: { onPick: (p: SavedPlan) => void }): React.JSX.
         {plans.map((p) => (
           <li
             key={p.key}
-            className="group flex items-center gap-1 rounded-[8px] border border-white/[0.08] transition-colors hover:border-white/[0.16] hover:bg-white/[0.04]"
+            className="group flex items-center gap-1 rounded-[8px] border border-border transition-colors hover:border-border-strong hover:bg-foreground/[0.04]"
           >
             <button
               type="button"
               onClick={() => onPick(p)}
               className="min-w-0 flex-1 cursor-pointer px-3 py-2 text-left"
             >
-              <span className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-[#ececea]">{p.title}</span>
+              <span className="flex items-start gap-2">
+                <span className="min-w-0 flex-1 break-words text-[12.5px] leading-5 text-foreground">{p.title}</span>
                 <Chip tone={p.state === 'approved' ? 'good' : 'neutral'}>
                   {p.state === 'approved' ? 'Approved' : 'Not started'}
                 </Chip>
@@ -296,7 +301,7 @@ export function PlanTab(): React.JSX.Element {
               onClick={() => setView(id)}
               className={cn(
                 'cursor-pointer rounded-[6px] px-2 py-0.5 text-[12px] transition-colors',
-                view === id ? 'bg-white/[0.09] text-[#ececea]' : 'text-muted-foreground hover:text-foreground'
+                view === id ? 'bg-foreground/[0.09] text-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               {label}

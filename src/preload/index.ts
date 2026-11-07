@@ -79,7 +79,26 @@ export interface AgentStart {
   connectors?: McpConfig[]
   skills?: SkillInput[]
   routines?: { title: string; cadence: string; time: string; enabled: boolean }[]
+  /** Memory is on for this chat. Leave it out for a fresh chat: no notes and no memory tools. */
+  memory?: { mode: 'ask' | 'auto' }
 }
+export interface MemoryNote {
+  id: string
+  text: string
+  date: string
+  pinned: boolean
+  chat?: string
+  stale: boolean
+}
+export interface MemoryView {
+  global: MemoryNote[]
+  project: MemoryNote[]
+  projects: { path: string; name: string; count: number; updated: string; preview: string }[]
+}
+export type MemoryImportResult =
+  | { ok: true; view: MemoryView; added: number; duplicates: number; rejected: { text: string; reason: string }[] }
+  | { ok: false; error: string }
+export type MemoryResult = { ok: true; view: MemoryView } | { ok: false; error: string }
 export interface QuestionOption {
   label: string
   description?: string
@@ -138,6 +157,8 @@ export interface BgJob {
   stopped: boolean
   output: string
 }
+export type OpenAction = { kind: 'folder'; path: string } | { kind: 'new-chat' } | { kind: 'new-project' } | { kind: 'settings' }
+
 export type AgentMessage = { runId: string } & (
   | {
       kind: 'evt'
@@ -146,6 +167,7 @@ export type AgentMessage = { runId: string } & (
         | { type: 'text'; delta: string }
         | { type: 'project'; name: string; path: string }
         | { type: 'usage'; tokens: number; detail: AgentUsage }
+        | { type: 'live'; tokens: number }
     }
   | {
       kind: 'ask'
@@ -190,6 +212,9 @@ function listen<T>(channel: string, cb: (payload: T) => void): () => void {
 
 const api = {
   platform: process.platform,
+  power: {
+    set: (prefs: { keepAwake: boolean; onBattery: boolean }): void => ipcRenderer.send('power:set', prefs)
+  },
   agent: {
     start: (payload: AgentStart): Promise<boolean> => ipcRenderer.invoke('agent:start', payload),
     abort: (runId: string): void => ipcRenderer.send('agent:abort', runId),
@@ -198,6 +223,7 @@ const api = {
     answer: (runId: string, id: string, answers: QuestionAnswer[] | null): void =>
       ipcRenderer.send('agent:answer', runId, id, answers),
     revert: (id: string): Promise<boolean> => ipcRenderer.invoke('agent:revert', id),
+    restore: (id: string): Promise<'restored' | 'changed' | 'none'> => ipcRenderer.invoke('agent:restore', id),
     keep: (id: string): void => ipcRenderer.send('agent:keep', id),
     jobs: (): Promise<BgJob[]> => ipcRenderer.invoke('agent:jobs'),
     stopJob: (id: string): Promise<boolean> => ipcRenderer.invoke('agent:stop-job', id),
@@ -211,12 +237,33 @@ const api = {
       ipcRenderer.invoke('agent:test-provider', check),
     onEvent: (cb: (m: AgentMessage) => void): (() => void) => listen('agent:event', cb)
   },
+  memory: {
+    list: (projectPath?: string): Promise<MemoryView> => ipcRenderer.invoke('memory:list', projectPath),
+    add: (scope: 'global' | 'project', projectPath: string | undefined, text: string, pinned = false): Promise<MemoryResult> => ipcRenderer.invoke('memory:add', scope, projectPath, text, pinned),
+    import: (projectPath: string | undefined, items: { scope: 'global' | 'project'; text: string }[]): Promise<MemoryImportResult> => ipcRenderer.invoke('memory:import', projectPath, items),
+    edit: (scope: 'global' | 'project', projectPath: string | undefined, id: string, patch: { text?: string; pinned?: boolean }): Promise<MemoryResult> => ipcRenderer.invoke('memory:edit', scope, projectPath, id, patch),
+    remove: (scope: 'global' | 'project', projectPath: string | undefined, id: string): Promise<MemoryResult> => ipcRenderer.invoke('memory:remove', scope, projectPath, id),
+    forgetChat: (chatId: string, projectPath?: string): Promise<number> => ipcRenderer.invoke('memory:forget-chat', chatId, projectPath),
+    clear: (scope: 'global' | 'project', projectPath?: string): Promise<MemoryResult> => ipcRenderer.invoke('memory:clear', scope, projectPath)
+  },
   browser: {
     /** Tell the main process which <webview> is the Browser tab, so the AI can drive it. */
     register: (webContentsId: number): void => ipcRenderer.send('browser:register', webContentsId),
+    /** Make the page see a dark or light system theme (or the real one with 'auto'). */
+    setColorScheme: (webContentsId: number, scheme: 'dark' | 'light' | 'auto'): void =>
+      ipcRenderer.send('browser:color-scheme', webContentsId, scheme),
     onAgent: (cb: (e: { id: number; active: boolean }) => void): (() => void) => listen('browser:agent', cb),
     /** The AI needs a Browser tab and none is open. */
     onOpen: (cb: () => void): (() => void) => listen('browser:open', cb)
+  },
+  window: {
+    /** Tell the window the narrowest its content may be for the layout in use, and optionally widen it to fit. */
+    fit: (minContentWidth: number, grow: boolean): Promise<{ contentWidth: number }> =>
+      ipcRenderer.invoke('window:fit', minContentWidth, grow)
+  },
+  notify: {
+    /** Show an operating-system notification; clicking it brings the window back. False when the system cannot. */
+    show: (title: string, body?: string): Promise<boolean> => ipcRenderer.invoke('notify:show', title, body ?? '')
   },
   background: {
     /** Is the window showing, and does it have focus? Routines wait politely while the person is using the app. */
@@ -243,7 +290,18 @@ const api = {
   showAppMenu: (x: number, y: number): void => ipcRenderer.send('app-menu:show', { x, y }),
   app: {
     info: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
-    setZoom: (factor: number): void => ipcRenderer.send('app:set-zoom', factor)
+    setZoom: (factor: number): void => ipcRenderer.send('app:set-zoom', factor),
+    /** What started or re-focused the app from outside: a folder (right-click → Open with MoreCode), or a jump list item. */
+    takePendingAction: (): Promise<OpenAction | null> => ipcRenderer.invoke('app:take-pending-action'),
+    onOpenAction: (cb: (action: OpenAction) => void): (() => void) => {
+      const handler = (_e: unknown, action: OpenAction): void => cb(action)
+      ipcRenderer.on('app:open-action', handler)
+      return () => ipcRenderer.removeListener('app:open-action', handler)
+    },
+    /** The projects shown under "Recent projects" in the taskbar and Start menu jump list. */
+    setRecentProjects: (list: { name: string; path: string }[]): void => ipcRenderer.send('app:set-recent-projects', list),
+    /** Tell the window about the theme's colours so the native title bar and window background match it. */
+    setTheme: (chrome: { background: string; symbol: string; dark: boolean; system: boolean }): void => ipcRenderer.send('app:set-theme', chrome)
   },
   workspace: {
     get: (): Promise<WorkspaceInfo> => ipcRenderer.invoke('workspace:get'),
@@ -266,7 +324,7 @@ const api = {
       path: string
     ): Promise<{ ok: true; dataUrl: string } | { ok: false; error: string }> =>
       ipcRenderer.invoke('workspace:read-image', path),
-    /** Read a binary project file (PDF, DOCX, XLSX, audio, video) as base64 for in-app preview. */
+    /** Read a binary project file (PDF, DOCX, XLSX, audio, video, CAD, 3D, archives, …) as base64 for in-app preview. */
     readBinary: (
       path: string
     ): Promise<{ ok: true; base64: string; mime: string } | { ok: false; error: string }> =>

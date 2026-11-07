@@ -37,8 +37,8 @@ export function Row({
       type="button"
       onClick={expandable ? onToggle : undefined}
       className={cn(
-        'group flex min-h-6 min-w-0 w-full items-center gap-2 rounded-[4px] px-1 py-0.5 text-left text-[12.5px] text-[#c9c9c6] [overflow-wrap:normal]',
-        expandable ? 'cursor-pointer hover:bg-white/[0.04]' : 'cursor-default'
+        'group flex min-h-6 min-w-0 w-full items-center gap-2 rounded-[4px] px-1 py-0.5 text-left text-[12.5px] text-soft-foreground [overflow-wrap:normal]',
+        expandable ? 'cursor-pointer hover:bg-foreground/[0.04]' : 'cursor-default'
       )}
     >
       {status === 'running' && <Spinner />}

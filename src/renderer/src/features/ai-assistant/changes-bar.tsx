@@ -30,7 +30,7 @@ export function ChangesBar({
       )}
     >
       <div className="flex items-center gap-2">
-        <span className="font-medium text-[#d6d6d3]">
+        <span className="font-medium text-soft-foreground">
           {files} {files === 1 ? 'file' : 'files'} changed
         </span>
         <span className="font-mono text-[10.5px] tabular-nums">

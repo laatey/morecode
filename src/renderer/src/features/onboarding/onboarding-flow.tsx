@@ -41,15 +41,15 @@ function Steps({ index }: { index: number }): React.JSX.Element {
           <span
             className={cn(
               'grid h-6 w-6 place-items-center rounded-full text-[12px] tabular-nums transition-colors',
-              i < index && 'bg-[#3fb950]/20 text-[#5fd17a]',
-              i === index && 'bg-[#3b82f6] text-white',
-              i > index && 'bg-white/[0.07] text-[#77776f]'
+              i < index && 'bg-success/20 text-success',
+              i === index && 'bg-primary text-primary-foreground',
+              i > index && 'bg-foreground/[0.07] text-faint-foreground'
             )}
           >
             {i < index ? <Check className="h-3 w-3 stroke-[3]" /> : i + 1}
           </span>
-          <span className={cn('text-[13px]', i === index ? 'text-[#ececea]' : 'text-[#77776f]')}>{label}</span>
-          {i < STEPS.length - 1 && <span className="h-px w-8 bg-white/[0.1]" />}
+          <span className={cn('text-[13px]', i === index ? 'text-foreground' : 'text-faint-foreground')}>{label}</span>
+          {i < STEPS.length - 1 && <span className="h-px w-8 bg-foreground/[0.1]" />}
         </li>
       ))}
     </ol>
@@ -85,20 +85,20 @@ function AboutYou({ onNext }: { onNext: () => void }): React.JSX.Element {
               aria-checked={level === l.id}
               onClick={() => setLevel(l.id)}
               className={cn(
-                'cursor-pointer rounded-[10px] border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]/50',
-                level === l.id ? 'border-[#3b82f6]/70 bg-[#3b82f6]/[0.08]' : 'border-white/[0.09] hover:border-white/[0.18] hover:bg-white/[0.04]'
+                'cursor-pointer rounded-[10px] border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                level === l.id ? 'border-primary/70 bg-primary/[0.08]' : 'border-border hover:border-border-strong hover:bg-foreground/[0.04]'
               )}
             >
-              <span className="block text-[13.5px] text-[#ececea]">{l.title}</span>
-              <span className="block text-[12.5px] text-[#8d8d8a]">{l.body}</span>
+              <span className="block text-[13.5px] text-foreground">{l.title}</span>
+              <span className="block text-[12.5px] text-muted-foreground">{l.body}</span>
             </button>
           ))}
         </div>
-        <div className="mt-3 rounded-[10px] bg-white/[0.04] p-3.5" aria-live="polite">
-          <p className="mb-1 flex items-center gap-1.5 text-[12px] text-[#77776f]">
+        <div className="mt-3 rounded-[10px] bg-foreground/[0.04] p-3.5" aria-live="polite">
+          <p className="mb-1 flex items-center gap-1.5 text-[12px] text-faint-foreground">
             <Code2 className="h-3.5 w-3.5" /> How the AI will explain a change
           </p>
-          <p className="text-[13.5px] leading-6 text-[#c9c9c6]">{sample}</p>
+          <p className="text-[13.5px] leading-6 text-soft-foreground">{sample}</p>
         </div>
       </section>
 
@@ -126,7 +126,7 @@ function ProjectStep({ onNext, onBack }: { onNext: () => void; onBack: () => voi
         }}
       />
       <div className="mt-6 flex items-center justify-between">
-        <TextLink className="inline-flex items-center gap-1.5 text-[13px] text-[#8d8d8a]" onClick={onBack}>
+        <TextLink className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground" onClick={onBack}>
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </TextLink>
         <TextLink className="text-[13px]" onClick={onNext}>
@@ -163,7 +163,7 @@ function PlanStep({ onBack }: { onBack: () => void }): React.JSX.Element {
         }}
       />
       <div className="mt-6">
-        <TextLink className="inline-flex items-center gap-1.5 text-[13px] text-[#8d8d8a]" onClick={onBack}>
+        <TextLink className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground" onClick={onBack}>
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </TextLink>
       </div>

@@ -16,10 +16,10 @@ const GROUPS: ShortcutGroup[] = ['General', 'Layout', 'Panels']
 
 function Keys({ combo }: { combo: string }): React.JSX.Element {
   return (
-    <span className="flex items-center gap-1.5 text-[12px] text-[#ececea]">
+    <span className="flex items-center gap-1.5 text-[12px] text-foreground">
       {comboParts(combo).map((k, i) => (
         <React.Fragment key={`${k}${i}`}>
-          {i > 0 && <span className="text-[#aaa9a5]">+</span>}
+          {i > 0 && <span className="text-muted-foreground">+</span>}
           <kbd className="font-sans">{k}</kbd>
         </React.Fragment>
       ))}
@@ -74,7 +74,7 @@ export function ShortcutsPage(): React.JSX.Element {
     <Page title="Keyboard shortcuts" description="Select a shortcut, then press the keys you want.">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#77776f]" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint-foreground" />
           <TextInput
             aria-label="Search shortcuts"
             placeholder="Search shortcuts"
@@ -109,7 +109,7 @@ export function ShortcutsPage(): React.JSX.Element {
                   key={s.id}
                   title={s.label}
                   description={
-                    error?.id === s.id ? <span className="text-[#f4a39e]">{error.text}</span> : undefined
+                    error?.id === s.id ? <span className="text-destructive">{error.text}</span> : undefined
                   }
                 >
                   {custom && !isEditing && (
@@ -120,7 +120,7 @@ export function ShortcutsPage(): React.JSX.Element {
                         delete next[s.id]
                         set({ shortcuts: next })
                       }}
-                      className="cursor-pointer text-[12.5px] text-[#7db1ff] hover:underline"
+                      className="cursor-pointer text-[12.5px] text-link hover:underline"
                     >
                       Reset
                     </button>
@@ -133,10 +133,10 @@ export function ShortcutsPage(): React.JSX.Element {
                       setEditing(isEditing ? null : s.id)
                     }}
                     className={cn(
-                      'flex h-7 min-w-[96px] cursor-pointer items-center justify-center rounded-[5px] bg-white/[0.1] px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6]/60',
+                      'flex h-7 min-w-[96px] cursor-pointer items-center justify-center rounded-[5px] bg-foreground/[0.1] px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60',
                       isEditing
-                        ? 'bg-[#3b82f6]/20 text-[12px] text-[#c6ddff]'
-                        : 'hover:bg-white/[0.16]'
+                        ? 'bg-primary/20 text-[12px] text-link'
+                        : 'hover:bg-foreground/[0.16]'
                     )}
                   >
                     {isEditing ? 'Press keys…' : <Keys combo={bindings[s.id]} />}
@@ -152,10 +152,10 @@ export function ShortcutsPage(): React.JSX.Element {
         <Group title="Always the same">
           {fixed.map((f) => (
             <Row key={f.label} title={f.label}>
-              <span className="flex items-center gap-1.5 text-[12px] text-[#ececea]">
+              <span className="flex items-center gap-1.5 text-[12px] text-foreground">
                 {f.keys.map((k, i) => (
                   <React.Fragment key={k}>
-                    {i > 0 && <span className="text-[#aaa9a5]">+</span>}
+                    {i > 0 && <span className="text-muted-foreground">+</span>}
                     <kbd className="font-sans">{k}</kbd>
                   </React.Fragment>
                 ))}
@@ -165,7 +165,7 @@ export function ShortcutsPage(): React.JSX.Element {
         </Group>
       )}
 
-      {none && <p className="text-[13px] text-[#8d8d8a]">No shortcuts match “{query}”.</p>}
+      {none && <p className="text-[13px] text-muted-foreground">No shortcuts match “{query}”.</p>}
     </Page>
   )
 }

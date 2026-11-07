@@ -44,7 +44,7 @@ interface Saved {
 
 export type WorkspaceDialog =
   | { kind: 'move'; chatId: string }
-  | { kind: 'new-project'; moveChatId?: string }
+  | { kind: 'new-project'; moveChatId?: string; /** Prefilled when a folder was opened from outside the app. */ folder?: string; name?: string }
   | { kind: 'rename-project'; id: string }
   | null
 
@@ -553,6 +553,45 @@ export function useWorkspace(): WorkspaceApi {
 
 /** The whole chat as Markdown, for copy and share. */
 // eslint-disable-next-line react-refresh/only-export-components
+/** Keeps pasted-in images and files readable: a long data URL becomes a short placeholder. */
+const debugJson = (value: unknown): string =>
+  JSON.stringify(
+    value,
+    (_key, v: unknown) => (typeof v === 'string' && v.startsWith('data:') && v.length > 200 ? `[data URL omitted, ${v.length} chars]` : v),
+    2
+  )
+
+/**
+ * Everything in a chat, for debugging: every message with its timing, every tool call with its full
+ * input and result as JSON, errors, summaries, and attachments. Nothing is trimmed except inline image data.
+ */
+export function chatToTranscript(title: string, list: Msg[]): string {
+  const blocks = list.map((m, i) => {
+    const head = `## ${i + 1}. ${m.role} (id: ${m.id})`
+    if (m.role === 'system') return `${head}\n\n${m.text}${m.summary ? `\n\n**Summary used for the AI:**\n\n${m.summary}` : ''}`
+    if (m.role === 'user') {
+      const extra = { shown: m.shown, images: m.images?.length, attachments: m.attachments }
+      return `${head}\n\n${m.text}\n\n\`\`\`json\n${debugJson(extra)}\n\`\`\``
+    }
+    const meta = {
+      running: m.running,
+      stopped: m.stopped,
+      startedAt: m.startedAt ? new Date(m.startedAt).toISOString() : undefined,
+      durationMs: m.durationMs,
+      tokens: m.tokens,
+      usage: m.usage,
+      feedback: m.feedback
+    }
+    const parts = m.parts.map((p, n) => {
+      if (p.type === 'text') return `### text ${n + 1}\n\n${p.text}`
+      if (p.type === 'tool') return `### tool ${n + 1}: ${p.tool.kind}\n\n\`\`\`json\n${debugJson(p.tool)}\n\`\`\``
+      return `### error ${n + 1}\n\n\`\`\`json\n${debugJson(p)}\n\`\`\``
+    })
+    return `${head}\n\n\`\`\`json\n${debugJson(meta)}\n\`\`\`\n\n${parts.join('\n\n')}`
+  })
+  return `# ${title} (full transcript)\n\nExported ${new Date().toISOString()}\n\n${blocks.join('\n\n---\n\n')}\n`
+}
+
 export function chatToMarkdown(title: string, list: Msg[]): string {
   const body = list
     .map((m) => {

@@ -1,19 +1,56 @@
 import React from 'react'
-import { Group, Page, Row, Segmented } from '../kit'
+import { Group, Page, Row, Segmented, Toggle } from '../kit'
+import { ThemeChooser } from '../theme-picker'
+import { getTheme } from '@/theme/themes'
 import { useSettings, type ContentWidth, type InterfaceSize } from '../settings-store'
 
 export function AppearancePage(): React.JSX.Element {
-  const { settings, set } = useSettings()
+  const { settings, set, activeThemeId } = useSettings()
   return (
     <Page title="Appearance" description="How MoreCode looks and moves.">
       <Group title="Theme">
-        <Row title="Color theme" description="Light and automatic themes are coming soon.">
-          <span className="text-[12px] text-[#c9c9c6]">Dark</span>
+        <Row
+          title="Match system"
+          description="Switch between a light and a dark theme with your operating system's appearance."
+        >
+          <Toggle
+            label="Match system appearance"
+            checked={settings.themeAuto}
+            onChange={(v) => set({ themeAuto: v })}
+          />
         </Row>
+        {settings.themeAuto ? (
+          <>
+            <ThemeChooser
+              title="Light theme"
+              description="Used when your system is in light mode."
+              side="light"
+              value={settings.themeLight}
+              onPick={(id) => set({ themeLight: id })}
+            />
+            <ThemeChooser
+              title="Dark theme"
+              description={`Used when your system is in dark mode. Now using ${getTheme(activeThemeId).label}.`}
+              side="dark"
+              value={settings.themeDark}
+              onPick={(id) => set({ themeDark: id })}
+            />
+          </>
+        ) : (
+          <ThemeChooser
+            title="Color theme"
+            description="The same themes VS Code ships with, plus MoreCode’s own."
+            value={settings.theme}
+            onPick={(id) => set({ theme: id })}
+          />
+        )}
       </Group>
 
       <Group title="Layout">
-        <Row title="Interface size" description="Makes text and controls across the whole app smaller or larger.">
+        <Row
+          title="Interface size"
+          description="Makes text and controls across the whole app smaller or larger."
+        >
           <Segmented<InterfaceSize>
             label="Interface size"
             value={settings.interfaceSize}
@@ -25,7 +62,10 @@ export function AppearancePage(): React.JSX.Element {
             ]}
           />
         </Row>
-        <Row title="Conversation width" description="How wide responses can grow. The composer stays compact.">
+        <Row
+          title="Conversation width"
+          description="How wide responses can grow. The composer stays compact."
+        >
           <Segmented<ContentWidth>
             label="Conversation width"
             value={settings.contentWidth}
@@ -40,7 +80,10 @@ export function AppearancePage(): React.JSX.Element {
       </Group>
 
       <Group title="Motion">
-        <Row title="Reduce motion" description="Turn off most animation, including the shimmer while the AI works.">
+        <Row
+          title="Reduce motion"
+          description="Turn off most animation, including the shimmer while the AI works."
+        >
           <Segmented<'system' | 'reduced'>
             label="Motion"
             value={settings.reduceMotion ? 'reduced' : 'system'}

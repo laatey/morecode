@@ -32,11 +32,11 @@ export class ErrorBoundary extends React.Component<Props, { failed: boolean }> {
     if (!this.state.failed) return this.props.children
     return (
       <div className={`flex ${this.props.reload ? 'h-screen' : 'h-full'} flex-col items-center justify-center gap-2 p-6 text-center`}>
-        <p className="text-[13px] text-[#ececea]">{this.props.label ?? 'This panel'} ran into a problem.</p>
+        <p className="text-[13px] text-foreground">{this.props.label ?? 'This panel'} ran into a problem.</p>
         <button
           type="button"
           onClick={() => (this.props.reload ? window.location.reload() : this.setState({ failed: false }))}
-          className="cursor-pointer rounded-[10px] border border-[#3b82f6]/60 bg-[#1d4ed8] px-3 py-1 text-[12px] text-white shadow-sm hover:bg-[#2563eb]"
+          className="cursor-pointer rounded-[10px] border border-primary/60 bg-primary px-3 py-1 text-[12px] text-primary-foreground shadow-sm hover:bg-primary/90"
         >
           {this.props.reload ? 'Reload' : 'Try again'}
         </button>

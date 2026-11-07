@@ -1,6 +1,5 @@
 import type { Account } from '@/features/auth/auth-service'
-import { dayKey } from '@/features/billing/usage'
-import { getPlan } from '@/features/billing/plans'
+import { LIMIT_LABEL, resetsIn, windowOf } from '@/features/billing/limits'
 import { cacheHitRate, getLastContext, summarize, type Totals } from '@/features/billing/usage-log'
 
 /** What the Usage and Context panels show, built from the real usage log and the account's plan. */
@@ -41,15 +40,6 @@ export const duration = (ms: number): string => {
   return m < 60 ? `${m}m ${s % 60}s` : `${Math.floor(m / 60)}h ${m % 60}m`
 }
 
-/** "Resets in 3 hr 12 min": time left until local midnight, when the daily count starts again. */
-function untilMidnight(now = new Date()): string {
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-  const mins = Math.max(1, Math.round((midnight.getTime() - now.getTime()) / 60_000))
-  return `Resets in ${Math.floor(mins / 60)} hr ${mins % 60} min`
-}
-
-const pct = (n: number, of: number): number => (of > 0 ? Math.min(100, Math.round((n / of) * 100)) : 0)
-
 export function getUsageSnapshot(account: Account | null, modelName: string): UsageSnapshot {
   const log = summarize(account?.id ?? 'guest')
   const s: Totals = log?.session ?? { requests: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, ms: 0 }
@@ -57,19 +47,13 @@ export function getUsageSnapshot(account: Account | null, modelName: string): Us
   let limits: PlanLimit[] = []
   let limitsNote: string | undefined
   if (account && !account.apiKey) {
-    const plan = getPlan(account.plan)
-    let week = 0
-    for (let i = 0; i < 7; i++) {
-      const d = new Date()
-      d.setDate(d.getDate() - i)
-      week += i === 0 ? account.sentToday : (account.usage?.[dayKey(d)] ?? 0)
-    }
-    limits = [
-      { id: 'today', label: 'Daily messages', percent: pct(account.sentToday, plan.dailyMessages), resets: untilMidnight() },
-      { id: 'week', label: 'Last 7 days', percent: pct(week, plan.dailyMessages * 7), resets: `${week} messages` }
-    ]
+    // the server counts both windows; with no server there is nothing to measure
+    limits = (['session', 'week'] as const).flatMap((kind) => {
+      const w = windowOf(account, kind)
+      return w ? [{ id: kind, label: LIMIT_LABEL[kind], percent: w.percent, resets: resetsIn(w.resetsAt) }] : []
+    })
   } else if (account) {
-    limitsNote = 'You are using your own API key, so there is no daily message limit. Your provider bills you directly.'
+    limitsNote = 'You are using your own API key, so there is no usage limit. Your provider bills you directly.'
   }
 
   const modelRequests = log?.byModel
@@ -82,7 +66,7 @@ export function getUsageSnapshot(account: Account | null, modelName: string): Us
     session: {
       requests: s.requests,
       apiTime: duration(s.ms),
-      activeTime: duration(Date.now() - (log?.sessionStart ?? Date.now())),
+      activeTime: duration(log.activeMs),
       added: log.edits.added,
       removed: log.edits.removed,
       modelName,
@@ -136,18 +120,18 @@ const TOOLS_TOKENS = 1500
 const REPLY_RESERVE = 8192
 
 /** How full the context window is. Total is what the API reported for the latest step. */
-export function getContextRows(): {
+export function getContextRows(chatId: string): {
   rows: ContextRow[]
   buffer: number
   used: number
   free: number
 } {
-  const total = getLastContext()
+  const total = getLastContext(chatId)
   const fixed = SYSTEM_PROMPT_TOKENS + TOOLS_TOKENS
   const rows: ContextRow[] = [
-    { id: 'messages', label: 'Messages', tokens: Math.max(0, total - fixed), color: 'bg-[#4f7fd9]' },
-    { id: 'system-tools', label: 'Tools', tokens: TOOLS_TOKENS, color: 'bg-[#6a97e6]' },
-    { id: 'system-prompt', label: 'Instructions', tokens: SYSTEM_PROMPT_TOKENS, color: 'bg-[#c9d8f8]' }
+    { id: 'messages', label: 'Messages', tokens: Math.max(0, total - fixed), color: 'bg-primary' },
+    { id: 'system-tools', label: 'Tools', tokens: TOOLS_TOKENS, color: 'bg-primary' },
+    { id: 'system-prompt', label: 'Instructions', tokens: SYSTEM_PROMPT_TOKENS, color: 'bg-primary' }
   ]
   const used = rows.reduce((n, r) => n + r.tokens, 0)
   return { rows, buffer: REPLY_RESERVE, used, free: Math.max(0, CONTEXT_WINDOW - used - REPLY_RESERVE) }

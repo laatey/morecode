@@ -40,37 +40,37 @@ function PlanCard({
   return (
     <div
       className={cn(
-        'flex flex-col overflow-hidden rounded-[16px] border bg-white/[0.02]',
-        featured ? 'border-white/[0.18]' : 'border-white/[0.1]'
+        'flex flex-col overflow-hidden rounded-[16px] border bg-foreground/[0.02]',
+        featured ? 'border-border-strong' : 'border-border'
       )}
     >
-      <div className="rounded-[15px] border-b border-white/[0.1] bg-white/[0.03] p-5 shadow-[0_6px_16px_rgba(0,0,0,0.28)]">
+      <div className="rounded-[15px] border-b border-border bg-foreground/[0.03] p-5 shadow-[0_6px_16px_rgba(0,0,0,0.28)]">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-display text-[20px] font-semibold tracking-tight text-[#ececea]">{plan.name}</h3>
+          <h3 className="font-display text-[20px] font-semibold tracking-tight text-foreground">{plan.name}</h3>
           {featured && (
-            <span className="rounded-full border border-white/[0.14] bg-white/[0.06] px-2.5 py-0.5 text-[11px] font-medium text-[#d4d4d0]">
+            <span className="rounded-full border border-border-strong bg-foreground/[0.06] px-2.5 py-0.5 text-[11px] font-medium text-soft-foreground">
               Popular
             </span>
           )}
         </div>
-        <p className="mt-1.5 min-h-[36px] text-[13px] leading-[1.45] text-[#c9c9c6]">{plan.tagline}</p>
+        <p className="mt-1.5 min-h-[36px] text-[13px] leading-[1.45] text-soft-foreground">{plan.tagline}</p>
 
         <div className="mt-4">
-          <div className="font-display text-[34px] font-semibold leading-none tracking-tight tabular-nums text-[#ececea]">
+          <div className="font-display text-[34px] font-semibold leading-none tracking-tight tabular-nums text-foreground">
             {money(price, cfg.currency)}
           </div>
-          <div className="mt-1.5 text-[12.5px] text-[#8d8d8a]">{price === 0 ? 'forever' : '/ month'}</div>
+          <div className="mt-1.5 text-[12.5px] text-muted-foreground">{price === 0 ? 'forever' : '/ month'}</div>
         </div>
 
-        <div className="mt-4 flex h-8 items-center justify-between rounded-[7px] border border-white/[0.12] bg-white/[0.04] px-3 text-[12.5px] font-medium text-[#e6e6e3]">
-          <span>{plan.dailyMessages.toLocaleString()} messages / day</span>
+        <div className="mt-4 flex h-8 items-center justify-between rounded-[7px] border border-border bg-foreground/[0.04] px-3 text-[12.5px] font-medium text-foreground">
+          <span>{plan.allowance}</span>
         </div>
 
         <button
           type="button"
           disabled={current || blocked}
           onClick={onChoose}
-          className="mt-3 h-9 w-full cursor-pointer rounded-[7px] border border-white/[0.14] bg-white/[0.05] px-3 text-[13px] font-medium text-[#ececea] transition-colors hover:border-white/[0.24] hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-45"
+          className="mt-3 h-9 w-full cursor-pointer rounded-[7px] border border-border-strong bg-foreground/[0.05] px-3 text-[13px] font-medium text-foreground transition-colors hover:border-border-strong hover:bg-foreground/[0.1] disabled:cursor-not-allowed disabled:opacity-45"
         >
           {current
             ? 'Your current plan'
@@ -82,17 +82,17 @@ function PlanCard({
         </button>
       </div>
 
-      <div className="px-5 py-3.5 text-[12.5px] font-medium text-[#d8d8d4]">
+      <div className="px-5 py-3.5 text-[12.5px] font-medium text-soft-foreground">
         <div className="flex items-center gap-2.5">
-          <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#8d8d8a]" />
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span>{highlights}</span>
         </div>
       </div>
 
-      <ul className="flex-1 space-y-2.5 border-t border-white/[0.07] px-5 py-4">
+      <ul className="flex-1 space-y-2.5 border-t border-border/50 px-5 py-4">
         {plan.perks.map((perk) => (
-          <li key={perk} className="flex items-start gap-2.5 text-[13px] font-medium leading-5 text-[#ececea]">
-            <Check className="mt-[3px] h-3.5 w-3.5 shrink-0 stroke-[2.2] text-[#b5b5b0]" />
+          <li key={perk} className="flex items-start gap-2.5 text-[13px] font-medium leading-5 text-foreground">
+            <Check className="mt-[3px] h-3.5 w-3.5 shrink-0 stroke-[2.2] text-muted-foreground" />
             <span>{perk}</span>
           </li>
         ))}
@@ -133,16 +133,16 @@ function Checkout({
   }
 
   const box =
-    'h-10 w-full rounded-[8px] border border-white/[0.1] bg-white/[0.04] px-3 text-[14px] outline-none placeholder:text-[#77776f] focus:border-[#3b82f6]/70'
+    'h-10 w-full rounded-[8px] border border-border bg-foreground/[0.04] px-3 text-[14px] outline-none placeholder:text-faint-foreground focus:border-primary/70'
   return (
     <form onSubmit={pay} className="mx-auto max-w-[380px] space-y-4">
       <div>
         <h3 className="font-display text-[18px] font-semibold">Start {plan.name}</h3>
-        <p className="mt-0.5 text-[13px] text-[#8d8d8a]">
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
           {money(price, cfg.currency)} a month{yearly ? `, billed yearly (${money(price * 12, cfg.currency)})` : ''}. Cancel any time.
         </p>
       </div>
-      <label className="block text-[13px] text-[#c9c9c6]">
+      <label className="block text-[13px] text-soft-foreground">
         Card number
         <input
           className={cn(box, 'mt-1.5')}
@@ -154,7 +154,7 @@ function Checkout({
         />
       </label>
       <div className="grid grid-cols-2 gap-3">
-        <label className="block text-[13px] text-[#c9c9c6]">
+        <label className="block text-[13px] text-soft-foreground">
           Expiry
           <input
             className={cn(box, 'mt-1.5')}
@@ -168,7 +168,7 @@ function Checkout({
             }}
           />
         </label>
-        <label className="block text-[13px] text-[#c9c9c6]">
+        <label className="block text-[13px] text-soft-foreground">
           Security code
           <input
             className={cn(box, 'mt-1.5')}
@@ -184,7 +184,7 @@ function Checkout({
       <Submit loading={busy}>
         <Lock className="h-3.5 w-3.5" /> Pay {money(price, cfg.currency)} and start
       </Submit>
-      <p className="text-center text-[12px] text-[#77776f]">
+      <p className="text-center text-[12px] text-faint-foreground">
         Demo checkout: nothing is charged. Only the card brand and last four digits are kept.{' '}
         <TextLink disabled={busy} onClick={onBack}>
           Choose a different plan
@@ -213,12 +213,12 @@ function ApiKeyBox({ onSaved }: { onSaved: (key: string) => void }): React.JSX.E
   }
 
   return (
-    <div className="rounded-[10px] border border-white/[0.08] bg-white/[0.025] px-4 py-3">
+    <div className="rounded-[10px] border border-border bg-foreground/[0.025] px-4 py-3">
       <div className="flex items-center gap-3">
-        <KeyRound className="h-4 w-4 shrink-0 text-[#8d8d8a]" />
+        <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] text-[#ececea]">Use your own API key</div>
-          <div className="text-[12px] leading-5 text-[#8d8d8a]">
+          <div className="text-[13px] text-foreground">Use your own API key</div>
+          <div className="text-[12px] leading-5 text-muted-foreground">
             Pay your provider directly and skip the daily message limit.
           </div>
         </div>
@@ -240,7 +240,7 @@ function ApiKeyBox({ onSaved }: { onSaved: (key: string) => void }): React.JSX.E
               aria-label="API key"
               placeholder="sk-…"
               onChange={(e) => setKey(e.target.value)}
-              className="h-8 min-w-0 flex-1 rounded-[8px] border border-white/[0.1] bg-white/[0.04] px-3 font-mono text-[12.5px] outline-none placeholder:text-[#77776f] focus:border-[#3b82f6]/70"
+              className="h-8 min-w-0 flex-1 rounded-[8px] border border-border bg-foreground/[0.04] px-3 font-mono text-[12.5px] outline-none placeholder:text-faint-foreground focus:border-primary/70"
             />
             <button type="submit" disabled={busy || !key.trim()} className={buttonVariants({ size: 'sm' })}>
               {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -248,11 +248,11 @@ function ApiKeyBox({ onSaved }: { onSaved: (key: string) => void }): React.JSX.E
             </button>
           </div>
           {error ? (
-            <p role="alert" className="text-[12px] text-[#f0746c]">
+            <p role="alert" className="text-[12px] text-destructive">
               {error}
             </p>
           ) : (
-            <p className="text-[12px] text-[#77776f]">Kept on this computer. You can remove it later.</p>
+            <p className="text-[12px] text-faint-foreground">Kept on this computer. You can remove it later.</p>
           )}
         </form>
       )}
@@ -282,7 +282,7 @@ export function PlanPicker({
   const [paying, setPaying] = useState<PlanId | null>(null)
   const { cfg, ready } = useBillingConfig()
 
-  if (!ready) return <p className="py-10 text-center text-[13px] text-[#8d8d8a]">Loading plans…</p>
+  if (!ready) return <p className="py-10 text-center text-[13px] text-muted-foreground">Loading plans…</p>
 
   if (paying) {
     return cfg.billing === 'paystack' ? (
@@ -304,7 +304,7 @@ export function PlanPicker({
     <div className="space-y-4">
       {!compact && (
       <div className="flex justify-center">
-        <div role="tablist" className="inline-flex rounded-[9px] bg-white/[0.06] p-0.5 text-[13px]">
+        <div role="tablist" className="inline-flex rounded-[9px] bg-foreground/[0.06] p-0.5 text-[13px]">
           {[
             [false, 'Monthly'],
             [true, saving > 0 ? `Yearly · save up to ${saving}%` : 'Yearly']
@@ -317,7 +317,7 @@ export function PlanPicker({
               onClick={() => setYearly(v as boolean)}
               className={cn(
                 'cursor-pointer rounded-[7px] px-3 py-1 transition-colors',
-                yearly === v ? 'bg-white/[0.12] text-[#ececea]' : 'text-[#8d8d8a] hover:text-[#ececea]'
+                yearly === v ? 'bg-foreground/[0.12] text-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               {label as string}
@@ -340,9 +340,9 @@ export function PlanPicker({
         ))}
       </div>
       {compact && !keyOpen ? (
-        <p className="text-center text-[12.5px] text-[#8d8d8a]">
+        <p className="text-center text-[12.5px] text-muted-foreground">
           Have your own API key?{' '}
-          <button type="button" onClick={() => setKeyOpen(true)} className="cursor-pointer text-[#7db1ff] hover:underline">
+          <button type="button" onClick={() => setKeyOpen(true)} className="cursor-pointer text-link hover:underline">
             Use it instead
           </button>
         </p>

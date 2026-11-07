@@ -21,10 +21,10 @@ test('Windows shows the whole path with backslashes', () => {
   assert.equal(promptPath('C:/Users/ama/app', 'win32'), 'C:\\Users\\ama\\app')
 })
 
-test('Mac and Linux show home as ~ and keep long paths short', () => {
+test('Mac and Linux show home as ~ and never cut a long path', () => {
   assert.equal(promptPath('/Users/ama', 'darwin'), '~')
   assert.equal(promptPath('/Users/ama/app', 'darwin'), '~/app')
-  assert.equal(promptPath('/home/ama/code/acme/web/src', 'linux'), '…/web/src')
+  assert.equal(promptPath('/home/ama/code/acme/web/src', 'linux'), '~/code/acme/web/src')
   assert.equal(promptPath('/srv/app', 'linux'), '/srv/app')
   assert.equal(promptPath('/Users/amanda', 'darwin'), '~')
 })

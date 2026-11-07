@@ -11,9 +11,9 @@ export interface HelperTask {
 }
 
 const STACK_STYLES = [
-  'mx-5 bg-[#323231] border-white/[0.1] z-[3]',
-  'mx-7 bg-[#2c2c2b] border-white/[0.09] z-[2]',
-  'mx-9 bg-[#262625] border-white/[0.08] z-[1]'
+  'mx-5 bg-secondary border-border z-[3]',
+  'mx-7 bg-muted border-border z-[2]',
+  'mx-9 bg-card border-border z-[1]'
 ] as const
 
 export function stackTabClass(stackIndex = 0): string {
@@ -68,24 +68,24 @@ export function BackgroundTasksBar({
           const isExpanded = expandedJob?.id === job.id
           const running = !job.exited
           return (
-            <li key={job.id} className="flex h-6 items-center gap-2 rounded-md px-1 hover:bg-white/[0.04]">
+            <li key={job.id} className="flex h-6 items-center gap-2 rounded-md px-1 hover:bg-foreground/[0.04]">
               <span
                 className={cn(
                   'h-1.5 w-1.5 shrink-0 rounded-full',
                   running
-                    ? 'animate-pulse bg-[#4cc38a]'
+                    ? 'animate-pulse bg-success'
                     : job.exitCode === 0
-                      ? 'bg-[#8e8e8a]'
+                      ? 'bg-muted-foreground'
                       : 'bg-[var(--diff-del)]'
                 )}
               />
-              <span className="shrink-0 rounded bg-white/[0.07] px-1 py-px font-mono text-[10px] text-[#a8a8a3]">
+              <span className="shrink-0 rounded bg-foreground/[0.07] px-1 py-px font-mono text-[10px] text-muted-foreground">
                 {job.id}
               </span>
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[#d6d6d3]" title={job.command}>
+              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-soft-foreground" title={job.command}>
                 {job.command}
               </span>
-              <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-[#8e8e8a]">
+              <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-muted-foreground">
                 {running
                   ? formatElapsed(job.startedAt, now)
                   : job.stopped
@@ -95,7 +95,7 @@ export function BackgroundTasksBar({
               <button
                 type="button"
                 onClick={() => setExpandedId(isExpanded ? null : job.id)}
-                className="inline-flex h-5 shrink-0 cursor-pointer items-center gap-0.5 rounded-[5px] px-1.5 text-[10.5px] text-[#a8a8a3] transition-colors hover:bg-white/[0.08] hover:text-white"
+                className="inline-flex h-5 shrink-0 cursor-pointer items-center gap-0.5 rounded-[5px] px-1.5 text-[10.5px] text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground"
               >
                 Output
                 <ChevronDown className={cn('h-3 w-3 transition-transform', isExpanded && 'rotate-180')} />
@@ -106,7 +106,7 @@ export function BackgroundTasksBar({
                   onClick={() => onStopJob(job.id)}
                   className={cn(
                     buttonVariants({ variant: 'ghost' }),
-                    'h-5 rounded-[5px] px-1.5 text-[10.5px] text-[#f29b96] hover:bg-white/[0.08] hover:text-[#ffb4b0]'
+                    'h-5 rounded-[5px] px-1.5 text-[10.5px] text-destructive hover:bg-foreground/[0.08] hover:text-destructive'
                   )}
                 >
                   Stop
@@ -117,7 +117,7 @@ export function BackgroundTasksBar({
                   title="Dismiss"
                   aria-label="Dismiss background task"
                   onClick={() => onDismissJob(job.id)}
-                  className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded text-[#8e8e8a] hover:bg-white/[0.08] hover:text-white"
+                  className="grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -128,14 +128,14 @@ export function BackgroundTasksBar({
 
         {helpers.map((h) => (
           <li key={h.id} className="flex h-6 items-center gap-2 rounded-md px-1">
-            <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[#6b9eff]" />
-            <span className="shrink-0 rounded bg-white/[0.07] px-1 py-px text-[10px] font-medium text-[#adc8ff]">
+            <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
+            <span className="shrink-0 rounded bg-foreground/[0.07] px-1 py-px text-[10px] font-medium text-link">
               Helper
             </span>
-            <span className="min-w-0 flex-1 truncate text-[11px] text-[#d6d6d3]" title={h.task}>
+            <span className="min-w-0 flex-1 truncate text-[11px] text-soft-foreground" title={h.task}>
               {h.task}
             </span>
-            <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-[#8e8e8a]">
+            <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-muted-foreground">
               {h.steps > 0 ? `Step ${h.steps}` : 'Starting…'}
             </span>
           </li>
@@ -143,8 +143,8 @@ export function BackgroundTasksBar({
       </ul>
 
       {expandedJob && (
-        <div className="mt-1.5 overflow-hidden rounded-[7px] border border-white/[0.08] bg-[#1b1b1a]">
-          <pre className="slim-scroll max-h-[110px] overflow-y-auto whitespace-pre-wrap break-all px-2.5 py-1.5 font-mono text-[10.5px] leading-4 text-[#c9c9c4]">
+        <div className="mt-1.5 overflow-hidden rounded-[7px] border border-border bg-inset">
+          <pre className="slim-scroll max-h-[110px] overflow-y-auto whitespace-pre-wrap break-all px-2.5 py-1.5 font-mono text-[10.5px] leading-4 text-soft-foreground">
             {expandedJob.output.trim() || '(no output yet)'}
           </pre>
         </div>

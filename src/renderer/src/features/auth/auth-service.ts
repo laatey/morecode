@@ -51,6 +51,13 @@ export interface Billing {
 
 export const EMPTY_BILLING: Billing = { card: null, yearly: false, renews: null, invoices: [] }
 
+export interface LimitWindow {
+  /** 0 to 100. */
+  percent: number
+  /** When the window resets, or null while it has not started. */
+  resetsAt: number | null
+}
+
 export interface Account {
   id: string
   name: string
@@ -67,6 +74,8 @@ export interface Account {
   apiKey: string | null
   /** Messages sent today on this plan, for the daily limit demo. */
   sentToday: number
+  /** How full the 5-hour and weekly usage windows are. Sent by the server; there is nothing to show without one. */
+  limits?: { session: LimitWindow; week: LimitWindow }
   /** Day (YYYY-MM-DD) that `sentToday` belongs to. */
   sentDate?: string
   /** Messages sent per day, for the usage history. */

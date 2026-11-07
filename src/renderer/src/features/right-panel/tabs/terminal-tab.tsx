@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Bot, Columns2, Eraser, Square, SquareTerminal } from '@/components/icons'
+import { Columns2, Eraser, Square, SquareTerminal } from '@/components/icons'
 import { IconButton } from '@/components/layout/icon-button'
-import { useChatInsights } from '@/features/ai-assistant/chat-context'
 import { useWorkspace } from '@/features/workspace/workspace-store'
 import { platform } from '@/lib/platform'
 import { cn } from '@/lib/utils'
@@ -18,44 +17,46 @@ import {
 } from '../terminal/terminal-store'
 import { useRightPanel } from '../store'
 import type { TabContentProps } from '../types'
-import { Chip, TabButton, TabEmpty, TabToolbar } from './tab-kit'
+import { TabButton, TabEmpty, TabToolbar } from './tab-kit'
 
-/** The start of a line, the way this computer's shell writes it: `C:\\app>` on Windows, `~/app %` on a Mac, `~/app $` on Linux. */
+/** The start of a line, the way this computer's shell writes it. A long path wraps onto the next line instead of being cut off. */
 function Prompt({ cwd, className }: { cwd: string | null; className?: string }): React.JSX.Element {
   return (
-    <span className={cn('inline-flex min-w-0 max-w-full items-baseline gap-1.5', className)}>
-      <span className="min-w-0 truncate text-[#6ea8fe]" title={cwd ?? undefined}>
-        {promptPath(cwd, platform)}
-      </span>
-      <span className="shrink-0 text-[#5fd17a]">{promptGlyph(platform)}</span>
+    <span className={cn('break-all', className)}>
+      <span className="text-link">{promptPath(cwd, platform)}</span>{' '}
+      <span className="text-success">{promptGlyph(platform)}</span>
     </span>
   )
 }
 
-function AiCommands(): React.JSX.Element {
-  const { commands } = useChatInsights()
-  if (!commands.length) {
+/** Every command typed in this terminal, newest first. Picking one puts it back at the prompt to edit or run again. */
+function History({ commands, onPick }: { commands: string[]; onPick: (command: string) => void }): React.JSX.Element {
+  const unique = [...new Set([...commands].reverse())]
+  if (!unique.length) {
     return (
-      <p className="px-4 py-8 text-center text-[12px] text-muted-foreground">
-        Checks and commands the AI runs for you will be listed here.
+      <p className="px-4 py-8 text-center text-[12px] leading-relaxed text-muted-foreground">
+        Commands you run in this terminal will be listed here.
       </p>
     )
   }
   return (
-    <div className="slim-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-3 font-mono text-[12px] leading-5">
-      {commands.map((c) => (
-        <div key={c.id}>
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-[#ececea]">
-              <span className="text-[#5fd17a]">{promptGlyph(platform)}</span> {c.command}
-            </span>
-            <Chip tone={c.status === 'done' ? 'good' : c.status === 'error' ? 'bad' : 'warn'}>
-              {c.status === 'done' ? 'Passed' : c.status === 'error' ? 'Failed' : 'Running'}
-            </Chip>
-          </div>
-          {c.output && <pre className="mt-0.5 whitespace-pre-wrap text-[#a9a9a6]">{c.output}</pre>}
-        </div>
-      ))}
+    <div className="slim-scroll min-h-0 flex-1 overflow-y-auto py-1.5">
+      <p className="px-3 pb-1.5 pt-1 text-[11.5px] text-muted-foreground">Click a command to bring it back to the prompt.</p>
+      <ul>
+        {unique.map((command) => (
+          <li key={command}>
+            <button
+              type="button"
+              onClick={() => onPick(command)}
+              title="Edit and run again"
+              className="flex w-full cursor-pointer items-start gap-2 px-3 py-1.5 text-left font-mono text-[12px] leading-5 text-soft-foreground transition-colors hover:bg-foreground/[0.05] focus-visible:bg-foreground/[0.05] focus-visible:outline-none"
+            >
+              <span className="shrink-0 text-success">{promptGlyph(platform)}</span>
+              <span className="min-w-0 flex-1 break-all">{command}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -66,7 +67,7 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
   const { splitTab } = useRightPanel()
   const ws = useWorkspace()
   const project = ws.groups.find((group) => group.id === ws.active.projectId)
-  const [view, setView] = useState<'shell' | 'ai'>('shell')
+  const [view, setView] = useState<'shell' | 'history'>('shell')
   const [input, setInput] = useState('')
   const [cursor, setCursor] = useState<number | null>(null) // position while walking through history
   const field = useRef<HTMLInputElement>(null)
@@ -117,13 +118,13 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#1f1f1e]">
+    <div className="flex h-full min-h-0 flex-col bg-inset">
       <TabToolbar className="py-1">
         <div className="flex items-center gap-0.5">
           {(
             [
               ['shell', 'Shell'],
-              ['ai', 'AI commands']
+              ['history', 'History']
             ] as const
           ).map(([id, label]) => (
             <button
@@ -132,10 +133,9 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
               onClick={() => setView(id)}
               className={cn(
                 'flex cursor-pointer items-center gap-1.5 rounded-[6px] px-2 py-0.5 text-[12px] transition-colors',
-                view === id ? 'bg-white/[0.09] text-[#ececea]' : 'text-muted-foreground hover:text-foreground'
+                view === id ? 'bg-foreground/[0.09] text-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {id === 'ai' && <Bot className="h-3 w-3" />}
               {label}
             </button>
           ))}
@@ -158,8 +158,15 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
         )}
       </TabToolbar>
 
-      {view === 'ai' ? (
-        <AiCommands />
+      {view === 'history' ? (
+        <History
+          commands={session.history}
+          onPick={(command) => {
+            setInput(command)
+            setCursor(null)
+            setView('shell')
+          }}
+        />
       ) : (
         <div
           ref={scroller}
@@ -170,14 +177,17 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
           className="slim-scroll min-h-0 flex-1 cursor-text select-text overflow-y-auto p-3 font-mono text-[12px] leading-5"
         >
           {session.entries.length === 0 && (
-            <p className="mb-2 font-sans text-[12px] text-muted-foreground">
-              Type a command and press Enter. Try <span className="font-mono text-[#d6d6d3]">{exampleCommand(platform)}</span>{' '}
-              or <span className="font-mono text-[#d6d6d3]">npm run lint</span>.
-            </p>
+            <div className="mb-3 font-sans text-[12px] leading-relaxed text-muted-foreground">
+              <p>
+                Type a command and press Enter. Try <span className="font-mono text-soft-foreground">{exampleCommand(platform)}</span>{' '}
+                or <span className="font-mono text-soft-foreground">npm run lint</span>.
+              </p>
+              <p className="mt-1 text-[11.5px] text-faint-foreground">Up and Down browse earlier commands · Ctrl+L clears · Ctrl+C stops</p>
+            </div>
           )}
           {session.entries.map((e) =>
             e.kind === 'cmd' ? (
-              <div key={e.id} className="mt-1.5 break-all text-[#ececea]">
+              <div key={e.id} className="mt-3 break-all text-foreground first:mt-0">
                 <Prompt cwd={e.cwd ?? null} /> {e.text}
               </div>
             ) : e.failed ? (
@@ -189,7 +199,7 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
                 key={e.id}
                 className={cn(
                   'whitespace-pre-wrap break-words font-mono',
-                  e.kind === 'err' ? 'text-[#f0a09a]' : e.kind === 'info' ? 'italic text-muted-foreground' : 'text-[#c9c9c6]'
+                  e.kind === 'err' ? 'text-destructive' : e.kind === 'info' ? 'italic text-muted-foreground' : 'text-soft-foreground'
                 )}
               >
                 <Ansi text={e.text} />
@@ -197,15 +207,21 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
             )
           )}
 
-          <div className="mt-1.5 flex items-center gap-2">
-            {!session.running && <Prompt cwd={session.cwd} className="max-w-[60%] shrink-0" />}
-            <input
+          <div className="mt-3">
+            {!session.running && (
+              <div className="break-all text-link" title={session.cwd ?? undefined}>
+                {promptPath(session.cwd, platform)}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              {!session.running && <span className="shrink-0 text-success">{promptGlyph(platform)}</span>}
+              <input
               ref={field}
               value={input}
               spellCheck={false}
               autoComplete="off"
               aria-label="Terminal input"
-              placeholder={session.running ? 'Type input for running command, or press Ctrl+C to stop…' : ''}
+              placeholder={session.running ? 'Input for the running command (Ctrl+C stops it)' : ''}
               onChange={(e) => {
                 setInput(e.target.value)
                 setCursor(null)
@@ -226,8 +242,9 @@ export function TerminalTab({ tabId }: TabContentProps): React.JSX.Element {
                   else setInput('')
                 }
               }}
-              className="min-w-0 flex-1 bg-transparent text-[#ececea] caret-[#ececea] outline-none placeholder:text-muted-foreground"
+              className="min-w-0 flex-1 bg-transparent text-foreground caret-foreground outline-none placeholder:text-muted-foreground"
             />
+            </div>
           </div>
         </div>
       )}

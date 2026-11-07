@@ -169,3 +169,12 @@ code {
     display: none;
   }
 }
+
+/* Layout changes: the sidebars glide open and shut. Only while the app itself changes the layout, never while dragging a handle. */
+@media (prefers-reduced-motion: no-preference) {
+  .layout-animating [data-panel] {
+    transition:
+      flex-grow 260ms cubic-bezier(0.22, 0.8, 0.24, 1),
+      flex-basis 260ms cubic-bezier(0.22, 0.8, 0.24, 1);
+  }
+}

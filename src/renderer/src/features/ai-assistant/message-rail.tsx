@@ -131,7 +131,7 @@ export function MessageRail({
                 className={cn(
                   'block h-[1.5px] w-[7px] origin-left rounded-full will-change-transform',
                   'transition-[transform,opacity,background-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
-                  isActive ? 'bg-white/90' : 'bg-white/30'
+                  isActive ? 'bg-foreground/90' : 'bg-foreground/30'
                 )}
               />
             </div>
@@ -139,11 +139,11 @@ export function MessageRail({
         })}
         {peek && hover !== null && (
           <div
-            className="pointer-events-none absolute left-full z-30 ml-4 w-[280px] -translate-y-1/2 animate-in fade-in-0 rounded-xl border border-white/[0.08] bg-[#2a2a29]/95 p-3 shadow-[0_12px_36px_rgba(0,0,0,0.5)] backdrop-blur"
+            className="pointer-events-none absolute left-full z-30 ml-4 w-[280px] -translate-y-1/2 animate-in fade-in-0 rounded-xl border border-border bg-muted/95 p-3 shadow-[0_12px_36px_rgba(0,0,0,0.5)] backdrop-blur"
             style={{ top: hover * ROW + ROW / 2 }}
           >
-            <p className="truncate text-[13px] font-semibold text-[#ececea]">{peek.title}</p>
-            {peek.body && <p className="mt-1 line-clamp-4 text-[12.5px] leading-5 text-[#a8a8a4]">{peek.body}</p>}
+            <p className="truncate text-[13px] font-semibold text-foreground">{peek.title}</p>
+            {peek.body && <p className="mt-1 line-clamp-4 text-[12.5px] leading-5 text-muted-foreground">{peek.body}</p>}
           </div>
         )}
       </div>

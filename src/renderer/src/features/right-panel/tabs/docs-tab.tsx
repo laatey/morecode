@@ -39,7 +39,7 @@ function Marked({ text, query }: { text: string; query: string }): React.JSX.Ele
     <>
       {parts.map((part, i) =>
         part.toLowerCase() === q.toLowerCase() ? (
-          <mark key={i} className="rounded-[2px] bg-[#e5a54b]/25 text-[#f1d9a8]">
+          <mark key={i} className="rounded-[2px] bg-warning/25 text-warning">
             {part}
           </mark>
         ) : (
@@ -125,9 +125,9 @@ function DocViewer({
         >
           <ArrowLeft className="h-3.5 w-3.5" />
         </IconButton>
-        <span className="min-w-0 flex-1 truncate text-[12.5px] text-[#ececea]">{doc.path}</span>
+        <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground">{doc.path}</span>
         {status && (
-          <span className={cn('shrink-0 text-[11.5px]', save === 'error' ? 'text-[#f0746c]' : 'text-muted-foreground')}>
+          <span className={cn('shrink-0 text-[11.5px]', save === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
             {status}
           </span>
         )}
@@ -149,7 +149,7 @@ function DocViewer({
       </TabToolbar>
 
       {error ? (
-        <p className="p-5 text-[12.5px] text-[#e8b365]">{error}</p>
+        <p className="p-5 text-[12.5px] text-warning">{error}</p>
       ) : text === null ? (
         <p className="p-5 text-[12px] text-muted-foreground">Opening…</p>
       ) : editing ? (
@@ -166,11 +166,11 @@ function DocViewer({
             }
           }}
           placeholder="Start writing. Markdown works: # for a heading, - for a list."
-          className="slim-scroll min-h-0 flex-1 resize-none bg-transparent px-5 py-4 font-mono text-[12.5px] leading-[20px] text-[#d6d6d3] outline-none placeholder:text-muted-foreground"
+          className="slim-scroll min-h-0 flex-1 resize-none bg-transparent px-5 py-4 font-mono text-[12.5px] leading-[20px] text-soft-foreground outline-none placeholder:text-muted-foreground"
         />
       ) : (
         <div className="slim-scroll min-h-0 flex-1 select-text overflow-y-auto">
-          <article className="mx-auto max-w-[680px] px-5 py-4 text-[13px] text-[#d6d6d3]">
+          <article className="mx-auto max-w-[680px] px-5 py-4 text-[13px] text-soft-foreground">
             {text.trim() ? (
               <Markdown text={text} />
             ) : (
@@ -207,8 +207,8 @@ function NewDoc({
   }
 
   return (
-    <div className="mx-1 mb-1.5 rounded-[8px] border border-white/[0.1] p-2.5">
-      <label className="mb-1 block text-[12px] text-[#a8a8a6]" htmlFor="new-doc-name">
+    <div className="mx-1 mb-1.5 rounded-[8px] border border-border p-2.5">
+      <label className="mb-1 block text-[12px] text-muted-foreground" htmlFor="new-doc-name">
         Name your doc
       </label>
       <input
@@ -225,10 +225,10 @@ function NewDoc({
         }}
         spellCheck={false}
         placeholder="notes, or docs/setup-guide"
-        className="h-7 w-full rounded-[6px] bg-white/[0.06] px-2 text-[12.5px] text-[#ececea] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-[#3b82f6]/60"
+        className="h-7 w-full rounded-[6px] bg-foreground/[0.06] px-2 text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/60"
       />
       {error ? (
-        <p className="mt-1.5 text-[11.5px] text-[#e8b365]">{error}</p>
+        <p className="mt-1.5 text-[11.5px] text-warning">{error}</p>
       ) : (
         <p className="mt-1.5 text-[11.5px] text-muted-foreground">
           It is saved as a .md file in your project. Add a folder name to put it in a subfolder.
@@ -372,7 +372,7 @@ export function DocsTab(): React.JSX.Element {
           type="button"
           onClick={() => void chooseFolder()}
           title="Choose a different folder"
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left text-[12.5px] text-[#ececea] transition-colors hover:bg-white/[0.06]"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left text-[12.5px] text-foreground transition-colors hover:bg-foreground/[0.06]"
         >
           <FolderOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate">{workspace?.name ?? 'Project'}</span>
@@ -386,14 +386,14 @@ export function DocsTab(): React.JSX.Element {
       </TabToolbar>
 
       <div className="shrink-0 px-3 pb-1 pt-2.5">
-        <label className="flex h-7 items-center gap-2 rounded-[7px] bg-white/[0.06] px-2.5 text-[12px] focus-within:ring-1 focus-within:ring-[#3b82f6]/60">
+        <label className="flex h-7 items-center gap-2 rounded-[7px] bg-foreground/[0.06] px-2.5 text-[12px] focus-within:ring-1 focus-within:ring-primary/60">
           <Search className="h-3 w-3 shrink-0 text-muted-foreground" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search names and contents"
             aria-label="Search docs"
-            className="min-w-0 flex-1 bg-transparent text-[#ececea] outline-none placeholder:text-muted-foreground"
+            className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
           />
         </label>
       </div>
@@ -429,10 +429,10 @@ export function DocsTab(): React.JSX.Element {
                     type="button"
                     disabled={!doc}
                     onClick={() => doc && setOpen({ doc, edit: false })}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-[6px] px-2 py-1 text-left transition-colors hover:bg-white/[0.06]"
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-[6px] px-2 py-1 text-left transition-colors hover:bg-foreground/[0.06]"
                   >
-                    <FileText className="h-3.5 w-3.5 shrink-0 stroke-[1.6] text-[#a8a8a6]" />
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-[#ececea]">
+                    <FileText className="h-3.5 w-3.5 shrink-0 stroke-[1.6] text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground">
                       <Marked text={path} query={q} />
                     </span>
                   </button>
@@ -443,12 +443,12 @@ export function DocsTab(): React.JSX.Element {
                         key={`${h.path}:${h.line}`}
                         type="button"
                         onClick={() => doc && setOpen({ doc, edit: false })}
-                        className="flex w-full cursor-pointer items-baseline gap-2 rounded-[6px] py-1 pl-8 pr-2 text-left transition-colors hover:bg-white/[0.05]"
+                        className="flex w-full cursor-pointer items-baseline gap-2 rounded-[6px] py-1 pl-8 pr-2 text-left transition-colors hover:bg-foreground/[0.05]"
                       >
-                        <span className="w-6 shrink-0 text-right text-[11px] tabular-nums text-[#77776f]">
+                        <span className="w-6 shrink-0 text-right text-[11px] tabular-nums text-faint-foreground">
                           {h.line}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-[12px] text-[#a8a8a6]">
+                        <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
                           <Marked text={h.text} query={q} />
                         </span>
                       </button>
@@ -476,16 +476,16 @@ export function DocsTab(): React.JSX.Element {
         ) : (
           groups.map(([dir, items]) => (
             <section key={dir || '.'} className="mt-2">
-              <h3 className="px-2 pb-1 text-[11.5px] font-medium text-[#77776f]">{dir || 'Project'}</h3>
+              <h3 className="px-2 pb-1 text-[11.5px] font-medium text-faint-foreground">{dir || 'Project'}</h3>
               {items.map((d) => (
                 <button
                   key={d.path}
                   type="button"
                   onClick={() => setOpen({ doc: d, edit: false })}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 text-left transition-colors hover:bg-white/[0.06]"
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 text-left transition-colors hover:bg-foreground/[0.06]"
                 >
-                  <FileText className="h-3.5 w-3.5 shrink-0 stroke-[1.6] text-[#a8a8a6]" />
-                  <span className="min-w-0 flex-1 truncate text-[12.5px] text-[#ececea]">
+                  <FileText className="h-3.5 w-3.5 shrink-0 stroke-[1.6] text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground">
                     {title(d.name)}
                   </span>
                   <span className="shrink-0 text-[11px] text-muted-foreground">

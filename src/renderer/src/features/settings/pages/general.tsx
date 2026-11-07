@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/auth-store'
 import { getPlan } from '@/features/billing/plans'
 import { isMac } from '@/lib/platform'
-import { Btn, Group, Page, Row, Segmented, TextInput } from '../kit'
+import { Btn, Group, Page, Row, Segmented, TextInput, Toggle } from '../kit'
 import { useSettings } from '../settings-store'
 
 export function GeneralPage(): React.JSX.Element {
@@ -41,13 +41,13 @@ export function GeneralPage(): React.JSX.Element {
           )}
         </Row>
         <Row title="Email" description={`Signed in with ${via}.`}>
-          <span className="text-[12px] text-[#c9c9c6]">{account.email}</span>
+          <span className="text-[12px] text-soft-foreground">{account.email}</span>
         </Row>
         <Row
           title="Plan"
-          description={account.apiKey ? 'You are using your own API key.' : `${getPlan(account.plan).dailyMessages} messages a day.`}
+          description={account.apiKey ? 'You are using your own API key.' : `${getPlan(account.plan).allowance}: a 5-hour and a weekly limit.`}
         >
-          <span className="text-[12px] text-[#c9c9c6]">{getPlan(account.plan).name}</span>
+          <span className="text-[12px] text-soft-foreground">{getPlan(account.plan).name}</span>
           <Btn onClick={() => setTab('billing')}>Manage</Btn>
         </Row>
       </Group>
@@ -57,7 +57,7 @@ export function GeneralPage(): React.JSX.Element {
           title="Project folder"
           description={account.project?.path || 'No folder chosen yet.'}
         >
-          <span className="max-w-[140px] truncate text-[12px] text-[#c9c9c6]">{account.project?.name}</span>
+          <span className="max-w-[140px] truncate text-[12px] text-soft-foreground">{account.project?.name}</span>
           {window.api?.workspace && (
             <Btn
               onClick={() => {
@@ -89,6 +89,23 @@ export function GeneralPage(): React.JSX.Element {
               { value: 'enter', label: 'Enter' },
               { value: 'mod-enter', label: isMac ? '⌘ Enter' : 'Ctrl Enter' }
             ]}
+          />
+        </Row>
+      </Group>
+
+      <Group title="Power">
+        <Row
+          title="Keep computer awake while the AI works"
+          description="Stops your computer going to sleep while a task is running, so long tasks can finish. Your screen can still turn off. Closing the laptop lid will still put it to sleep."
+        >
+          <Toggle label="Keep computer awake while the AI works" checked={settings.keepAwake} onChange={(v) => set({ keepAwake: v })} />
+        </Row>
+        <Row title="Keep awake on battery power" description="Also do this when your laptop is not plugged in. Off by default to save battery.">
+          <Toggle
+            label="Keep awake on battery power"
+            checked={settings.keepAwakeOnBattery}
+            disabled={!settings.keepAwake}
+            onChange={(v) => set({ keepAwakeOnBattery: v })}
           />
         </Row>
       </Group>

@@ -19,21 +19,21 @@ export function HelpPanel({ onClose }: { onClose: () => void }): React.JSX.Eleme
   ]
   return (
     <PanelFrame title="Help" onClose={onClose} width={460}>
-      <p className="mb-3 text-[12.5px] leading-5 text-[#8d8d8a]">
-        Type <span className="text-[#d6d6d3]">/</span> in the message box to run a command.
+      <p className="mb-3 text-[12.5px] leading-5 text-muted-foreground">
+        Type <span className="text-soft-foreground">/</span> in the message box to run a command.
       </p>
 
       <div className="space-y-3.5">
         {GROUP_ORDER.filter((g) => commands.some((c) => c.group === g)).map((g) => (
           <section key={g}>
-            <h3 className="mb-1 text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#77776f]">
+            <h3 className="mb-1 text-[10.5px] font-medium uppercase tracking-[0.06em] text-faint-foreground">
               {g}
             </h3>
             <ul className="space-y-1">
               {commands.filter((c) => c.group === g).map((c) => (
                 <li key={c.id} className="flex gap-3 text-[12.5px]">
-                  <span className="w-[92px] shrink-0 font-medium text-[#d6d6d3]">/{c.id}</span>
-                  <span className="text-[#8d8d8a]">{c.description}</span>
+                  <span className="w-[92px] shrink-0 font-medium text-soft-foreground">/{c.id}</span>
+                  <span className="text-muted-foreground">{c.description}</span>
                 </li>
               ))}
             </ul>
@@ -41,16 +41,16 @@ export function HelpPanel({ onClose }: { onClose: () => void }): React.JSX.Eleme
         ))}
       </div>
 
-      <section className="mt-4 border-t border-white/[0.07] pt-3.5">
+      <section className="mt-4 border-t border-border/50 pt-3.5">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#77776f]">Keyboard</h3>
+          <h3 className="text-[10.5px] font-medium uppercase tracking-[0.06em] text-faint-foreground">Keyboard</h3>
           <button
             type="button"
             onClick={() => {
               onClose()
               openSettings('shortcuts')
             }}
-            className="cursor-pointer text-[12px] text-[#7db1ff] hover:underline"
+            className="cursor-pointer text-[12px] text-link hover:underline"
           >
             See all and change
           </button>
@@ -58,7 +58,7 @@ export function HelpPanel({ onClose }: { onClose: () => void }): React.JSX.Eleme
         <ul className="space-y-1.5">
           {rows.map((s) => (
             <li key={s.label} className="flex items-center justify-between text-[12.5px]">
-              <span className="text-[#8d8d8a]">{s.label}</span>
+              <span className="text-muted-foreground">{s.label}</span>
               <span className="flex items-center gap-1">
                 {s.keys.map((k, i) => (
                   <KeyChip key={`${k}${i}`}>{k}</KeyChip>
@@ -69,8 +69,8 @@ export function HelpPanel({ onClose }: { onClose: () => void }): React.JSX.Eleme
         </ul>
       </section>
 
-      <div className="mt-4 flex items-center justify-between border-t border-white/[0.07] pt-3.5 text-[12.5px]">
-        <span className="text-[#8d8d8a]">New here?</span>
+      <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3.5 text-[12.5px]">
+        <span className="text-muted-foreground">New here?</span>
         <button
           type="button"
           onClick={() => {

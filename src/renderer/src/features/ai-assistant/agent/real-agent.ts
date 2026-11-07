@@ -27,6 +27,8 @@ export interface RealConfig {
   skills?: () => NonNullable<Parameters<Window['api']['agent']['start']>[0]['skills']>
   /** The routines already scheduled, so the AI does not propose a repeat. */
   routines?: () => NonNullable<Parameters<Window['api']['agent']['start']>[0]['routines']>
+  /** Memory for this chat; undefined when it is off (a fresh chat, or turned off in settings). */
+  memory?: () => { mode: 'ask' | 'auto' } | undefined
 }
 
 /**
@@ -94,7 +96,8 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         style: cfg.style,
         connectors: cfg.connectors?.(),
         skills: cfg.skills?.(),
-        routines: cfg.routines?.()
+        routines: cfg.routines?.(),
+        memory: cfg.memory?.()
       })
       if (!started) throw new AgentError('failed', 'Could not start the AI. Please try again.')
 
@@ -110,6 +113,7 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         }
         if (e.type === 'tool') yield { type: 'tool', tool: e.tool as unknown as ToolBlock }
         else if (e.type === 'text') yield { type: 'text', delta: e.delta }
+        else if (e.type === 'live') yield { type: 'live', tokens: e.tokens }
         else if (e.type === 'project') {
           window.dispatchEvent(
             new CustomEvent('workspace:project-created', { detail: { name: e.name, path: e.path } })
@@ -117,7 +121,7 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         }
         else {
           cfg.onUsage(e.detail)
-          yield { type: 'usage', tokens: e.tokens }
+          yield { type: 'usage', tokens: e.detail.output, detail: { input: e.detail.input, output: e.detail.output, cacheRead: e.detail.cacheRead, cacheWrite: e.detail.cacheWrite } }
         }
       }
     } finally {

@@ -24,6 +24,7 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --font-display: var(--font-display-family);
+  --font-hero: var(--font-hero-family);
   --font-sans: var(--font-sans-family);
   --font-mono: var(--font-mono-family);
   --color-background: var(--background);
@@ -65,93 +66,44 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-soft-foreground: var(--soft-foreground);
+  --color-faint-foreground: var(--faint-foreground);
+  --color-inset: var(--inset);
+  --color-border-strong: var(--border-strong);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-link: var(--link);
+  --color-scrim: var(--scrim);
+  --color-scrim-foreground: var(--scrim-foreground);
+  --color-selection: var(--selection);
+  --color-terminal: var(--terminal-bg);
+  --color-terminal-foreground: var(--terminal-fg);
+  --color-diff-add: var(--diff-add);
+  --color-diff-del: var(--diff-del);
+  --color-diff-mod: var(--diff-mod);
+  --color-diff-add-bg: var(--diff-add-bg);
+  --color-diff-del-bg: var(--diff-del-bg);
 }
 
 :root {
   --radius: 0.75rem;
   --font-display-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-hero-family: 'Instrument Serif', ui-serif, Georgia, 'Times New Roman', serif;
   --font-sans-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono-family: 'JetBrains Mono', ui-monospace, monospace;
 
-  --background: oklch(0.982 0.008 92);
-  --foreground: oklch(0.19 0.012 264);
-  --surface: oklch(0.955 0.01 92);
-  --card: oklch(0.995 0.004 92);
-  --card-foreground: oklch(0.19 0.012 264);
-  --popover: oklch(0.995 0.004 92);
-  --popover-foreground: oklch(0.19 0.012 264);
-  --primary: oklch(0.52 0.21 262);
-  --primary-foreground: oklch(0.99 0.004 92);
-  --secondary: oklch(0.94 0.012 92);
-  --secondary-foreground: oklch(0.23 0.012 264);
-  --muted: oklch(0.945 0.01 92);
-  --muted-foreground: oklch(0.5 0.016 264);
-  --accent: oklch(0.93 0.03 262);
-  --accent-foreground: oklch(0.32 0.12 262);
-  --destructive: oklch(0.58 0.22 25);
-  --destructive-foreground: oklch(0.99 0.004 92);
-  --border: oklch(0.89 0.012 92);
-  --input: oklch(0.89 0.012 92);
-  --ring: oklch(0.52 0.21 262);
-  --score: oklch(0.72 0.19 142);
-  --score-foreground: oklch(0.19 0.012 264);
-  --score-mid: oklch(0.8 0.16 85);
-  --score-low: oklch(0.65 0.18 30);
-  --grid: oklch(0.89 0.012 92);
-  --chart-1: oklch(0.52 0.21 262);
-  --chart-2: oklch(0.72 0.19 142);
-  --chart-3: oklch(0.8 0.16 85);
-  --chart-4: oklch(0.65 0.18 30);
-  --chart-5: oklch(0.45 0.05 264);
-  --sidebar: oklch(0.965 0.01 92);
-  --sidebar-foreground: oklch(0.19 0.012 264);
-  --sidebar-primary: oklch(0.52 0.21 262);
-  --sidebar-primary-foreground: oklch(0.99 0.004 92);
-  --sidebar-accent: oklch(0.93 0.03 262);
-  --sidebar-accent-foreground: oklch(0.32 0.12 262);
-  --sidebar-border: oklch(0.89 0.012 92);
-  --sidebar-ring: oklch(0.52 0.21 262);
-}
-
-.dark {
+  /*
+   * Colours are not defined here. The theme engine (src/renderer/src/theme) sets every colour token on :root
+   * before the first frame, from the theme the person picked in Settings → Appearance. These two are only a
+   * safety net so an unthemed page is readable.
+   */
   --background: #272726;
-  --foreground: oklch(0.965 0.006 92);
-  --surface: #272726;
-  --card: oklch(0.225 0.001 106);
-  --card-foreground: oklch(0.965 0.006 92);
-  --popover: oklch(0.225 0.001 106);
-  --popover-foreground: oklch(0.965 0.006 92);
-  --primary: oklch(0.65 0.19 262);
-  --primary-foreground: oklch(0.15 0.012 264);
-  --secondary: oklch(0.255 0.001 106);
-  --secondary-foreground: oklch(0.955 0.006 92);
-  --muted: oklch(0.248 0.001 106);
-  --muted-foreground: oklch(0.7 0.003 106);
-  --accent: oklch(0.31 0.002 106);
-  --accent-foreground: oklch(0.94 0.003 106);
-  --destructive: oklch(0.68 0.2 25);
-  --destructive-foreground: oklch(0.15 0.012 264);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.65 0.19 262);
-  --score: oklch(0.78 0.19 145);
-  --score-foreground: oklch(0.16 0.012 264);
-  --score-mid: oklch(0.83 0.16 85);
-  --score-low: oklch(0.7 0.18 30);
-  --grid: oklch(1 0 0 / 8%);
-  --chart-1: oklch(0.65 0.19 262);
-  --chart-2: oklch(0.78 0.19 145);
-  --chart-3: oklch(0.83 0.16 85);
-  --chart-4: oklch(0.7 0.18 30);
-  --chart-5: oklch(0.75 0.003 106);
-  --sidebar: oklch(0.205 0.001 106);
-  --sidebar-foreground: oklch(0.965 0.006 92);
-  --sidebar-primary: oklch(0.65 0.19 262);
-  --sidebar-primary-foreground: oklch(0.15 0.012 264);
-  --sidebar-accent: oklch(0.31 0.002 106);
-  --sidebar-accent-foreground: oklch(0.94 0.003 106);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.65 0.19 262);
+  --foreground: #ececea;
+  color-scheme: dark;
 }
 
 @layer base {
@@ -222,6 +174,10 @@
   ::-webkit-scrollbar-thumb:hover,
   *::-webkit-scrollbar-thumb:hover {
     background-color: var(--color-foreground);
+  }
+
+  ::selection {
+    background: var(--selection);
   }
 
   h1,
@@ -344,20 +300,9 @@
   border-right: 2px solid;
 }
 
-/* Printed red sun disc (hinomaru) behind the hero wordmark. */
-.sun-disc {
-  background: radial-gradient(circle at 50% 40%, #d8503a 0%, #c23a28 55%, #a52c1d 100%);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
-  opacity: 0.95;
-}
-
-/* Ink captions sitting directly on the ukiyo-e plate. */
-.plate-note {
-  color: #241d12;
-}
-
-/* Prevent iOS Safari from auto-zooming on focus when font-size < 16px */
-@media screen and (max-width: 768px) {
+/* Prevent iOS Safari from auto-zooming on focus when font-size < 16px.
+   Touch screens only: a narrow desktop window must keep the 12-13px sizes. */
+@media screen and (max-width: 768px) and (pointer: coarse) {
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
       [type='button']
     ):not([type='submit']):not([type='reset']),
@@ -368,68 +313,52 @@
   }
 }
 
-/* Diff colours for the change review. */
-:root {
-  --diff-add: oklch(0.55 0.15 150);
-  --diff-del: oklch(0.58 0.2 25);
-}
-.dark {
-  --diff-add: oklch(0.74 0.15 150);
-  --diff-del: oklch(0.7 0.17 25);
-}
-
-/* Syntax colours for code in the change review (light and dark). */
-:root {
-  --syn-keyword: oklch(0.5 0.2 20);
-  --syn-string: oklch(0.45 0.12 250);
-  --syn-number: oklch(0.5 0.14 60);
-  --syn-title: oklch(0.45 0.18 300);
-  --syn-comment: oklch(0.55 0.02 260);
-  --syn-attr: oklch(0.45 0.13 200);
-  --syn-meta: oklch(0.5 0.16 150);
-}
-.dark {
-  --syn-keyword: oklch(0.72 0.17 20);
-  --syn-string: oklch(0.8 0.09 240);
-  --syn-number: oklch(0.8 0.13 70);
-  --syn-title: oklch(0.78 0.14 300);
-  --syn-comment: oklch(0.62 0.02 260);
-  --syn-attr: oklch(0.78 0.11 200);
-  --syn-meta: oklch(0.78 0.14 150);
-}
+/* Syntax and diff colours come from the theme's --syn-* and --diff-* tokens. */
 .hljs-keyword,
 .hljs-selector-tag,
-.hljs-literal,
-.hljs-doctag,
-.hljs-built_in,
-.hljs-type {
+.hljs-doctag {
   color: var(--syn-keyword);
 }
+.hljs-literal {
+  color: var(--syn-constant);
+}
+.hljs-built_in,
+.hljs-type {
+  color: var(--syn-type);
+}
 .hljs-string,
-.hljs-regexp,
 .hljs-template-variable,
 .hljs-symbol {
   color: var(--syn-string);
 }
+.hljs-regexp {
+  color: var(--syn-regexp);
+}
 .hljs-number,
-.hljs-variable,
 .hljs-bullet {
   color: var(--syn-number);
 }
+.hljs-variable,
+.hljs-params {
+  color: var(--syn-variable);
+}
 .hljs-title,
-.hljs-title.class_,
 .hljs-title.function_,
 .hljs-section,
-.hljs-selector-id,
-.hljs-selector-class {
+.hljs-selector-id {
   color: var(--syn-title);
+}
+.hljs-title.class_,
+.hljs-selector-class {
+  color: var(--syn-type);
 }
 .hljs-attr,
 .hljs-attribute,
-.hljs-property,
-.hljs-name,
-.hljs-params {
+.hljs-property {
   color: var(--syn-attr);
+}
+.hljs-name {
+  color: var(--syn-tag);
 }
 .hljs-meta,
 .hljs-link,
@@ -498,7 +427,7 @@
   }
 }
 .text-shimmer {
-  background: linear-gradient(90deg, #8d8d8a 35%, #e8e8e6 50%, #8d8d8a 65%) 120% 0 / 250% 100%;
+  background: linear-gradient(90deg, var(--muted-foreground) 35%, var(--foreground) 50%, var(--muted-foreground) 65%) 120% 0 / 250% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -511,41 +440,81 @@
     animation: none;
   }
   .text-shimmer {
-    color: #8d8d8a;
+    color: var(--muted-foreground);
     background: none;
   }
 }
 
 /* Terminal and diff scrollbars: slim, only as visible as they need to be. */
 .slim-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.14);
+  background-color: color-mix(in oklab, var(--foreground) 16%, transparent);
 }
 .slim-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.28);
+  background-color: color-mix(in oklab, var(--foreground) 32%, transparent);
 }
 @supports not selector(::-webkit-scrollbar) {
   .slim-scroll {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 16%, transparent) transparent;
   }
 }
 
-/* Pierre renders the code and syntax tokens; these app tokens keep it in MoreCode's visual system. */
+/* Pierre renders the code; its colours are the app's tokens, so it follows the theme without re-highlighting.
+   Declared on :root so they cross the diff component's shadow boundary. */
+:root {
+  --diffs-foreground: var(--foreground);
+  --diffs-background: var(--background);
+  --diffs-token-comment: var(--syn-comment);
+  --diffs-token-keyword: var(--syn-keyword);
+  --diffs-token-string: var(--syn-string);
+  --diffs-token-string-expression: var(--syn-string);
+  --diffs-token-constant: var(--syn-number);
+  --diffs-token-parameter: var(--syn-variable);
+  --diffs-token-function: var(--syn-title);
+  --diffs-token-punctuation: var(--soft-foreground);
+  --diffs-token-link: var(--link);
+  --diffs-token-inserted: var(--diff-add);
+  --diffs-token-deleted: var(--diff-del);
+  --diffs-ansi-black: var(--ansi-black);
+  --diffs-ansi-red: var(--ansi-red);
+  --diffs-ansi-green: var(--ansi-green);
+  --diffs-ansi-yellow: var(--ansi-yellow);
+  --diffs-ansi-blue: var(--ansi-blue);
+  --diffs-ansi-magenta: var(--ansi-magenta);
+  --diffs-ansi-cyan: var(--ansi-cyan);
+  --diffs-ansi-white: var(--ansi-white);
+  --diffs-ansi-bright-black: var(--ansi-bright-black);
+  --diffs-ansi-bright-red: var(--ansi-bright-red);
+  --diffs-ansi-bright-green: var(--ansi-bright-green);
+  --diffs-ansi-bright-yellow: var(--ansi-bright-yellow);
+  --diffs-ansi-bright-blue: var(--ansi-bright-blue);
+  --diffs-ansi-bright-magenta: var(--ansi-bright-magenta);
+  --diffs-ansi-bright-cyan: var(--ansi-bright-cyan);
+  --diffs-ansi-bright-white: var(--ansi-bright-white);
+}
 .morecode-pierre-diff {
-  --diffs-dark-bg: #272726;
-  --diffs-dark: #d6d6d3;
+  --diffs-bg: var(--background);
+  --diffs-fg: var(--soft-foreground);
+  --diffs-dark-bg: var(--background);
+  --diffs-light-bg: var(--background);
+  --diffs-dark: var(--soft-foreground);
+  --diffs-light: var(--soft-foreground);
   --diffs-dark-addition-color: var(--diff-add);
+  --diffs-light-addition-color: var(--diff-add);
   --diffs-dark-deletion-color: var(--diff-del);
-  --diffs-dark-modified-color: #78a9ff;
+  --diffs-light-deletion-color: var(--diff-del);
+  --diffs-dark-modified-color: var(--diff-mod);
+  --diffs-light-modified-color: var(--diff-mod);
   --diffs-font-family: var(--font-mono-family);
   --diffs-header-font-family: var(--font-sans-family);
   --diffs-font-size: 11.5px;
   --diffs-line-height: 20px;
   --diffs-gap-fallback: 0px;
   --diffs-gap-block: 0px;
-  --diffs-bg-context-override: #272726;
-  --diffs-bg-separator-override: color-mix(in oklch, #272726 92%, white);
-  --diffs-fg-number-override: #858582;
+  --diffs-bg-context-override: var(--background);
+  --diffs-bg-separator: color-mix(in oklab, var(--background) 92%, var(--foreground));
+  --diffs-bg-separator-override: color-mix(in oklab, var(--background) 92%, var(--foreground));
+  --diffs-fg-number-override: var(--faint-foreground);
 }
 
 /* Token markup from Pierre/Shiki, deliberately without its own code-surface styling. */
@@ -554,36 +523,29 @@
   min-height: 1lh;
 }
 
-/* Error notifications use the compact red banner treatment from the reference. */
+/* Notifications: a tint of the status colour over the page, so they read on every theme. */
 [data-sonner-toast][data-type='success'] {
-  background: #102117 !important;
-  border-color: #27623c !important;
-  color: #79d99a !important;
-}
-[data-sonner-toast][data-type='success'] [data-title] {
-  color: #79d99a !important;
-  font-weight: 600;
-}
-[data-sonner-toast][data-type='success'] [data-description] {
-  color: #a5cdb0 !important;
-}
-[data-sonner-toast][data-type='success'] [data-close-button] {
-  color: #8bd9a3 !important;
+  background: color-mix(in oklab, var(--success) 14%, var(--background)) !important;
+  border-color: color-mix(in oklab, var(--success) 45%, var(--background)) !important;
+  color: var(--success) !important;
 }
 [data-sonner-toast][data-type='error'] {
-  background: #210d0d !important;
-  border-color: #7f1d1d !important;
-  color: #ff5b5b !important;
+  background: color-mix(in oklab, var(--destructive) 14%, var(--background)) !important;
+  border-color: color-mix(in oklab, var(--destructive) 45%, var(--background)) !important;
+  color: var(--destructive) !important;
 }
+[data-sonner-toast][data-type='success'] [data-title],
 [data-sonner-toast][data-type='error'] [data-title] {
-  color: #ff5b5b !important;
+  color: inherit !important;
   font-weight: 600;
 }
+[data-sonner-toast][data-type='success'] [data-description],
 [data-sonner-toast][data-type='error'] [data-description] {
-  color: #d6a0a0 !important;
+  color: var(--soft-foreground) !important;
 }
+[data-sonner-toast][data-type='success'] [data-close-button],
 [data-sonner-toast][data-type='error'] [data-close-button] {
-  color: #ff7777 !important;
+  color: inherit !important;
 }
 
 /* Indeterminate page-loading bar in the Browser tab. */
@@ -635,9 +597,10 @@
 @keyframes agent-glow {
   0%,
   100% {
-    box-shadow: inset 0 0 0 1.5px rgba(59, 130, 246, 0.85), inset 0 0 18px 2px rgba(59, 130, 246, 0.35);
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--ring) 85%, transparent), inset 0 0 18px 2px color-mix(in oklab, var(--ring) 35%, transparent);
   }
   50% {
-    box-shadow: inset 0 0 0 1.5px rgba(96, 165, 250, 1), inset 0 0 34px 6px rgba(59, 130, 246, 0.6);
+    box-shadow: inset 0 0 0 1.5px var(--ring), inset 0 0 34px 6px color-mix(in oklab, var(--ring) 60%, transparent);
   }
 }
+

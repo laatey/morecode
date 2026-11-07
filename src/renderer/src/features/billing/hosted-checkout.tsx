@@ -125,18 +125,18 @@ export function HostedCheckout({
     <form onSubmit={start} className="mx-auto max-w-[380px] space-y-4">
       <div>
         <h3 className="font-display text-[18px] font-semibold">Start {plan.name}</h3>
-        <p className="mt-0.5 text-[13px] text-[#8d8d8a]">
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
           {money(price, cfg.currency)} a month{yearly ? `, billed yearly (${money(price * 12, cfg.currency)})` : ''}. Cancel any time and keep
           what you have paid for.
         </p>
       </div>
 
       {phase === 'waiting' ? (
-        <div className="space-y-3 rounded-[10px] border border-white/[0.1] bg-white/[0.03] px-4 py-3.5">
-          <p className="flex items-center gap-2 text-[13px] text-[#ececea]">
+        <div className="space-y-3 rounded-[10px] border border-border bg-foreground/[0.03] px-4 py-3.5">
+          <p className="flex items-center gap-2 text-[13px] text-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Waiting for your payment
           </p>
-          <p className="text-[12.5px] leading-5 text-[#8d8d8a]">
+          <p className="text-[12.5px] leading-5 text-muted-foreground">
             Finish paying in the page that opened in your browser. This screen updates by itself when it is confirmed.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -158,7 +158,7 @@ export function HostedCheckout({
       )}
 
       <FormError>{error}</FormError>
-      <p className="text-center text-[12px] text-[#77776f]">
+      <p className="text-center text-[12px] text-faint-foreground">
         You pay on Paystack&apos;s page, so MoreCode never sees your card number.{' '}
         <TextLink disabled={phase === 'starting'} onClick={onBack}>
           Choose a different plan

@@ -38,10 +38,10 @@ function Showcase(): React.JSX.Element {
 
   return (
     <div className="w-full max-w-[460px]" aria-hidden>
-      <div className="min-h-[196px] rounded-[12px] border border-white/[0.09] bg-[#2b2b2a] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-        <div className="ml-auto w-fit max-w-[88%] rounded-[10px] bg-white/[0.08] px-3 py-2 text-[13px] leading-5 text-[#ececea]">
+      <div className="min-h-[196px] rounded-[12px] border border-border bg-muted p-4 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        <div className="ml-auto w-fit max-w-[88%] rounded-[10px] bg-foreground/[0.08] px-3 py-2 text-[13px] leading-5 text-foreground">
           {DEMO_PROMPT.slice(0, typed)}
-          {phase === 'typing' && <span className="ml-px inline-block h-3.5 w-px translate-y-0.5 animate-pulse bg-[#ececea]" />}
+          {phase === 'typing' && <span className="ml-px inline-block h-3.5 w-px translate-y-0.5 animate-pulse bg-foreground" />}
         </div>
         {phase !== 'typing' && (
           <div className="mt-4 space-y-1.5 text-[12.5px]">
@@ -50,15 +50,15 @@ function Showcase(): React.JSX.Element {
               {phase === 'thinking' ? (
                 <span className="text-shimmer">Thinking…</span>
               ) : (
-                <span className="text-[#8d8d8a]">Thought for 4s</span>
+                <span className="text-muted-foreground">Thought for 4s</span>
               )}
             </div>
             {phase === 'done' && (
               <>
-                <p className="text-[#c9c9c6]">Swapping the back-out curve for a hard-stop snap.</p>
-                <div className="flex items-center gap-2 text-[#c9c9c6]">
-                  <span className="text-[#8d8d8a]">Edited</span>
-                  <span className="rounded-[4px] bg-white/[0.06] px-1.5 text-[12px] leading-[18px] text-[#ececea]">
+                <p className="text-soft-foreground">Swapping the back-out curve for a hard-stop snap.</p>
+                <div className="flex items-center gap-2 text-soft-foreground">
+                  <span className="text-muted-foreground">Edited</span>
+                  <span className="rounded-[4px] bg-foreground/[0.06] px-1.5 text-[12px] leading-[18px] text-foreground">
                     AlignmentGrid.tsx
                   </span>
                   <span className="tabular-nums">
@@ -66,9 +66,9 @@ function Showcase(): React.JSX.Element {
                     <span className="text-[var(--diff-del)]">−2</span>
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-[#c9c9c6]">
-                  <span className="text-[#8d8d8a]">Checked types</span>
-                  <span className="text-[#5fd17a]">Passed</span>
+                <div className="flex items-center gap-2 text-soft-foreground">
+                  <span className="text-muted-foreground">Checked types</span>
+                  <span className="text-success">Passed</span>
                 </div>
               </>
             )}
@@ -105,7 +105,7 @@ export function AuthShell({
       />
       <div className="flex min-h-0 flex-1">
         {showcase && (
-          <aside className="hidden min-w-0 flex-1 flex-col justify-between border-r border-white/[0.07] bg-[#232322] p-10 lg:flex">
+          <aside className="hidden min-w-0 flex-1 flex-col justify-between border-r border-border/50 bg-card p-10 lg:flex">
             <Logo />
             <div className="flex flex-col gap-8">
               <Showcase />
@@ -113,12 +113,12 @@ export function AuthShell({
                 <h2 className="font-display text-[26px] font-semibold leading-8 tracking-tight">
                   Ask for a change. Watch it happen. Keep what you like.
                 </h2>
-                <p className="mt-2 text-[14px] leading-6 text-[#8d8d8a]">
+                <p className="mt-2 text-[14px] leading-6 text-muted-foreground">
                   Every edit is shown to you first, so you stay in charge of your project.
                 </p>
               </div>
             </div>
-            <p className="text-[12px] text-[#77776f]">morecode.app</p>
+            <p className="text-[12px] text-faint-foreground">morecode.app</p>
           </aside>
         )}
         <main className="slim-scroll flex min-w-0 flex-1 select-text justify-center overflow-y-auto px-6 pb-8 pt-14">
@@ -144,7 +144,7 @@ export function Heading({
   return (
     <header className="mb-6">
       <h1 className="font-display text-[26px] font-semibold leading-8 tracking-tight">{title}</h1>
-      {children && <p className="mt-1.5 text-[14px] leading-6 text-[#8d8d8a]">{children}</p>}
+      {children && <p className="mt-1.5 text-[14px] leading-6 text-muted-foreground">{children}</p>}
     </header>
   )
 }

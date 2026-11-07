@@ -27,8 +27,9 @@ export function loadConfig(env = process.env) {
     max: { monthly: price('PRICE_MAX_MONTHLY', 1250), yearly: price('PRICE_MAX_YEARLY', 1060) }
   }
   // paystack = real payments; demo = plan changes apply with no payment (development only); off = plan changes refused
+  // demo (plans for free) is only ever on when asked for by name: forgetting a setting must never give plans away
   const wanted = env.BILLING_MODE
-  const billing = wanted === 'off' ? 'off' : wanted === 'demo' ? 'demo' : paystackKey ? 'paystack' : production ? 'off' : 'demo'
+  const billing = wanted === 'off' ? 'off' : wanted === 'demo' ? 'demo' : paystackKey ? 'paystack' : 'off'
   if (billing === 'demo' && production) throw new Error('BILLING_MODE=demo gives every plan away free: it is not allowed when NODE_ENV=production')
   if (billing === 'paystack' && !paystackKey) throw new Error('BILLING_MODE=paystack needs PAYSTACK_SECRET_KEY')
 
@@ -81,6 +82,17 @@ export function loadConfig(env = process.env) {
     /** A JSON file {latest, notes[], url} describing the newest app release. */
     releasesFile: env.RELEASES_FILE || '',
     billing,
+    /** Plan limits in tokens (a 5-hour session and a week), each adjustable: LIMIT_PRO_SESSION, LIMIT_PRO_WEEK, and so on. */
+    plans: Object.fromEntries(
+      Object.entries(PLANS).map(([id, p]) => {
+        const cap = (kind) => {
+          const v = Number(env[`LIMIT_${id.toUpperCase()}_${kind.toUpperCase()}`] ?? p[kind])
+          if (!Number.isFinite(v) || v <= 0) throw new Error(`LIMIT_${id.toUpperCase()}_${kind.toUpperCase()} must be a positive number`)
+          return v
+        }
+        return [id, { ...p, session: cap('session'), week: cap('week') }]
+      })
+    ),
     paystack: {
       secret: paystackKey,
       base: (env.PAYSTACK_BASE_URL || 'https://api.paystack.co').replace(/\/$/, ''),
@@ -102,8 +114,12 @@ export function loadConfig(env = process.env) {
   }
 }
 
+/**
+ * What each plan includes. Limits are in tokens per window: Pro is the base, Free is about 15% of it and Max is 5 times it.
+ * A long task with many steps costs a few hundred thousand, so Pro's session fits roughly a dozen of them.
+ */
 export const PLANS = {
-  free: { daily: 25, models: ['claude-haiku-5-5'] },
-  pro: { daily: 400, models: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'] },
-  max: { daily: 2000, models: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'] }
+  free: { session: 225_000, week: 2_250_000, models: ['claude-haiku-5-5'] },
+  pro: { session: 1_500_000, week: 15_000_000, models: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'] },
+  max: { session: 7_500_000, week: 75_000_000, models: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'] }
 }

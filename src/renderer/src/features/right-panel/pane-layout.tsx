@@ -12,7 +12,7 @@ function EmptyPane(): React.JSX.Element {
   return (
     <div className="flex h-full w-full items-center justify-center p-6">
       <div className="w-full max-w-[340px]">
-        <h2 className="mb-1 text-[13px] font-medium text-[#ececea]">Open a tool</h2>
+        <h2 className="mb-1 text-[13px] font-medium text-foreground">Open a tool</h2>
         <p className="mb-3 text-[12px] text-muted-foreground">Pick something to work with here.</p>
         <div className="space-y-1.5">
           {TAB_DEFINITIONS.map((d) => (
@@ -20,13 +20,13 @@ function EmptyPane(): React.JSX.Element {
               key={d.kind}
               type="button"
               onClick={() => openTab(d.kind)}
-              className="flex w-full cursor-pointer items-center gap-3 rounded-[8px] border border-white/[0.08] px-3 py-2 text-left transition-colors hover:border-white/[0.16] hover:bg-white/[0.05]"
+              className="flex w-full cursor-pointer items-center gap-3 rounded-[8px] border border-border px-3 py-2 text-left transition-colors hover:border-border-strong hover:bg-foreground/[0.05]"
             >
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-white/[0.06] text-[#c9c9c6]">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-foreground/[0.06] text-soft-foreground">
                 <d.icon className="h-3.5 w-3.5 stroke-[1.7]" />
               </span>
               <span className="min-w-0">
-                <span className="block text-[12.5px] text-[#ececea]">{d.title}</span>
+                <span className="block text-[12.5px] text-foreground">{d.title}</span>
                 <span className="block truncate text-[11.5px] text-muted-foreground">
                   {d.description}
                 </span>
@@ -53,7 +53,7 @@ function Pane({ index }: { index: number }): React.JSX.Element {
         'relative h-full w-full min-h-0 min-w-0 overflow-auto bg-background',
         // thin accent line on the focused pane (only when there is more than one)
         focused &&
-          'after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-[#3b82f6]'
+          'after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-primary'
       )}
     >
       {tab && def ? (

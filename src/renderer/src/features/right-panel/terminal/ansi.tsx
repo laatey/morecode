@@ -1,23 +1,14 @@
 import React from 'react'
 
-const COLORS: Record<number, string> = {
-  30: '#6b6b68',
-  31: '#f0746c',
-  32: '#5fd17a',
-  33: '#e8b365',
-  34: '#6ea8fe',
-  35: '#c792ea',
-  36: '#56d4dd',
-  37: '#d6d6d3',
-  90: '#8d8d8a',
-  91: '#ff8f87',
-  92: '#7ee495',
-  93: '#f3c987',
-  94: '#8dbaff',
-  95: '#d9aef5',
-  96: '#7ae3ea',
-  97: '#ffffff'
-}
+const NAMES = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white']
+
+/** SGR colour code → the theme's terminal colour (30–37 normal, 90–97 bright). Undefined for other codes. */
+const ansiColor = (code: number): string | undefined =>
+  code >= 30 && code <= 37
+    ? `var(--ansi-${NAMES[code - 30]})`
+    : code >= 90 && code <= 97
+      ? `var(--ansi-bright-${NAMES[code - 90]})`
+      : undefined
 
 interface Style {
   color?: string
@@ -39,7 +30,7 @@ function apply(style: Style, codes: number[]): Style {
     else if (c === 2) next.dim = true
     else if (c === 22) next = { ...next, bold: false, dim: false }
     else if (c === 39) next.color = undefined
-    else if (COLORS[c]) next.color = COLORS[c]
+    else if (ansiColor(c)) next.color = ansiColor(c)
   }
   return next
 }

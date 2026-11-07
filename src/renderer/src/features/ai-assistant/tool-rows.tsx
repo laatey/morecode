@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { toast } from 'sonner'
 import { SkillDraftReview } from '@/features/skills/skill-draft-review'
-import { Check, Circle, CircleDot, ClipboardList } from '@/components/icons'
+import { Brain, Check, Circle, ClipboardList } from '@/components/icons'
 import { DiffView } from '@/components/diff-view'
 import { Tip } from '@/components/tooltip'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,12 @@ import type { TodoItem, ToolBlock } from './types'
 
 const todoIcon: Record<TodoItem['status'], React.ReactNode> = {
   done: <Check className="h-3 w-3 text-[var(--diff-add)]" />,
-  active: <CircleDot className="h-3 w-3 text-[#6ea8fe]" />,
+  active: (
+    <span
+      aria-label="In progress"
+      className="block h-3 w-3 animate-spin rounded-full border-[1.5px] border-primary/30 border-t-primary"
+    />
+  ),
   pending: <Circle className="h-3 w-3 text-muted-foreground/60" />
 }
 
@@ -49,8 +54,8 @@ function MiniAction({
       className={cn(
         'cursor-pointer rounded-[6px] px-2 text-[11.5px] leading-[18px] transition-colors',
         strong
-          ? 'border border-[#4a7fe0]/60 bg-[#1d4fb4] text-[#eaf1ff] font-medium shadow-[0_1px_3px_rgba(0,0,0,0.45)] hover:border-[#6c9aee]/70 hover:bg-[#2359c4] active:bg-[#1a46a0]'
-          : 'border border-transparent text-muted-foreground hover:bg-white/[0.06] hover:text-foreground'
+          ? 'border border-primary/60 bg-primary text-primary-foreground font-medium shadow-[0_1px_3px_rgba(0,0,0,0.45)] hover:border-primary/70 hover:bg-primary/90 active:bg-primary/90'
+          : 'border border-transparent text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground'
       )}
     >
       {label}
@@ -116,7 +121,7 @@ function McpAuthCard({
   }
 
   return (
-    <div className="my-1.5 rounded-[10px] border border-white/[0.08] p-3 text-[12.5px]">
+    <div className="my-1.5 rounded-[10px] border border-border p-3 text-[12.5px]">
       <div className="flex items-start gap-2.5">
         <ConnectorLogo
           id={c?.catalogId ?? connectorId}
@@ -127,13 +132,13 @@ function McpAuthCard({
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-[#ededeb]">{connectorName}</span>
+            <span className="font-medium text-foreground">{connectorName}</span>
             <span
               className={cn(
                 'rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium',
                 reconnected
                   ? 'bg-[var(--diff-add)]/15 text-[var(--diff-add)]'
-                  : 'bg-white/[0.06] text-muted-foreground'
+                  : 'bg-foreground/[0.06] text-muted-foreground'
               )}
             >
               {reconnected ? 'Connected' : 'Sign-in expired'}
@@ -146,7 +151,7 @@ function McpAuthCard({
           </p>
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-2.5">
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/50 pt-2.5">
         {error ? (
           <button
             type="button"
@@ -182,7 +187,7 @@ function McpAuthCard({
         </div>
       </div>
       {showError && error && (
-        <pre className="slim-scroll mt-2 max-h-[140px] overflow-auto whitespace-pre-wrap break-words rounded-[6px] border border-white/[0.08] bg-black/30 p-2 font-mono text-[11px] leading-4 text-[#cfcfcc]">
+        <pre className="slim-scroll mt-2 max-h-[140px] overflow-auto whitespace-pre-wrap break-words rounded-[6px] border border-border bg-scrim/30 p-2 font-mono text-[11px] leading-4 text-soft-foreground">
           {error}
         </pre>
       )}
@@ -193,11 +198,11 @@ function McpAuthCard({
 function Block({ label, text, error }: { label: string; text: string; error?: boolean }): React.JSX.Element {
   return (
     <div className="min-w-0">
-      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#a9a9a4]">{label}</div>
+      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
       <pre
         className={cn(
-          'slim-scroll max-h-[220px] overflow-auto whitespace-pre-wrap break-words border-l-2 border-[#4a4a45] pl-3 font-mono text-[11.5px] leading-[18px] select-text',
-          error ? 'text-[var(--diff-del)]' : 'text-[#d6d6d3]'
+          'slim-scroll max-h-[220px] overflow-auto whitespace-pre-wrap break-words border-l-2 border-border-strong pl-3 font-mono text-[11.5px] leading-[18px] select-text',
+          error ? 'text-[var(--diff-del)]' : 'text-soft-foreground'
         )}
       >
         {text}
@@ -227,7 +232,7 @@ function McpRow({ tool }: { tool: Extract<ToolBlock, { kind: 'mcp' }> }): React.
     <div>
       <Row expandable open={open} onToggle={() => setOpen((o) => !o)} status={tool.status === 'done' ? undefined : tool.status}>
         <ConnectorLogo id={c?.catalogId ?? tool.connectorId} domain={c?.domain} name={tool.connector} size={16} className="rounded-[4px]" />
-        <span className="min-w-0 truncate font-mono text-[12px] text-[#e2e2e0]">{tool.tool}</span>
+        <span className="min-w-0 truncate font-mono text-[12px] text-foreground">{tool.tool}</span>
         <span className="shrink-0 text-muted-foreground">{tool.connector}</span>
         <span className="flex-1" />
         {tool.ms !== undefined && <span className="shrink-0 text-[11.5px] tabular-nums text-muted-foreground/70">{(tool.ms / 1000).toFixed(2)}s</span>}
@@ -256,17 +261,32 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
   if (tool.kind === 'web') return <WebRow tool={tool} />
   if (tool.kind === 'question') return <QuestionRow tool={tool} />
 
+  if (tool.kind === 'memory') {
+    const verb = { search: ['Checking memory', 'Checked memory'], save: ['Saving', 'Saved'], forget: ['Forgetting', 'Forgot'] }[tool.op]
+    return (
+      <div>
+        <Row expandable={Boolean(tool.error)} open={open} onToggle={() => setOpen((o) => !o)} status={tool.status}>
+          <Brain className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="shrink-0 whitespace-nowrap text-muted-foreground">{tool.status === 'running' ? verb[0] : verb[1]}</span>
+          <span className="min-w-0 truncate rounded-[4px] bg-foreground/[0.05] px-1.5 text-[12px] leading-[18px] text-foreground">{tool.text}</span>
+          {tool.op === 'save' && tool.scope && <span className="shrink-0 text-[11.5px] text-muted-foreground/80">{tool.scope === 'global' ? 'everywhere' : 'this project'}</span>}
+        </Row>
+        {open && tool.error && <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-destructive/25 bg-destructive/30 p-2 text-[12px] leading-5 text-destructive">{tool.error}</p>}
+      </div>
+    )
+  }
+
   if (tool.kind === 'read') {
     const names = tool.paths.map((p) => p.split('/').pop() ?? p)
     return (
       <div>
       <Row expandable={Boolean(tool.error)} open={open} onToggle={() => setOpen((o) => !o)} status={tool.status}>
         <span className="text-muted-foreground">{tool.status === 'running' ? 'Reading' : 'Read'}</span>
-        <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
+        <span className="min-w-0 truncate rounded-[4px] bg-foreground/[0.05] px-1.5 text-[12px] leading-[18px] text-foreground">
           {names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ')}
         </span>
       </Row>
-      {open && tool.error && <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-red-400/25 bg-red-950/30 p-2 text-[12px] leading-5 text-red-100">{tool.error}</p>}
+      {open && tool.error && <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-destructive/25 bg-destructive/30 p-2 text-[12px] leading-5 text-destructive">{tool.error}</p>}
       </div>
     )
   }
@@ -277,7 +297,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
       <div>
         <Row expandable={expandable} open={open} onToggle={() => setOpen((o) => !o)} status={tool.status}>
           <span className="text-muted-foreground">{tool.status === 'running' ? 'Reading skill' : 'Read skill'}</span>
-          <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
+          <span className="min-w-0 truncate rounded-[4px] bg-foreground/[0.05] px-1.5 text-[12px] leading-[18px] text-foreground">
             {tool.skillName}
           </span>
           {tool.path && (
@@ -287,12 +307,12 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
           )}
         </Row>
         {open && tool.error && (
-          <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-red-400/25 bg-red-950/30 p-2 text-[12px] leading-5 text-red-100">
+          <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-destructive/25 bg-destructive/30 p-2 text-[12px] leading-5 text-destructive">
             {tool.error}
           </p>
         )}
         {open && tool.content && (
-          <pre className="slim-scroll my-1 ml-5 max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[6px] border border-white/[0.08] bg-[#242423] px-3 py-2 font-mono text-[11.5px] leading-[18px] text-[#b4b4b0]">
+          <pre className="slim-scroll my-1 ml-5 max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[6px] border border-border bg-card px-3 py-2 font-mono text-[11.5px] leading-[18px] text-muted-foreground">
             {tool.content}
           </pre>
         )}
@@ -307,7 +327,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
           <span className="shrink-0 whitespace-nowrap text-muted-foreground">
             {tool.status === 'running' ? 'Helper researching' : 'Helper'}
           </span>
-          <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
+          <span className="min-w-0 truncate rounded-[4px] bg-foreground/[0.05] px-1.5 text-[12px] leading-[18px] text-foreground">
             {tool.task}
           </span>
           {tool.steps > 0 && (
@@ -317,21 +337,21 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
           )}
         </Row>
         {open && tool.report && (
-          <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-white/[0.08] bg-[#242423] p-2.5 text-[12px] leading-5 text-[#b4b4b0]">{tool.report}</p>
+          <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-border bg-card p-2.5 text-[12px] leading-5 text-muted-foreground">{tool.report}</p>
         )}
       </div>
     )
   }
 
   if (tool.kind === 'thinking') {
-    return <ThinkingBlock text={tool.text} status={tool.status} durationMs={tool.durationMs} />
+    return <ThinkingBlock text={tool.text} status={tool.status} durationMs={tool.durationMs} startedAt={tool.startedAt} />
   }
 
   if (tool.kind === 'plan') {
     return (
       <div className="flex min-h-7 items-center gap-2 px-1 py-0.5 text-[12.5px]">
         <ClipboardList className="h-3 w-3 shrink-0 text-muted-foreground" />
-        <span className="text-[#d6d6d3]">{tool.state === 'approved' ? 'Plan approved' : 'Plan ready'}</span>
+        <span className="text-soft-foreground">{tool.state === 'approved' ? 'Plan approved' : 'Plan ready'}</span>
         <span className="min-w-0 truncate text-muted-foreground">{tool.title}</span>
         <span className="flex-1" />
         <Button variant="secondary" size="xs" onClick={() => openTab('plan')}>
@@ -358,7 +378,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
           <Tip label={tool.path} side="top" align="start">
             <span
               className={cn(
-                'min-w-0 truncate font-medium text-[#e2e2e0] rounded-[4px] bg-white/[0.05] px-1.5 py-0 text-[12px] leading-[18px]',
+                'min-w-0 truncate font-medium text-foreground rounded-[4px] bg-foreground/[0.05] px-1.5 py-0 text-[12px] leading-[18px]',
                 discarded && 'text-muted-foreground line-through'
               )}
             >
@@ -374,9 +394,9 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
             </>
           )}
         </Row>
-        {open && tool.error && <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-red-400/25 bg-red-950/30 p-2 text-[12px] leading-5 text-red-100">{tool.error}</p>}
+        {open && tool.error && <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-destructive/25 bg-destructive/30 p-2 text-[12px] leading-5 text-destructive">{tool.error}</p>}
         {open && tool.diff && (
-          <div className="my-1 ml-1 overflow-hidden rounded-[6px] border border-white/[0.08] text-[11.5px]">
+          <div className="my-1 ml-1 overflow-hidden rounded-[6px] border border-border text-[11.5px]">
             <DiffView file={tool.diff} />
           </div>
         )}
@@ -393,10 +413,10 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
           onToggle={() => setOpen((o) => !o)}
           status={tool.status}
         >
-          <span className="text-[#d6d6d3]">{tool.label}</span>
+          <span className="text-soft-foreground">{tool.label}</span>
         </Row>
         {open && (
-          <pre className="slim-scroll my-1 ml-1 max-h-[240px] overflow-auto rounded-[6px] border border-white/[0.08] px-3 py-2 font-mono text-[11.5px] leading-5 text-[#a9a9a6]">
+          <pre className="slim-scroll my-1 ml-1 max-h-[240px] overflow-auto rounded-[6px] border border-border px-3 py-2 font-mono text-[11.5px] leading-5 text-muted-foreground">
             <span className="text-muted-foreground">$ {tool.command}</span>
             {'\n'}
             {tool.output}
@@ -410,7 +430,7 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
   return (
     <div>
       <Row expandable open={open} onToggle={() => setOpen((o) => !o)}>
-        <span className="text-[#d6d6d3]">Task list</span>
+        <span className="text-soft-foreground">Task list</span>
         <span className="text-muted-foreground">
           {done} of {tool.items.length} done
         </span>
@@ -418,8 +438,8 @@ export function ToolRow({ tool }: { tool: ToolBlock }): React.JSX.Element {
       {open && (
         <ul className="my-1 ml-1 space-y-1 px-1 text-[12.5px]">
           {tool.items.map((item, i) => (
-            <li key={i} className="flex items-center gap-2">
-              {todoIcon[item.status]}
+            <li key={i} className="flex items-start gap-2">
+              <span className="mt-[3px] grid h-3 w-3 shrink-0 place-items-center">{todoIcon[item.status]}</span>
               <span className={cn(item.status === 'done' && 'text-muted-foreground line-through')}>
                 {item.text}
               </span>

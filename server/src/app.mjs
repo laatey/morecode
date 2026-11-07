@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { PLANS } from './config.mjs'
+import { addTokens, blocked, costOf, start, usageReader, view } from './limits.mjs'
 import { createBilling } from './billing.mjs'
 import { HttpError } from './http-error.mjs'
 import { createPaystack } from './paystack.mjs'
@@ -36,6 +37,10 @@ export function createApp({ config, repo, mail, fetchImpl = fetch }) {
 
   /* ---------- shape sent to the app ---------- */
 
+  const planOf = (u) => config.plans[u.plan] ?? config.plans.free
+  /** Plans can only be bought when the AI they pay for is actually switched on and payments are set up. */
+  const canBuy = () => config.billing !== 'off' && Boolean(config.anthropicKey)
+
   async function publicAccount(u, tz = 0) {
     const today = dayKey(tz)
     const usage = await repo.usageMap(u.id)
@@ -55,6 +60,7 @@ export function createApp({ config, repo, mail, fetchImpl = fetch }) {
       sentToday: usage[today] ?? 0,
       sentDate: today,
       usage,
+      limits: view(await repo.limitsGet(u.id), Date.now(), planOf(u)),
       billing: u.billing
     }
   }
@@ -227,10 +233,10 @@ export function createApp({ config, repo, mail, fetchImpl = fetch }) {
     if (config.billing !== 'paystack') {
       if (typeof body.plan === 'string' && body.plan !== user.plan) {
         if (!PLANS[body.plan]) throw new HttpError(400, 'invalid', 'Unknown plan.')
-        if (config.billing !== 'demo') throw new HttpError(403, 'billing-off', 'Plan changes are not available on this server.')
+        if (config.billing !== 'demo' || !canBuy()) throw new HttpError(403, 'billing-off', 'Plan changes are not available on this server.')
         user.plan = body.plan
       }
-      if (body.billing && typeof body.billing === 'object' && config.billing === 'demo') {
+      if (body.billing && typeof body.billing === 'object' && config.billing === 'demo' && canBuy()) {
         const b = body.billing
         const card = b.card && typeof b.card === 'object' ? { brand: str(b.card.brand, 20), last4: str(b.card.last4, 4), exp: str(b.card.exp, 7) } : null
         user.billing = {
@@ -266,19 +272,46 @@ export function createApp({ config, repo, mail, fetchImpl = fetch }) {
     body: JSON.stringify({ type: 'error', error: { type, message } })
   })
 
+  /** "2 hours 10 minutes", "3 days" - how long until a window resets, in words a person would say. */
+  const inWords = (ms) => {
+    const mins = Math.max(1, Math.ceil(ms / 60_000))
+    if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'}`
+    if (mins < 2 * 1440) {
+      const h = Math.floor(mins / 60)
+      const m = mins % 60
+      return m && h < 10 ? `${h} hour${h === 1 ? '' : 's'} ${m} minutes` : `${h} hour${h === 1 ? '' : 's'}`
+    }
+    return `${Math.round(mins / 1440)} days`
+  }
+
   /** Returns an error response to send, or null when the request may go ahead (and is counted). */
   async function admit(user, req, model, tz) {
-    const plan = PLANS[user.plan] ?? PLANS.free
-    if (!plan.models.includes(model)) {
+    const plan = planOf(user)
+    if (!(PLANS[user.plan] ?? PLANS.free).models.includes(model)) {
       return aiError(403, 'permission_error', `Your ${user.plan[0].toUpperCase()}${user.plan.slice(1)} plan does not include this model. Choose another, or upgrade.`)
     }
-    // one message = one run: the many steps the AI takes for a single request are counted once
+    // one message = one run: the many steps the AI takes for a single request are counted once, and a run
+    // that was let in may finish even if it fills a window part-way through
     const runId = clean(req.headers['x-morecode-run'], 64)
-    const r = await repo.admitMessage(user.id, dayKey(tz), plan.daily, runId)
-    if (r.ok) return null
-    const now = Date.now()
-    const mins = Math.max(1, 1440 - Math.floor(((now - tz * 60_000) % DAY) / 60_000))
-    return aiError(429, 'rate_limit_error', `You have used all ${plan.daily} messages on your plan today. They come back in about ${Math.ceil(mins / 60)} hours.`, { 'retry-after': String(mins * 60) })
+    if (!(await repo.runSeen(user.id, runId))) {
+      const now = Date.now()
+      const verdict = await repo.limitsUpdate(user.id, (row) => {
+        const hit = blocked(row, now, plan)
+        // a window starts with the first message that is let in
+        return hit ? { next: null, out: hit } : { next: start(row, now), out: null }
+      })
+      if (verdict) {
+        const wait = Math.max(1000, verdict.resetsAt - now)
+        const msg =
+          verdict.which === 'session'
+            ? `You have reached your 5-hour limit. It resets in about ${inWords(wait)}.`
+            : `You have reached this week’s limit. It resets in about ${inWords(wait)}.`
+        return aiError(429, 'rate_limit_error', msg, { 'retry-after': String(Math.ceil(wait / 1000)) })
+      }
+    }
+    // the per-day count is kept only for the usage history chart
+    await repo.admitMessage(user.id, dayKey(tz), Number.MAX_SAFE_INTEGER, runId)
+    return null
   }
 
   async function proxyAi(req, res, rawBody) {
@@ -316,9 +349,26 @@ export function createApp({ config, repo, mail, fetchImpl = fetch }) {
     } catch {
       return send(res, aiError(502, 'api_error', 'Could not reach the AI service.'))
     }
+    const streaming = (upstream.headers.get('content-type') || '').includes('event-stream')
+    const reader = usageReader(streaming)
+    let recorded = false
+    // what the answer cost is counted against the person's windows when it ends (or when they stop it part-way)
+    const record = () => {
+      if (recorded) return
+      recorded = true
+      const tokens = costOf(reader.done(), String(body.model || ''))
+      if (tokens > 0) void Promise.resolve().then(() => repo.limitsUpdate(user.id, (row) => ({ next: addTokens(row, tokens, Date.now()), out: null }))).catch(() => {})
+    }
     res.writeHead(upstream.status, { 'content-type': upstream.headers.get('content-type') || 'application/json', 'cache-control': 'no-store', ...(upstream.headers.get('retry-after') ? { 'retry-after': upstream.headers.get('retry-after') } : {}) })
     if (!upstream.body) return res.end()
-    Readable.fromWeb(upstream.body).on('error', () => res.end()).pipe(res)
+    const body$ = Readable.fromWeb(upstream.body)
+    body$.on('data', (c) => reader.feed(c))
+    body$.on('end', record).on('close', record)
+    body$.on('error', () => {
+      record()
+      res.end()
+    })
+    body$.pipe(res)
   }
 
   /* ---------- share links ---------- */
@@ -537,7 +587,7 @@ section{margin:0 0 22px}p{margin:0}.user p{background:#323231;padding:10px 14px;
       return json(res, up ? 200 : 503, { ok: up })
     }
     if (m === 'GET' && path === '/v1/config') {
-      return json(res, 200, { social: { google: Boolean(config.oauth.google), github: Boolean(config.oauth.github) }, billing: config.billing, ai: Boolean(config.anthropicKey), plans: PLANS, ...(billing.live ? { currency: config.paystack.currency, prices: config.paystack.prices } : {}) })
+      return json(res, 200, { social: { google: Boolean(config.oauth.google), github: Boolean(config.oauth.github) }, billing: canBuy() ? config.billing : 'off', ai: Boolean(config.anthropicKey), plans: config.plans, ...(billing.live ? { currency: config.paystack.currency, prices: config.paystack.prices } : {}) })
     }
     const oauth = /^\/v1\/auth\/oauth\/(google|github)\/(start|callback)$/.exec(path)
     if (m === 'GET' && oauth) return oauth[2] === 'start' ? await oauthStart(res, oauth[1], url.searchParams.get('client') || '') : oauthCallback(res, oauth[1], url.searchParams)
@@ -597,6 +647,7 @@ section{margin:0 0 22px}p{margin:0}.user p{background:#323231;padding:10px 14px;
     if (m === 'PATCH' && path === '/v1/me') return json(res, 200, { account: await patchMe(user, await readJson(), tz) })
     if (m === 'DELETE' && path === '/v1/me') return json(res, 200, await deleteMe(user, await readJson()))
     if (m === 'POST' && path === '/v1/billing/checkout') {
+      if (!canBuy()) throw new HttpError(403, 'billing-off', 'Plans are not available yet.')
       guard(`checkout:${user.id}`, 10, 3_600_000, 'checkout attempts')
       return json(res, 200, await billing.checkout(user, await readJson()))
     }

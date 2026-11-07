@@ -40,7 +40,7 @@ function suggestMessage(files: GitFile[]): string {
 }
 
 const field =
-  'w-full rounded-[7px] bg-white/[0.06] px-2.5 text-[12.5px] text-[#ececea] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-[#3b82f6]/60'
+  'w-full rounded-[7px] bg-foreground/[0.06] px-2.5 text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/60'
 
 function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }): React.JSX.Element {
   return (
@@ -52,7 +52,7 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: ()
       onClick={onChange}
       className={cn(
         'grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-[4px] border transition-colors',
-        checked ? 'border-[#3b82f6] bg-[#3b82f6] text-white' : 'border-white/[0.25] hover:border-white/[0.45]'
+        checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border-strong hover:border-foreground/[0.45]'
       )}
     >
       {checked && <Check className="h-3 w-3 stroke-[3]" />}
@@ -89,9 +89,9 @@ function ShareForm({
 
   if (made) {
     return (
-      <div className="rounded-[8px] border border-[#3fb950]/30 bg-[#3fb950]/[0.06] p-3">
-        <div className="flex items-center gap-2 text-[12.5px] text-[#ececea]">
-          <Check className="h-3.5 w-3.5 text-[#5fd17a]" />
+      <div className="rounded-[8px] border border-success/30 bg-success/[0.06] p-3">
+        <div className="flex items-center gap-2 text-[12.5px] text-foreground">
+          <Check className="h-3.5 w-3.5 text-success" />
           {made.opened ? 'Your changes are on GitHub' : 'Pull request created'}
         </div>
         <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground">
@@ -112,16 +112,16 @@ function ShareForm({
   }
 
   return (
-    <div className="space-y-2.5 rounded-[8px] border border-white/[0.1] p-3">
+    <div className="space-y-2.5 rounded-[8px] border border-border p-3">
       <div>
-        <label htmlFor="pr-title" className="mb-1 block text-[12px] text-[#a8a8a6]">
+        <label htmlFor="pr-title" className="mb-1 block text-[12px] text-muted-foreground">
           Title
         </label>
         <input id="pr-title" value={title} onChange={(e) => setTitle(e.target.value)} className={cn(field, 'h-7')} />
       </div>
       <div>
-        <label htmlFor="pr-body" className="mb-1 block text-[12px] text-[#a8a8a6]">
-          What should reviewers know? <span className="text-[#77776f]">(optional)</span>
+        <label htmlFor="pr-body" className="mb-1 block text-[12px] text-muted-foreground">
+          What should reviewers know? <span className="text-faint-foreground">(optional)</span>
         </label>
         <textarea
           id="pr-body"
@@ -132,12 +132,12 @@ function ShareForm({
         />
       </div>
       <div>
-        <label htmlFor="pr-base" className="mb-1 block text-[12px] text-[#a8a8a6]">
+        <label htmlFor="pr-base" className="mb-1 block text-[12px] text-muted-foreground">
           Merge into
         </label>
         <input id="pr-base" value={base} onChange={(e) => setBase(e.target.value)} className={cn(field, 'h-7 font-mono')} />
       </div>
-      {error && <p className="text-[12px] leading-[18px] text-[#e8b365]">{error}</p>}
+      {error && <p className="text-[12px] leading-[18px] text-warning">{error}</p>}
       <div className="flex items-center justify-between gap-2 pt-0.5">
         <TabButton onClick={onDone}>Cancel</TabButton>
         <TabButton tone="primary" disabled={!title.trim() || !base.trim() || busy} onClick={() => void submit()}>
@@ -197,12 +197,12 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
   const row = (f: GitFile): React.JSX.Element => {
     const name = f.path.split('/').pop() ?? f.path
     return (
-      <div className="group flex items-center gap-2 rounded-[6px] px-1.5 py-1 hover:bg-white/[0.04]">
+      <div className="group flex items-center gap-2 rounded-[6px] px-1.5 py-1 hover:bg-foreground/[0.04]">
         <Checkbox checked={picked.has(f.path)} onChange={() => toggle(f.path)} label={`Include ${f.path}`} />
         <FileIcon name={name} />
         <span
           title={f.path}
-          className={cn('min-w-0 flex-1 truncate text-[12.5px] text-[#ececea]', f.status === 'deleted' && 'text-muted-foreground line-through')}
+          className={cn('min-w-0 flex-1 truncate text-[12.5px] text-foreground', f.status === 'deleted' && 'text-muted-foreground line-through')}
         >
           {name}
         </span>
@@ -226,7 +226,7 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
               label="Include every file"
               onChange={() => setPicked(allOn ? new Set() : new Set(files.map((f) => f.path)))}
             />
-            <h3 className="min-w-0 flex-1 text-[12.5px] font-medium text-[#ececea]">
+            <h3 className="min-w-0 flex-1 text-[12.5px] font-medium text-foreground">
               {chosen.length} of {files.length} {files.length === 1 ? 'file' : 'files'} to save
             </h3>
           </div>
@@ -238,17 +238,17 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
             </p>
           )}
 
-          <div className="mt-3 space-y-2.5 border-t border-white/[0.07] pt-3">
+          <div className="mt-3 space-y-2.5 border-t border-border/50 pt-3">
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <label htmlFor="save-message" className="text-[12px] text-[#a8a8a6]">
+                <label htmlFor="save-message" className="text-[12px] text-muted-foreground">
                   Describe this version
                 </label>
                 <button
                   type="button"
                   onClick={() => setMessage(suggestMessage(chosen))}
                   disabled={!chosen.length}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-[5px] px-1.5 text-[11.5px] text-[#8ab8ff] transition-colors hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-[5px] px-1.5 text-[11.5px] text-link transition-colors hover:bg-foreground/[0.07] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Sparkles className="h-3 w-3" /> Suggest
                 </button>
@@ -267,7 +267,7 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
             </div>
 
             {canBranch && (
-              <label className="flex cursor-pointer items-start gap-2 text-[12px] leading-[18px] text-[#c9c9c6]">
+              <label className="flex cursor-pointer items-start gap-2 text-[12px] leading-[18px] text-soft-foreground">
                 <span className="mt-[1px]">
                   <Checkbox checked={ownBranch} onChange={() => setOwnBranch((v) => !v)} label="Keep on its own branch" />
                 </span>
@@ -276,7 +276,7 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
                   <span className="block text-muted-foreground">
                     {ownBranch ? (
                       <>
-                        Saved as <span className="font-mono text-[11.5px] text-[#a8a8a6]">{branchName}</span>, so{' '}
+                        Saved as <span className="font-mono text-[11.5px] text-muted-foreground">{branchName}</span>, so{' '}
                         {repo.branch} stays untouched until someone reviews it.
                       </>
                     ) : (
@@ -287,7 +287,7 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
               </label>
             )}
 
-            {error && <p className="text-[12px] leading-[18px] text-[#e8b365]">{error}</p>}
+            {error && <p className="text-[12px] leading-[18px] text-warning">{error}</p>}
             <TabButton
               tone="primary"
               className="h-8 w-full"
@@ -301,9 +301,9 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
       )}
 
       {nothingToSave && (
-        <div className="rounded-[8px] border border-white/[0.08] px-3 py-3">
-          <div className="flex items-center gap-2 text-[12.5px] text-[#ececea]">
-            <Check className="h-3.5 w-3.5 text-[#5fd17a]" /> Everything is saved
+        <div className="rounded-[8px] border border-border px-3 py-3">
+          <div className="flex items-center gap-2 text-[12.5px] text-foreground">
+            <Check className="h-3.5 w-3.5 text-success" /> Everything is saved
           </div>
           <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground">
             {repo.lastMessage ? `Latest version: “${repo.lastMessage}”. ` : ''}New changes from you or the AI show up here.
@@ -311,9 +311,9 @@ function RepoView({ repo, refresh }: { repo: GitRepo; refresh: () => Promise<voi
         </div>
       )}
 
-      <section className={cn(!nothingToSave && 'border-t border-white/[0.07] pt-4')}>
-        <h3 className="mb-1 flex items-center gap-1.5 text-[12.5px] font-medium text-[#ececea]">
-          <GitPullRequest className="h-3.5 w-3.5 stroke-[1.7] text-[#a8a8a6]" /> Share for review
+      <section className={cn(!nothingToSave && 'border-t border-border/50 pt-4')}>
+        <h3 className="mb-1 flex items-center gap-1.5 text-[12.5px] font-medium text-foreground">
+          <GitPullRequest className="h-3.5 w-3.5 stroke-[1.7] text-muted-foreground" /> Share for review
         </h3>
         {sharing ? (
           <ShareForm repo={repo} refresh={refresh} onDone={() => setSharing(false)} />
@@ -434,8 +434,8 @@ export function GitPanel(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <TabToolbar className="py-1">
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-[#ececea]">
-          <GitBranch className="h-3.5 w-3.5 shrink-0 stroke-[1.7] text-[#a8a8a6]" />
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-foreground">
+          <GitBranch className="h-3.5 w-3.5 shrink-0 stroke-[1.7] text-muted-foreground" />
           <span className="truncate">{state.branch}</span>
         </span>
         <IconButton title="Refresh" onClick={() => void refresh()}>

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Btn, Group, Page, Row, Toggle } from '../kit'
-import { useNotify } from '../notifications'
+import { chime, useNotify } from '../notifications'
 import { useSettings } from '../settings-store'
 
 export function NotificationsPage(): React.JSX.Element {
@@ -22,8 +22,14 @@ export function NotificationsPage(): React.JSX.Element {
         </Row>
       </Group>
       <Group title="How">
-        <Row title="Play a sound" description="A short chime with each notification.">
+        <Row title="Play a sound" description="A soft chime with each notification, only while MoreCode is in the background.">
           <Toggle label="Play a sound" checked={n.sound} onChange={(v) => patch({ sound: v })} />
+        </Row>
+        <Row title="Hear the sounds" description="A rising chime when a task finishes, two taps when the AI needs you.">
+          <div className="flex gap-2">
+            <Btn onClick={() => chime('done')}>Finished</Btn>
+            <Btn onClick={() => chime('attention')}>Needs you</Btn>
+          </div>
         </Row>
         <Row title="Try it out" description="Sends a sample notification now.">
           <Btn onClick={() => notify('test', 'Task finished', 'This is what a notification looks like.')}>

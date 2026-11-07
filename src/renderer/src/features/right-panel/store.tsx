@@ -72,6 +72,7 @@ function load(): State {
         Boolean(t) &&
         typeof t.id === 'string' &&
         typeof t.kind === 'string' &&
+        (t.path === undefined || typeof t.path === 'string') &&
         Boolean(getTabDefinition(t.kind)) &&
         !seen.has(t.id) &&
         Boolean(seen.add(t.id))
@@ -152,6 +153,8 @@ function reducer(s: State, a: Action): State {
 interface RightPanelApi extends State {
   /** Open a tab by kind (focuses the existing one unless the kind allows multiple). */
   openTab: (kind: string) => void
+  /** Open a project file in its own tab (focuses the tab if that file is already open). */
+  openFile: (path: string) => void
   /** Open a tab next to the one you are looking at, switching to a two-pane layout if needed. */
   splitTab: (kind: string) => void
   /** Move an open tab into the other pane. */
@@ -236,10 +239,33 @@ export function RightPanelProvider({ children }: { children: React.ReactNode }):
     [state.tabs]
   )
 
+  const openFile = useCallback(
+    (path: string) => {
+      const existing = state.tabs.find((t) => t.kind === 'file' && t.path === path)
+      reveal()
+      dispatch({ type: 'open', tab: existing ?? { ...newTab('file'), path }, existing: Boolean(existing) })
+    },
+    [state.tabs]
+  )
+
+  /** Ask before closing tabs that hold unsaved work. */
+  const confirmClose = useCallback(
+    (ids: string[]): boolean => {
+      const dirty = ids.filter((id) => {
+        const tab = state.tabs.find((t) => t.id === id)
+        return tab ? getTabDefinition(tab.kind)?.isDirty?.(id) : false
+      })
+      if (!dirty.length) return true
+      return window.confirm(dirty.length === 1 ? 'This tab has unsaved changes. Close it and discard them?' : `${dirty.length} tabs have unsaved changes. Close them and discard the changes?`)
+    },
+    [state.tabs]
+  )
+
   const api = useMemo<RightPanelApi>(
     () => ({
       ...state,
       openTab,
+      openFile,
       splitTab,
       moveBeside: (tabId) => {
         const tab = state.tabs.find((t) => t.id === tabId)
@@ -247,11 +273,13 @@ export function RightPanelProvider({ children }: { children: React.ReactNode }):
       },
       showTab: (tabId) => dispatch({ type: 'show', tabId }),
       closeTab: (tabId) => {
+        if (!confirmClose([tabId])) return
         dispose([tabId])
         dispatch({ type: 'close', tabIds: [tabId] })
       },
       closeOthers: (tabId) => {
         const others = state.tabs.filter((t) => t.id !== tabId).map((t) => t.id)
+        if (!confirmClose(others)) return
         dispose(others)
         dispatch({ type: 'close', tabIds: others })
       },
@@ -263,7 +291,7 @@ export function RightPanelProvider({ children }: { children: React.ReactNode }):
       titleOf: (tab) =>
         state.titles[tab.id] ?? state.autoTitles[tab.id] ?? getTabDefinition(tab.kind)?.title ?? tab.kind
     }),
-    [state, openTab, splitTab, dispose]
+    [state, openTab, openFile, splitTab, dispose, confirmClose]
   )
 
   useEffect(() => {

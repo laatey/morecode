@@ -48,7 +48,7 @@ export function UserMessage({
 
   if (editing) {
     return (
-      <div className="ml-auto w-full max-w-[88%] rounded-[10px] border border-white/[0.14] bg-white/[0.05] p-2">
+      <div className="ml-auto w-full max-w-[88%] rounded-[10px] border border-border-strong bg-foreground/[0.05] p-2">
         <textarea
           ref={box}
           rows={1}

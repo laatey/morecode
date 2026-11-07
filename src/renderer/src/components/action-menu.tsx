@@ -78,8 +78,8 @@ export function ActionMenu({
     const usesExplicitSeparators = list.some((i) => i.separatorBefore)
     return list.map((item, index) => {
       const tone = item.danger
-        ? 'text-[#f87171] focus:bg-red-500/15 data-[state=open]:bg-red-500/15'
-        : 'text-[#e2e2e0] focus:bg-white/[0.07] data-[state=open]:bg-white/[0.07]'
+        ? 'text-destructive focus:bg-destructive/15 data-[state=open]:bg-destructive/15'
+        : 'text-foreground focus:bg-foreground/[0.07] data-[state=open]:bg-foreground/[0.07]'
       const showSubArrow = item.hasSubmenu || Boolean(item.submenu?.length)
       const content = (
         <>
@@ -87,7 +87,7 @@ export function ActionMenu({
           <span
             className={cn(
               'flex h-3.5 w-3.5 shrink-0 items-center justify-center',
-              item.danger ? 'text-[#f87171]' : 'text-[#a8a8a6]'
+              item.danger ? 'text-destructive' : 'text-muted-foreground'
             )}
           >
             {item.checked ? <Check className="h-3.5 w-3.5 stroke-[2]" /> : item.icon}
@@ -97,7 +97,7 @@ export function ActionMenu({
             {item.description && (
               <span
                 className={cn(
-                  'block truncate text-[#8e8e8a]',
+                  'block truncate text-muted-foreground',
                   compact ? 'text-[10.5px] leading-[14px]' : 'text-[11px] leading-4'
                 )}
               >
@@ -108,9 +108,9 @@ export function ActionMenu({
           {item.right ? (
             <span className="ml-4 shrink-0">{item.right}</span>
           ) : showSubArrow ? (
-            <ChevronRight className="ml-5 h-3 w-3 shrink-0 text-[#a8a8a6]" />
+            <ChevronRight className="ml-5 h-3 w-3 shrink-0 text-muted-foreground" />
           ) : item.shortcut ? (
-            <span className="ml-5 shrink-0 text-[11.5px] text-[#a8a8a6]">
+            <span className="ml-5 shrink-0 text-[11.5px] text-muted-foreground">
               {item.shortcut}
             </span>
           ) : null}
@@ -122,7 +122,7 @@ export function ActionMenu({
       return (
         <React.Fragment key={item.id}>
           {showSeparator && (
-            <DropdownMenu.Separator className="my-0.5 h-px bg-white/[0.08]" />
+            <DropdownMenu.Separator className="my-0.5 h-px bg-foreground/[0.08]" />
           )}
           {item.submenu && item.submenu.length > 0 ? (
             <DropdownMenu.Sub>
@@ -145,8 +145,8 @@ export function ActionMenu({
                     }
                   }}
                   className={cn(
-                    'app-no-drag z-50 min-w-[200px] overflow-hidden rounded-[6px] border border-white/[0.09]',
-                    'bg-[#2b2b2a] p-0.5 text-foreground shadow-lg outline-none select-none',
+                    'app-no-drag z-50 min-w-[200px] overflow-hidden rounded-[6px] border border-border',
+                    'bg-muted p-0.5 text-foreground shadow-lg outline-none select-none',
                     'animate-in fade-in-0 zoom-in-95'
                   )}
                 >
@@ -197,8 +197,8 @@ export function ActionMenu({
           sideOffset={sideOffset}
           // Compact, low-contrast surface: barely lighter than the app background.
           className={cn(
-            'app-no-drag z-50 min-w-[168px] overflow-hidden rounded-[6px] border border-white/[0.09]',
-            'bg-[#2b2b2a] p-0.5 text-foreground shadow-lg outline-none select-none',
+            'app-no-drag z-50 min-w-[168px] overflow-hidden rounded-[6px] border border-border',
+            'bg-muted p-0.5 text-foreground shadow-lg outline-none select-none',
             'animate-in fade-in-0 zoom-in-95',
             contentClassName
           )}

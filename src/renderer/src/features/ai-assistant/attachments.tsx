@@ -51,7 +51,7 @@ export function AttachmentChip({
   return (
     <span
       title={item.path ?? item.name}
-      className="inline-flex h-6 max-w-[200px] items-center gap-1.5 rounded-[6px] border border-white/[0.09] bg-white/[0.04] pl-1.5 pr-1 text-[12px] text-[#d6d6d3]"
+      className="inline-flex h-6 max-w-[200px] items-center gap-1.5 rounded-[6px] border border-border bg-foreground/[0.04] pl-1.5 pr-1 text-[12px] text-soft-foreground"
     >
       <Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
       <span className="truncate">{item.name}</span>
@@ -60,7 +60,7 @@ export function AttachmentChip({
           type="button"
           aria-label={`Remove ${item.name}`}
           onClick={onRemove}
-          className="grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-[3px] text-muted-foreground hover:bg-white/[0.1] hover:text-foreground"
+          className="grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-[3px] text-muted-foreground hover:bg-foreground/[0.1] hover:text-foreground"
         >
           <X className="h-3 w-3" />
         </button>

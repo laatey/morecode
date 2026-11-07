@@ -14,22 +14,28 @@ const ALTERNATE_IDS: Record<string, string[]> = {
   // none needed right now; add 'name': ['other name'] if ModelScope's API ever disagrees with its website
 }
 
+/** Reply sizes asked for, biggest first. A service that refuses one is asked again with the next. */
+const CAPS = [32768, 16384, 8192]
+/** The size each model last accepted, so the next request does not go down the list again. */
+const accepted = new Map<string, number>()
+const CAP_REFUSED = /max_tokens|max_completion_tokens|maximum|too large|exceed|out of range|less than or equal|at most/i
+
 export async function streamOpenAI(
   req: StreamRequest,
-  on: { text?: (delta: string) => void }
+  on: { text?: (delta: string) => void; progress?: (chars: number, thinking?: boolean) => void; thinking?: (delta: string) => void }
 ): Promise<StreamResult> {
   const doFetch = req.fetchImpl ?? fetch
   const base = (req.baseUrl ?? '').replace(/\/$/, '')
   const who = base.includes('groq.com') ? 'Groq' : 'ModelScope'
 
-  const send = (withUsage: boolean, model: string): Promise<Response> =>
+  const send = (withUsage: boolean, model: string, cap: number): Promise<Response> =>
     doFetch(`${base}/v1/chat/completions`, {
       method: 'POST',
       signal: req.signal,
       headers: { 'content-type': 'application/json', authorization: `Bearer ${req.apiKey}` },
       body: JSON.stringify({
         model,
-        max_tokens: Math.min(req.maxTokens ?? 8192, 8192),
+        max_tokens: cap,
         stream: true,
         ...(withUsage ? { stream_options: { include_usage: true } } : {}),
         messages: toOpenAIMessages(req.system, req.messages),
@@ -40,10 +46,26 @@ export async function streamOpenAI(
   let res!: Response
   try {
     for (const model of [req.model, ...(ALTERNATE_IDS[req.model] ?? [])]) {
-      res = await send(true, model)
-      // a server that does not know stream_options is asked again without it; the answer just has no token counts
-      if (res.status === 400) res = await send(false, model)
-      if (res.ok) break
+      const want = Math.min(req.maxTokens ?? CAPS[0], CAPS[0])
+      const known = accepted.get(`${base}|${model}`)
+      const caps = [...new Set([known ?? want, ...CAPS.filter((c) => c <= (known ?? want))])]
+      let stop = false
+      for (let i = 0; i < caps.length; i++) {
+        res = await send(true, model, caps[i])
+        // a server that does not know stream_options is asked again without it; the answer just has no token counts
+        if (res.status === 400) {
+          const said400 = await res.clone().text().catch(() => '')
+          // a reply size the service refuses: try the next smaller one
+          if (CAP_REFUSED.test(said400) && !/invalid model id/i.test(said400) && i < caps.length - 1) continue
+          res = await send(false, model, caps[i])
+        }
+        if (res.ok) {
+          accepted.set(`${base}|${model}`, caps[i])
+          stop = true
+        }
+        break
+      }
+      if (stop) break
       // only an unknown name moves on to the next name; any other refusal is the real answer
       const said = await res
         .clone()

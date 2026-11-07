@@ -12,20 +12,20 @@ const TONES: Record<
   }
 > = {
   emerald: {
-    surface: 'bg-[#1a241d]',
-    badgeFill: '#3b634c'
+    surface: 'bg-inset',
+    badgeFill: 'color-mix(in oklab, var(--success) 38%, var(--background))'
   },
   indigo: {
-    surface: 'bg-[#1c212b]',
-    badgeFill: '#3d5175'
+    surface: 'bg-inset',
+    badgeFill: 'color-mix(in oklab, var(--primary) 38%, var(--background))'
   },
   amber: {
-    surface: 'bg-[#25201a]',
-    badgeFill: '#695239'
+    surface: 'bg-inset',
+    badgeFill: 'color-mix(in oklab, var(--warning) 38%, var(--background))'
   },
   violet: {
-    surface: 'bg-[#221e28]',
-    badgeFill: '#54436b'
+    surface: 'bg-inset',
+    badgeFill: 'color-mix(in oklab, var(--chart-5) 38%, var(--background))'
   }
 }
 
@@ -41,7 +41,7 @@ function Illustration({
       <svg
         viewBox="0 0 120 80"
         fill="none"
-        className="h-[72px] w-[108px] shrink-0 select-none opacity-80"
+        className="h-[72px] w-[108px] shrink-0 select-none text-foreground opacity-80"
         aria-hidden
       >
         <rect
@@ -50,7 +50,7 @@ function Illustration({
           width="74"
           height="52"
           rx="4"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.6"
           strokeOpacity="0.65"
         />
@@ -59,7 +59,7 @@ function Illustration({
           y1="24"
           x2="84"
           y2="24"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeOpacity="0.5"
         />
@@ -68,7 +68,7 @@ function Illustration({
           y1="24"
           x2="34"
           y2="62"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeOpacity="0.5"
         />
@@ -77,7 +77,7 @@ function Illustration({
           y1="24"
           x2="59"
           y2="62"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeOpacity="0.5"
         />
@@ -86,7 +86,7 @@ function Illustration({
           y1="43"
           x2="84"
           y2="43"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeOpacity="0.5"
         />
@@ -95,13 +95,13 @@ function Illustration({
           cy="52"
           r="18"
           fill={badgeFill}
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.6"
           strokeOpacity="0.85"
         />
         <path
           d="M76 55L82 48L86 52L92 44"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.7"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -116,7 +116,7 @@ function Illustration({
       <svg
         viewBox="0 0 120 80"
         fill="none"
-        className="h-[72px] w-[108px] shrink-0 select-none opacity-80"
+        className="h-[72px] w-[108px] shrink-0 select-none text-foreground opacity-80"
         aria-hidden
       >
         <rect
@@ -125,7 +125,7 @@ function Illustration({
           width="70"
           height="50"
           rx="4"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.6"
           strokeOpacity="0.65"
         />
@@ -134,7 +134,7 @@ function Illustration({
           y1="25"
           x2="48"
           y2="25"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.6"
           strokeLinecap="round"
           strokeOpacity="0.65"
@@ -144,7 +144,7 @@ function Illustration({
           y1="35"
           x2="66"
           y2="35"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeOpacity="0.45"
@@ -154,7 +154,7 @@ function Illustration({
           y1="45"
           x2="56"
           y2="45"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeOpacity="0.45"
@@ -164,13 +164,13 @@ function Illustration({
           cy="52"
           r="18"
           fill={badgeFill}
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.6"
           strokeOpacity="0.85"
         />
         <path
           d="M79 57L85 45M87 55H92"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.7"
           strokeLinecap="round"
           strokeOpacity="0.9"
@@ -184,7 +184,7 @@ function Illustration({
       <svg
         viewBox="0 0 120 80"
         fill="none"
-        className="h-[72px] w-[108px] shrink-0 select-none opacity-80"
+        className="h-[72px] w-[108px] shrink-0 select-none text-foreground opacity-80"
         aria-hidden
       >
         <rect
@@ -193,7 +193,7 @@ function Illustration({
           width="70"
           height="48"
           rx="4"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.6"
           strokeOpacity="0.65"
         />
@@ -202,7 +202,7 @@ function Illustration({
           y1="26"
           x2="82"
           y2="26"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.5"
           strokeOpacity="0.5"
         />
@@ -212,7 +212,7 @@ function Illustration({
           width="12"
           height="9"
           rx="1.5"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.4"
           strokeOpacity="0.55"
         />
@@ -222,7 +222,7 @@ function Illustration({
           width="12"
           height="9"
           rx="1.5"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.4"
           strokeOpacity="0.55"
         />
@@ -232,7 +232,7 @@ function Illustration({
           width="12"
           height="9"
           rx="1.5"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.4"
           strokeOpacity="0.45"
         />
@@ -241,13 +241,13 @@ function Illustration({
           cy="52"
           r="18"
           fill={badgeFill}
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.6"
           strokeOpacity="0.85"
         />
         <path
           d="M84 44V52L90 55"
-          stroke="#e6e6e1"
+          stroke="currentColor"
           strokeWidth="1.7"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -261,7 +261,7 @@ function Illustration({
     <svg
       viewBox="0 0 120 80"
       fill="none"
-      className="h-[72px] w-[108px] shrink-0 select-none opacity-80"
+      className="h-[72px] w-[108px] shrink-0 select-none text-foreground opacity-80"
       aria-hidden
     >
       <rect
@@ -270,7 +270,7 @@ function Illustration({
         width="16"
         height="22"
         rx="2.5"
-        stroke="#e6e6e1"
+        stroke="currentColor"
         strokeWidth="1.5"
         strokeOpacity="0.5"
       />
@@ -280,7 +280,7 @@ function Illustration({
         width="16"
         height="34"
         rx="2.5"
-        stroke="#e6e6e1"
+        stroke="currentColor"
         strokeWidth="1.5"
         strokeOpacity="0.6"
       />
@@ -290,7 +290,7 @@ function Illustration({
         width="16"
         height="46"
         rx="2.5"
-        stroke="#e6e6e1"
+        stroke="currentColor"
         strokeWidth="1.6"
         strokeOpacity="0.7"
       />
@@ -299,13 +299,13 @@ function Illustration({
         cy="52"
         r="18"
         fill={badgeFill}
-        stroke="#e6e6e1"
+        stroke="currentColor"
         strokeWidth="1.6"
         strokeOpacity="0.85"
       />
       <path
         d="M78 52H90M85 47L90 52L85 57"
-        stroke="#e6e6e1"
+        stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -349,18 +349,18 @@ export function FeatureBanner({
       )}
     >
       <div className="min-w-0 flex-1">
-        <div className="text-[11.5px] text-white/50">{eyebrow}</div>
-        <h3 className="mt-0.5 font-display text-[17px] font-semibold leading-snug text-[#f1f1ef]">
+        <div className="text-[11.5px] text-foreground/50">{eyebrow}</div>
+        <h3 className="mt-0.5 font-display text-[17px] font-semibold leading-snug text-foreground">
           {title}
         </h3>
-        <p className="mt-1 max-w-[460px] text-[12.5px] leading-[18px] text-white/65">
+        <p className="mt-1 max-w-[460px] text-[12.5px] leading-[18px] text-foreground/65">
           {description}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onAction}
-            className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-[6px] bg-[#ececea] px-3 text-[12px] font-medium text-[#1a1a19] transition-colors hover:bg-white"
+            className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-[6px] bg-foreground px-3 text-[12px] font-medium text-background transition-colors hover:bg-foreground"
           >
             {actionLabel}
           </button>
@@ -368,7 +368,7 @@ export function FeatureBanner({
             <button
               type="button"
               onClick={onSecondary}
-              className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-[6px] px-2.5 text-[12px] font-medium text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
+              className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-[6px] px-2.5 text-[12px] font-medium text-foreground/70 transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
             >
               {secondaryLabel}
             </button>

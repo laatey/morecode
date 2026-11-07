@@ -6,6 +6,7 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { cn } from '@/lib/utils'
 import { languageForName } from '@/lib/highlight'
+import { ImageThumbs } from './image-lightbox'
 import { escapeCodeHtml, getCachedHighlight, highlightWithPierre } from '@/lib/pierre-highlight'
 
 /** What a message says when the person sent only attachments. It is never shown. */
@@ -21,7 +22,7 @@ export function WithMentions({ text }: { text: string }): React.JSX.Element {
           <span
             key={i}
             title={part.slice(1)}
-            className="inline-block max-w-full truncate align-middle rounded-[5px] bg-[#1d4ed8]/20 px-1.5 py-[1.5px] text-[#a9c8ff]"
+            className="inline-block max-w-full truncate align-middle rounded-[5px] bg-primary/20 px-1.5 py-[1.5px] text-link"
           >
             {part.slice(1)}
           </span>
@@ -54,23 +55,18 @@ export function UserBubble({
   return (
     <div className="flex max-w-[88%] min-w-0 flex-col items-end gap-1.5">
       {images?.length ? (
-        <div className="flex flex-wrap justify-end gap-1.5">
-          {images.map((src, i) => (
-            <img
-              key={i}
-              src={src}
-              alt=""
-              className="h-16 w-16 rounded-[6px] border border-white/[0.1] object-cover"
-            />
-          ))}
-        </div>
+        <ImageThumbs
+          images={images}
+          className="flex flex-wrap justify-end gap-1.5"
+          thumbClassName="h-16 w-16 rounded-[6px] border border-border object-cover transition-opacity hover:opacity-90"
+        />
       ) : null}
       {children}
       {text.trim() && !ATTACH_ONLY.includes(text) ? (
         <div
           onClick={() => clamped && setOpen((o) => !o)}
           className={cn(
-            'relative min-w-0 max-w-full rounded-[10px] bg-white/[0.07] px-3 py-2 text-[13px] leading-6',
+            'relative min-w-0 max-w-full rounded-[10px] bg-foreground/[0.07] px-3 py-2 text-[13px] leading-6',
             clamped && 'cursor-pointer'
           )}
         >
@@ -113,8 +109,8 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }): React.JSX.E
   }, [code, language])
 
   return (
-    <div className="my-3 overflow-hidden rounded-md border border-white/[0.08] bg-transparent font-mono text-[11.5px]">
-      <div className="flex items-center justify-between border-b border-white/[0.08] px-3.5 py-1.5 text-[11px] text-muted-foreground font-sans">
+    <div className="my-3 overflow-hidden rounded-md border border-border bg-transparent font-mono text-[11.5px]">
+      <div className="flex items-center justify-between border-b border-border px-3.5 py-1.5 text-[11px] text-muted-foreground font-sans">
         <span>{lang || 'text'}</span>
         <button
           type="button"
@@ -210,8 +206,8 @@ const MarkdownBlock = React.memo(function MarkdownBlock({ content }: { content: 
                 className={cn(
                   'inline rounded-[5px] px-1.5 py-[1.5px] font-mono text-[12px]',
                   isFileReference
-                    ? 'bg-[#1d4ed8]/20 text-[#a9c8ff]'
-                    : 'bg-white/[0.07] text-[#e1e7ff]'
+                    ? 'bg-primary/20 text-link'
+                    : 'bg-foreground/[0.07] text-foreground'
                 )}
               >
                 {children}

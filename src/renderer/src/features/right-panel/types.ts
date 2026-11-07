@@ -20,6 +20,8 @@ export interface TabDefinition {
   component: ComponentType<TabContentProps>
   /** Runs when a tab of this kind is closed: stop processes, forget saved state. */
   onClose?: (tabId: string) => void
+  /** True when closing the tab would lose work; the person is asked first. */
+  isDirty?: (tabId: string) => boolean
 }
 
 export type LayoutId = 'single' | 'columns' | 'rows' | 'grid'
@@ -27,4 +29,6 @@ export type LayoutId = 'single' | 'columns' | 'rows' | 'grid'
 export interface TabInstance {
   id: string
   kind: string
+  /** File tabs: the project file this tab shows. */
+  path?: string
 }

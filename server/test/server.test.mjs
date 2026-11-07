@@ -24,7 +24,7 @@ const upstream = createServer((req, res) => {
   req.on('end', () => {
     upstreamSeen.push({ headers: req.headers, body: JSON.parse(data) })
     res.writeHead(200, { 'content-type': 'text/event-stream' })
-    res.end('event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":5}}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n')
+    res.end('event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":4000}}}\n\nevent: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":1000}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n')
   })
 })
 const upstreamUrl = await listen(upstream)
@@ -65,7 +65,7 @@ const dir = mkdtempSync(join(tmpdir(), 'mcs-'))
 const dataFile = join(dir, 'd.db')
 const releases = join(dir, 'releases.json')
 writeFileSync(releases, JSON.stringify({ latest: '1.2.0', notes: ['Faster'], url: 'https://morecode.test/dl' }))
-const config = loadConfig({ SIGNUPS_PER_HOUR: '200', DATABASE_FILE: dataFile, RELEASES_FILE: releases, GOOGLE_CLIENT_ID: 'gid', GOOGLE_CLIENT_SECRET: 'gsec', GOOGLE_AUTH_URL: 'https://accounts.example/auth', GOOGLE_TOKEN_URL: providerUrl + '/token', GOOGLE_USERINFO_URL: providerUrl + '/google/userinfo', GITHUB_CLIENT_ID: 'hid', GITHUB_CLIENT_SECRET: 'hsec', GITHUB_AUTH_URL: 'https://gh.example/auth', GITHUB_TOKEN_URL: providerUrl + '/token', GITHUB_API_URL: providerUrl + '/gh', ANTHROPIC_API_KEY: 'sk-server-secret-key', ANTHROPIC_BASE_URL: upstreamUrl, APP_URL: 'https://morecode.test', BILLING_MODE: 'demo' })
+const config = loadConfig({ SIGNUPS_PER_HOUR: '200', DATABASE_FILE: dataFile, RELEASES_FILE: releases, GOOGLE_CLIENT_ID: 'gid', GOOGLE_CLIENT_SECRET: 'gsec', GOOGLE_AUTH_URL: 'https://accounts.example/auth', GOOGLE_TOKEN_URL: providerUrl + '/token', GOOGLE_USERINFO_URL: providerUrl + '/google/userinfo', GITHUB_CLIENT_ID: 'hid', GITHUB_CLIENT_SECRET: 'hsec', GITHUB_AUTH_URL: 'https://gh.example/auth', GITHUB_TOKEN_URL: providerUrl + '/token', GITHUB_API_URL: providerUrl + '/gh', ANTHROPIC_API_KEY: 'sk-server-secret-key', ANTHROPIC_BASE_URL: upstreamUrl, APP_URL: 'https://morecode.test', BILLING_MODE: 'demo', LIMIT_FREE_SESSION: '3000', LIMIT_PRO_WEEK: '9000' })
 const repo = openRepo(dataFile)
 const mails = []
 const app = createApp({ config, repo, mail: { send: async (to, subject, text) => mails.push({ to, subject, text }) } })
@@ -166,16 +166,24 @@ try {
   await (await ai(token, 'claude-haiku-5-5', 'run-1')).text()
   const used = (await call('GET', '/v1/me', { token })).json.account.sentToday
   ok('three steps of one run count as ONE message', used === 1, used)
-  for (let i = 2; i <= 25; i++) await (await ai(token, 'claude-haiku-5-5', `run-${i}`)).text()
-  const over = await ai(token, 'claude-haiku-5-5', 'run-26')
+  const settle = () => new Promise((r) => setTimeout(r, 80)) // the cost of an answer is counted just after it ends
+  await settle()
+  // each Haiku step here costs (4000 + 1000) x 0.25 = 1250 tokens; the free session holds 3000
+  const over = await ai(token, 'claude-haiku-5-5', 'run-2')
   const overJson = await over.json()
-  ok('26th message refused with 429 and a retry-after', over.status === 429 && overJson.error.type === 'rate_limit_error' && Number(over.headers.get('retry-after')) > 0, [over.status, overJson])
-  ok('upstream was not called for the refused one (run 1 made 3 calls + runs 2-25)', upstreamSeen.length === 27, upstreamSeen.length)
-  ok('a run already counted may finish even at the limit', (await ai(token, 'claude-haiku-5-5', 'run-25')).status === 200)
+  ok('a new message is refused with 429 once the 5-hour limit is full', over.status === 429 && overJson.error.type === 'rate_limit_error' && overJson.error.message.includes('5-hour') && Number(over.headers.get('retry-after')) > 0, [over.status, overJson])
+  ok('upstream was not called for the refused one', upstreamSeen.length === 3, upstreamSeen.length)
+  const meNow = (await call('GET', '/v1/me', { token })).json.account
+  ok('the account reports both windows', meNow.limits.session.percent === 100 && meNow.limits.session.resetsAt > Date.now() && meNow.limits.week.percent > 0 && meNow.limits.week.percent < 100, meNow.limits)
+  ok('a run already let in may finish even at the limit', (await ai(token, 'claude-haiku-5-5', 'run-1')).status === 200)
   const up = await call('PATCH', '/v1/me', { token, body: { plan: 'pro', billing: { card: { brand: 'Visa', last4: '4242', exp: '12/30', number: '4242424242424242' }, yearly: true, renews: Date.now(), invoices: [{ id: 'i1', date: Date.now(), description: 'Pro', amount: 192 }] } } })
   ok('demo plan change applies', up.json.account.plan === 'pro' && up.json.account.billing.card.last4 === '4242')
   ok('full card number never stored', !dump().includes('4242424242424242'))
   ok('pro can use Opus and has room again', (await ai(token, 'claude-opus-5-5', 'run-27')).status === 200)
+  await settle()
+  const weekly = await ai(token, 'claude-opus-5-5', 'run-28')
+  const weeklyJson = await weekly.json()
+  ok('the weekly limit refuses once it is full', weekly.status === 429 && weeklyJson.error.message.includes('week'), weeklyJson)
 
   /* ---- reset password ---- */
   const before = mails.length
@@ -222,10 +230,12 @@ try {
   ok('no plain passwords or codes in the database', !preDump.includes('longenough1') && !preDump.includes('brandnewpass1'))
   ok('passwords are scrypt hashes', /"pass_hash":"[0-9a-f]{32}:[0-9a-f]{128}"/.test(preDump))
 
-  /* ---- concurrency: 30 people at once, a plan of 25 ---- */
+  /* ---- concurrency: many messages at once from one person ---- */
   const racer = await makeUser('race@x.com', 'Race')
-  const burst = await Promise.all(Array.from({ length: 30 }, (_, i) => ai(racer.token, 'claude-haiku-5-5', `burst-${i}`).then(async (r) => (await r.text(), r.status))))
-  ok('exactly 25 of 30 simultaneous messages admitted', burst.filter((x) => x === 200).length === 25 && burst.filter((x) => x === 429).length === 5, burst.reduce((a, x) => ((a[x] = (a[x] || 0) + 1), a), {}))
+  const burst = await Promise.all(Array.from({ length: 6 }, (_, i) => ai(racer.token, 'claude-haiku-5-5', `burst-${i}`).then(async (r) => (await r.text(), r.status))))
+  ok('a burst never errors', burst.every((x) => x === 200 || x === 429), burst)
+  await settle()
+  ok('and the limit holds afterwards', (await ai(racer.token, 'claude-haiku-5-5', 'burst-after')).status === 429)
 
   /* ---- sign in with Google / GitHub ---- */
   const cl = () => 'client-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)

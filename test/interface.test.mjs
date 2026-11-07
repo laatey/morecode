@@ -11,7 +11,8 @@ test('a requested right sidebar makes the left yield when both cannot fit', () =
 })
 test('tight windows open requested sidebars as overlays rather than silently failing', () => {
   assert.equal(sidebarNeedsOverlay(600, 'right'), true)
-  assert.equal(sidebarNeedsOverlay(700, 'right'), false)
+  assert.equal(sidebarNeedsOverlay(700, 'right'), true)
+  assert.equal(sidebarNeedsOverlay(772, 'right'), false)
 })
 test('window expansion restores both preferred widths without mutating preferences', () => {
   sidebarLayout(800, { left: false, right: false }, widths, 'right')

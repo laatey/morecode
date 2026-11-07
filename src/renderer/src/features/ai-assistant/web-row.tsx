@@ -49,7 +49,7 @@ export function WebRow({ tool }: { tool: Web }): React.JSX.Element {
               ? 'Reading'
               : 'Read'}
         </span>
-        <span className="min-w-0 truncate rounded-[4px] bg-white/[0.05] px-1.5 text-[12px] leading-[18px] text-[#e2e2e0]">
+        <span className="min-w-0 truncate rounded-[4px] bg-foreground/[0.05] px-1.5 text-[12px] leading-[18px] text-foreground">
           {search ? tool.query : host(tool.url ?? '')}
         </span>
         {search && tool.results && (
@@ -67,7 +67,7 @@ export function WebRow({ tool }: { tool: Web }): React.JSX.Element {
         )}
       </Row>
       {open && tool.status === 'error' && tool.error && (
-        <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-red-400/25 bg-red-950/30 p-2 text-[12px] leading-5 text-red-100">
+        <p className="ml-5 mt-1 whitespace-pre-wrap rounded-md border border-destructive/25 bg-destructive/30 p-2 text-[12px] leading-5 text-destructive">
           {tool.error}
         </p>
       )}
@@ -80,7 +80,7 @@ export function WebRow({ tool }: { tool: Web }): React.JSX.Element {
                 onClick={() => openUrl(r.url)}
                 className="group flex max-w-full cursor-pointer items-baseline gap-1.5 text-left"
               >
-                <span className="min-w-0 truncate text-[12.5px] text-[#e2e2e0] group-hover:underline">
+                <span className="min-w-0 truncate text-[12.5px] text-foreground group-hover:underline">
                   {r.title}
                 </span>
                 <ExternalLink className="h-2.5 w-2.5 shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -97,7 +97,7 @@ export function WebRow({ tool }: { tool: Web }): React.JSX.Element {
       )}
       {open && !search && tool.excerpt && (
         <div className="ml-[22px] mt-1 mb-1.5 pr-1">
-          <p className="line-clamp-6 whitespace-pre-wrap border-l-2 border-[#4a4a45] pl-3 text-[12px] leading-[18px] text-muted-foreground">
+          <p className="line-clamp-6 whitespace-pre-wrap border-l-2 border-border-strong pl-3 text-[12px] leading-[18px] text-muted-foreground">
             {tool.excerpt}
           </p>
           <div className="mt-1.5 flex items-center gap-3 pl-3 text-[11px] text-muted-foreground/70">

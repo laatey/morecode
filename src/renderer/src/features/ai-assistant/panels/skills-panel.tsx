@@ -5,8 +5,10 @@ import {
   ChevronDown,
   ChevronRight,
   Code2,
+  Copy,
   Download,
   Eye,
+  FileCode2,
   FileText,
   Folder,
   FolderOpen,
@@ -38,7 +40,6 @@ import { Markdown } from '../message-parts'
 import { languageFor } from '@/lib/highlight'
 import { escapeCodeHtml, getCachedHighlight, highlightWithPierre } from '@/lib/pierre-highlight'
 import { cn } from '@/lib/utils'
-import { FeatureBanner } from '@/components/feature-banner'
 import { SegmentedSwitch } from '@/components/segmented-switch'
 import { MiniTabs, PanelFrame } from './ui'
 
@@ -59,7 +60,7 @@ function Tile({ icon, size = 'sm' }: { icon: string; size?: 'sm' | 'lg' }): Reac
   return (
     <span
       className={cn(
-        'grid shrink-0 place-items-center bg-[#33332f] text-[#e2e2e0]',
+        'grid shrink-0 place-items-center bg-secondary text-foreground',
         size === 'lg' ? 'h-10 w-10 rounded-[10px]' : 'h-8 w-8 rounded-[8px]'
       )}
     >
@@ -68,9 +69,9 @@ function Tile({ icon, size = 'sm' }: { icon: string; size?: 'sm' | 'lg' }): Reac
   )
 }
 
-const label = 'mb-1 block text-[12px] font-medium text-[#e2e2e0]'
+const label = 'mb-1 block text-[12px] font-medium text-foreground'
 const area =
-  'slim-scroll w-full resize-none rounded-[5px] border border-[#3a3a37] bg-[#272726] px-2.5 py-2 text-[12.5px] leading-[18px] text-white outline-none transition-colors placeholder:text-[#9a9a95] focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]'
+  'slim-scroll w-full resize-none rounded-[5px] border border-border bg-background px-2.5 py-2 text-[12.5px] leading-[18px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary'
 
 /** Skills library, the person's own skills, and their own / commands. */
 export function SkillsPanel({
@@ -174,7 +175,6 @@ function ListView({
 
   const mine = sk.all.filter((s) => sk.isInstalled(s.id) && match(s))
   const discoverList = sk.all.filter((s) => match(s))
-  const dataSkillInstalled = sk.isInstalled('data')
 
   return (
     <div
@@ -193,10 +193,10 @@ function ListView({
       className="relative"
     >
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center rounded-[12px] border border-dashed border-[#5793ff]/60 bg-[#1e1e1d]/90 backdrop-blur-xs">
+        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center rounded-[12px] border border-dashed border-primary/60 bg-inset/90 backdrop-blur-xs">
           <div className="flex flex-col items-center gap-1.5 text-center">
-            <Package className="h-5 w-5 text-[#8ab4f8]" />
-            <span className="text-[13px] font-medium text-white">Drop .zip, SKILL.md, or skill files to import</span>
+            <Package className="h-5 w-5 text-link" />
+            <span className="text-[13px] font-medium text-foreground">Drop a .skill, .zip, SKILL.md, or skill files to import</span>
           </div>
         </div>
       )}
@@ -205,7 +205,7 @@ function ListView({
       <input
         ref={filePicker}
         type="file"
-        accept=".zip,.md,.mdx,.json,.yaml,.yml,.txt,.skill"
+        accept=".skill,.zip,.md,.mdx,.json,.yaml,.yml,.txt"
         multiple
         hidden
         onChange={(e) => {
@@ -227,41 +227,6 @@ function ListView({
         }}
       />
 
-      {embedded && !q && (
-        <FeatureBanner
-          tone={tab === 'discover' ? 'emerald' : 'indigo'}
-          art="skills"
-          eyebrow={tab === 'commands' ? 'Slash Workflows' : 'From MoreCode'}
-          tag={tab === 'commands' ? '/command' : dataSkillInstalled ? '✓ Added' : 'Plugin'}
-          title={tab === 'commands' ? 'Reusable Slash Commands' : 'Data'}
-          description={
-            tab === 'commands'
-              ? 'Turn multi-step prompts like /review, /ship, or /audit into one-keystroke shortcuts in the chat composer.'
-              : 'Query, chart, and explain your data — SQL, spreadsheets, and dashboards in one place.'
-          }
-          actionLabel={
-            tab === 'commands'
-              ? 'Create command'
-              : dataSkillInstalled
-                ? 'View plugin'
-                : 'Add'
-          }
-          onAction={() => {
-            if (tab === 'commands') {
-              setView({ name: 'command', id: null })
-            } else if (dataSkillInstalled) {
-              setView({ name: 'detail', id: 'data' })
-            } else {
-              sk.install('data')
-              toast.success('Data plugin added')
-            }
-          }}
-          secondaryLabel={tab !== 'commands' ? 'Upload .zip / SKILL.md' : undefined}
-          onSecondary={tab !== 'commands' ? () => filePicker.current?.click() : undefined}
-          className="mb-4"
-        />
-      )}
-
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <MiniTabs
           value={tab}
@@ -279,7 +244,7 @@ function ListView({
         <div className="flex items-center gap-2">
           {tab !== 'commands' && (
             <div className="relative w-[190px]">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#737370]" />
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint-foreground" />
               <TextInput
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -294,7 +259,7 @@ function ListView({
             <button
               type="button"
               onClick={() => setAddOpen((o) => !o)}
-              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[7px] bg-[#ececea] px-3 text-[12.5px] font-medium text-[#161615] transition-colors hover:bg-white"
+              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[7px] bg-foreground px-3 text-[12.5px] font-medium text-background transition-opacity hover:opacity-90"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Add</span>
@@ -302,19 +267,19 @@ function ListView({
             </button>
 
             {addOpen && (
-              <div className="absolute right-0 top-full z-30 mt-1.5 w-[225px] rounded-[9px] border border-white/[0.1] bg-[#242423] p-1 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+              <div className="absolute right-0 top-full z-30 mt-1.5 w-[225px] rounded-[9px] border border-border bg-card p-1 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
                 <button
                   type="button"
                   onClick={() => {
                     setAddOpen(false)
                     filePicker.current?.click()
                   }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2.5 py-2 text-left text-[12.5px] text-[#ececea] transition-colors hover:bg-white/[0.07]"
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2.5 py-2 text-left text-[12.5px] text-foreground transition-colors hover:bg-foreground/[0.07]"
                 >
-                  <Package className="h-3.5 w-3.5 text-[#9a9a95]" />
+                  <Package className="h-3.5 w-3.5 text-muted-foreground" />
                   <div>
-                    <div className="font-medium leading-tight">Upload skill (.zip or .md)</div>
-                    <div className="mt-0.5 text-[11px] text-[#8d8d8a]">Import a Claude/MoreCode zip or SKILL.md</div>
+                    <div className="font-medium leading-tight">Upload skill (.skill, .zip or .md)</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">Import a .skill package, zip or SKILL.md</div>
                   </div>
                 </button>
                 <button
@@ -323,24 +288,24 @@ function ListView({
                     setAddOpen(false)
                     folderPicker.current?.click()
                   }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2.5 py-2 text-left text-[12.5px] text-[#ececea] transition-colors hover:bg-white/[0.07]"
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2.5 py-2 text-left text-[12.5px] text-foreground transition-colors hover:bg-foreground/[0.07]"
                 >
-                  <FolderPlus className="h-3.5 w-3.5 text-[#9a9a95]" />
+                  <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />
                   <div>
                     <div className="font-medium leading-tight">Upload skill folder</div>
-                    <div className="mt-0.5 text-[11px] text-[#8d8d8a]">Select a folder containing SKILL.md files</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">Select a folder containing SKILL.md files</div>
                   </div>
                 </button>
-                <div className="my-1 h-px bg-white/[0.07]" />
+                <div className="my-1 h-px bg-foreground/[0.07]" />
                 <button
                   type="button"
                   onClick={() => {
                     setAddOpen(false)
                     setView({ name: 'edit', id: null })
                   }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-left text-[12.5px] text-[#ececea] transition-colors hover:bg-white/[0.07]"
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-left text-[12.5px] text-foreground transition-colors hover:bg-foreground/[0.07]"
                 >
-                  <Plus className="h-3.5 w-3.5 text-[#9a9a95]" />
+                  <Plus className="h-3.5 w-3.5 text-muted-foreground" />
                   <span>Write a new skill</span>
                 </button>
                 <button
@@ -349,9 +314,9 @@ function ListView({
                     setAddOpen(false)
                     setView({ name: 'command', id: null })
                   }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-left text-[12.5px] text-[#ececea] transition-colors hover:bg-white/[0.07]"
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-left text-[12.5px] text-foreground transition-colors hover:bg-foreground/[0.07]"
                 >
-                  <Code2 className="h-3.5 w-3.5 text-[#9a9a95]" />
+                  <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
                   <span>New slash command</span>
                 </button>
               </div>
@@ -363,18 +328,18 @@ function ListView({
       {tab === 'mine' &&
         (mine.length === 0 ? (
           <Empty
-            text={q ? `No skills match “${query}”.` : 'You have not added any skills yet. Drop a .zip or SKILL.md here, or browse Discover.'}
+            text={q ? `No skills match “${query}”.` : 'You have not added any skills yet. Drop a .skill, .zip or SKILL.md here, or browse Discover.'}
             action={
               !q && (
                 <div className="flex items-center gap-2">
-                  <Btn onClick={() => filePicker.current?.click()}>Upload .zip / SKILL.md</Btn>
+                  <Btn onClick={() => filePicker.current?.click()}>Upload .skill / .zip / SKILL.md</Btn>
                   <Btn onClick={() => setTab('discover')}>Browse Discover</Btn>
                 </div>
               )
             }
           />
         ) : (
-          <ul className="-mx-1 space-y-0.5">
+          <ul className="divide-y divide-border/60 overflow-hidden rounded-[10px] border border-border">
             {mine.map((s) => (
               <SkillRow
                 key={s.id}
@@ -395,7 +360,7 @@ function ListView({
 
       {tab === 'discover' && (
         <div>
-          <div className="mb-2.5 text-[12.5px] font-medium text-[#d6d6d3]">For you</div>
+          <div className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-faint-foreground">Recommended</div>
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {discoverList.map((s) => {
               const added = sk.isInstalled(s.id)
@@ -403,12 +368,12 @@ function ListView({
                 <div
                   key={s.id}
                   onClick={() => setView({ name: 'detail', id: s.id })}
-                  className="group flex cursor-pointer items-start gap-3 rounded-[10px] border border-white/[0.08] p-3.5 transition-colors hover:bg-white/[0.03]"
+                  className="group flex cursor-pointer items-start gap-3 rounded-[10px] border border-border p-3.5 transition-colors hover:border-border-strong hover:bg-foreground/[0.02]"
                 >
                   <Tile icon={s.icon} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[13.5px] font-medium text-[#f1f1ef]">{s.name}</span>
+                      <span className="truncate text-[13.5px] font-medium text-foreground">{s.name}</span>
                       <div
                         className="flex shrink-0 items-center gap-1.5"
                         onClick={(e) => e.stopPropagation()}
@@ -417,12 +382,12 @@ function ListView({
                           type="button"
                           onClick={() => {
                             if (!added) sk.install(s.id)
-                            prefill(`/${s.id} ${s.example}`.trim())
+                            window.dispatchEvent(new CustomEvent('skill:try-in-chat', { detail: `/${s.id} ` }))
                             onClose()
                           }}
-                          className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-[6px] bg-white/[0.08] px-2 text-[11.5px] text-[#e2e2e0] transition-colors hover:bg-white/[0.14]"
+                          className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-[6px] bg-foreground/[0.08] px-2 text-[11.5px] text-foreground transition-colors hover:bg-foreground/[0.14]"
                         >
-                          <MessageSquare className="h-3 w-3 text-[#a8a8a3]" />
+                          <MessageSquare className="h-3 w-3 text-muted-foreground" />
                           <span>Try</span>
                         </button>
                         <button
@@ -439,18 +404,18 @@ function ListView({
                           className={cn(
                             'grid h-6 w-6 cursor-pointer place-items-center rounded-[6px] transition-colors',
                             added
-                              ? 'bg-emerald-500/15 text-emerald-300'
-                              : 'bg-white/[0.08] text-[#e2e2e0] hover:bg-white/[0.14]'
+                              ? 'bg-success/15 text-success'
+                              : 'bg-foreground/[0.08] text-foreground hover:bg-foreground/[0.14]'
                           )}
                         >
                           {added ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                         </button>
                       </div>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-[12px] leading-[17px] text-[#8f8f8a]">
+                    <p className="mt-1 line-clamp-2 text-[12px] leading-[17px] text-muted-foreground">
                       {s.description}
                     </p>
-                    <div className="mt-2 text-[11px] text-[#6e6e69]">
+                    <div className="mt-2 text-[11px] text-faint-foreground">
                       by {s.author ?? 'MoreCode'}
                       {s.installs ? ` · ${s.installs}` : ''}
                     </div>
@@ -464,9 +429,9 @@ function ListView({
 
       {tab === 'commands' && (
         <div>
-          <p className="mb-3 text-[12.5px] leading-5 text-[#8d8d8a]">
+          <p className="mb-3 text-[12.5px] leading-5 text-muted-foreground">
             Save a message you send often as your own command. Type{' '}
-            <span className="text-[#d6d6d3]">/name</span> and it is sent for you.
+            <span className="text-soft-foreground">/name</span> and it is sent for you.
           </p>
           {sk.commands.length === 0 ? (
             <Empty text="No commands yet." />
@@ -477,15 +442,15 @@ function ListView({
                   <button
                     type="button"
                     onClick={() => setView({ name: 'command', id: c.id })}
-                    className="flex w-full cursor-pointer items-center gap-3 rounded-[8px] px-2 py-2 text-left transition-colors hover:bg-[#30302e]"
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-[8px] px-2 py-2 text-left transition-colors hover:bg-secondary"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[12.5px] text-[#ececea]">/{c.id}</span>
-                      <span className="block truncate text-[11.5px] text-[#8d8d8a]">
+                      <span className="block text-[12.5px] text-foreground">/{c.id}</span>
+                      <span className="block truncate text-[11.5px] text-muted-foreground">
                         {c.description || c.prompt}
                       </span>
                     </span>
-                    <Pencil className="h-3.5 w-3.5 text-[#737370]" />
+                    <Pencil className="h-3.5 w-3.5 text-faint-foreground" />
                   </button>
                 </li>
               ))}
@@ -516,24 +481,24 @@ function SkillRow({
 }): React.JSX.Element {
   const fileCount = Object.keys(getSkillBundle(skill)).length
   return (
-    <li className="flex items-center gap-1 rounded-[8px] pr-2 transition-colors hover:bg-[#30302e]">
+    <li className="flex items-center gap-1 pr-3 transition-colors hover:bg-foreground/[0.03]">
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-1.5 py-2 text-left"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2.5 text-left"
       >
         <Tile icon={skill.icon} />
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#ececea]">
+          <span className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
             {skill.name}
             {custom && (
-              <span className="rounded-full bg-white/[0.08] px-1.5 text-[10px] font-medium leading-[15px] text-[#c9c9c4]">
-                yours
+              <span className="rounded-full border border-border px-1.5 text-[10px] font-medium leading-[15px] text-soft-foreground">
+                Yours
               </span>
             )}
-            <span className="text-[11px] font-normal text-[#777772]">· {fileCount} files</span>
+            <span className="text-[11px] font-normal text-faint-foreground">{fileCount} files</span>
           </span>
-          <span className="block truncate text-[12px] text-[#8d8d8a]">{skill.description}</span>
+          <span className="block truncate text-[12px] text-muted-foreground">{skill.description}</span>
         </span>
       </button>
       <span className="shrink-0">{right}</span>
@@ -543,7 +508,7 @@ function SkillRow({
 
 function Empty({ text, action }: { text: string; action?: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="flex flex-col items-center gap-2.5 rounded-[8px] border border-dashed border-[#454540] px-4 py-8 text-center text-[12.5px] text-[#a9a9a4]">
+    <div className="flex flex-col items-center gap-3 rounded-[10px] border border-dashed border-border px-6 py-10 text-center text-[12.5px] leading-5 text-muted-foreground">
       {text}
       {action}
     </div>
@@ -571,7 +536,7 @@ function PierreFileView({ path, code }: { path: string; code: string }): React.J
   }, [code, language])
 
   return (
-    <pre className="whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-[12px] leading-relaxed text-[#d6d6d3]">
+    <pre className="whitespace-pre font-mono text-[12px] leading-[20px] text-soft-foreground">
       <code className="pierre-code bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
     </pre>
   )
@@ -645,9 +610,13 @@ function DetailView({
 }): React.JSX.Element {
   const sk = useSkills()
   const skill = sk.all.find((s) => s.id === id) ?? CATALOG.find((s) => s.id === id)
-  const [subTab, setSubTab] = useState<'overview' | 'contents' | 'skills'>('contents')
+  const [subTab, setSubTab] = useState<'overview' | 'contents' | 'skills'>('overview')
   const [mode, setMode] = useState<'preview' | 'code'>('preview')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({})
+  const [copied, setCopied] = useState(false)
+  const [fileFilter, setFileFilter] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -659,35 +628,17 @@ function DetailView({
     return () => window.removeEventListener('mousedown', onDown)
   }, [menuOpen])
 
-  if (!skill) {
-    return (
-      <div>
-        <BackLink onBack={onBack} />
-        <Empty text="This skill no longer exists." />
-      </div>
-    )
-  }
-
-  const bundle = getSkillBundle(skill)
-  const filePaths = Object.keys(bundle).sort()
+  const bundle = useMemo(() => (skill ? getSkillBundle(skill) : {}), [skill])
+  const filePaths = useMemo(() => Object.keys(bundle).sort(), [bundle])
   const defaultFile =
     filePaths.find((p) => /(?:^|\/)README\.md$/i.test(p)) ??
     filePaths.find((p) => /\.md$/i.test(p)) ??
     filePaths[0] ??
     'README.md'
-
-  const [selectedFile, setSelectedFile] = useState<string>(defaultFile)
-  const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({})
-
-  const activeFile = bundle[selectedFile] !== undefined ? selectedFile : defaultFile
-  const rawContent = bundle[activeFile] ?? ''
-  const isMarkdown = /\.(md|mdx)$/i.test(activeFile)
-  const { meta: frontmatter, body: markdownBody } = stripYamlFrontmatter(rawContent)
-
   const tree = useMemo(() => buildFileTree(filePaths), [filePaths])
 
-  // Sub-skills discovered under skills/<name>/SKILL.md
   const subSkills = useMemo(() => {
+    if (!skill) return []
     const found = filePaths
       .filter((p) => /skills\/[^/]+\/SKILL\.md$/i.test(p))
       .map((p) => {
@@ -697,31 +648,45 @@ function DetailView({
           .split(/\r?\n/)
           .map((l) => l.trim())
           .find((l) => l && !l.startsWith('#'))
-        return {
-          id: subId,
-          path: p,
-          description: meta?.description || firstLine || skill.description
-        }
+        return { id: subId, path: p, description: meta?.description || firstLine || skill.description }
       })
-    return found.length > 0
-      ? found
-      : [{ id: skill.id, path: defaultFile, description: skill.description }]
-  }, [filePaths, bundle, skill.id, skill.description, defaultFile])
+    return found.length > 0 ? found : [{ id: skill.id, path: defaultFile, description: skill.description }]
+  }, [filePaths, bundle, skill, defaultFile])
+
+  if (!skill) {
+    return (
+      <div>
+        <BackLink onBack={onBack} />
+        <div className="mt-3">
+          <Empty text="This skill no longer exists." />
+        </div>
+      </div>
+    )
+  }
+
+  const activeFile = selectedFile && bundle[selectedFile] !== undefined ? selectedFile : defaultFile
+  const rawContent = bundle[activeFile] ?? ''
+  const isMarkdown = /\.(md|mdx)$/i.test(activeFile)
+  const { meta: frontmatter, body: markdownBody } = stripYamlFrontmatter(rawContent)
 
   const installed = sk.isInstalled(id)
+  const enabled = installed && sk.isEnabled(id)
   const custom = skill.source === 'custom'
   const author = skill.author ?? (custom ? 'You' : 'MoreCode')
   const version = skill.version ?? '1.0.0'
   const updatedAt = skill.updatedAt ?? 'Oct 29'
+  const overviewDoc = bundle['README.md'] ?? `${skill.instructions}`
 
-  const toggleFolder = (path: string): void => {
-    setCollapsedFolders((prev) => ({ ...prev, [path]: !prev[path] }))
+  const toggleFolder = (path: string): void => setCollapsedFolders((prev) => ({ ...prev, [path]: !prev[path] }))
+
+  const tryInChat = (): void => {
+    if (!installed) sk.install(id)
+    window.dispatchEvent(new CustomEvent('skill:try-in-chat', { detail: `/${skill.id} ` }))
+    onClose()
   }
 
   const exportBundle = (): void => {
-    const blob = new Blob([JSON.stringify({ skill, bundle }, null, 2)], {
-      type: 'application/json'
-    })
+    const blob = new Blob([JSON.stringify({ skill, bundle }, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -729,6 +694,13 @@ function DetailView({
     a.click()
     URL.revokeObjectURL(url)
     toast.success(`Exported ${skill.id}-skill.json`)
+  }
+
+  const copyFile = (): void => {
+    void navigator.clipboard?.writeText(rawContent).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1400)
+    })
   }
 
   const renderTree = (nodes: TreeNode[], depth = 0): React.JSX.Element[] =>
@@ -740,318 +712,371 @@ function DetailView({
             <button
               type="button"
               onClick={() => toggleFolder(node.path)}
-              style={{ paddingLeft: `${depth * 12 + 8}px` }}
-              className="flex w-full cursor-pointer items-center justify-between gap-1.5 rounded-[6px] py-1.5 pr-2 text-left text-[12.5px] text-[#c9c9c4] transition-colors hover:bg-white/[0.05] hover:text-white"
+              className="flex h-[26px] w-full cursor-pointer items-center gap-1.5 rounded-[5px] px-1.5 text-left text-[12.5px] text-soft-foreground transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
             >
-              <span className="flex min-w-0 items-center gap-2">
-                {isClosed ? (
-                  <Folder className="h-3.5 w-3.5 shrink-0 text-[#8f8f8a]" />
-                ) : (
-                  <FolderOpen className="h-3.5 w-3.5 shrink-0 text-[#8f8f8a]" />
-                )}
-                <span className="truncate">{node.name}</span>
-              </span>
+              <ChevronRight
+                className={cn('h-3 w-3 shrink-0 text-faint-foreground transition-transform duration-150', !isClosed && 'rotate-90')}
+              />
               {isClosed ? (
-                <ChevronRight className="h-3 w-3 shrink-0 text-[#777772]" />
+                <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-3 w-3 shrink-0 text-[#777772]" />
+                <FolderOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               )}
+              <span className="truncate">{node.name}</span>
             </button>
-            {!isClosed && <div>{renderTree(node.children, depth + 1)}</div>}
+            {!isClosed && (
+              <div className="ml-[13px] border-l border-border/70 pl-1.5">{renderTree(node.children, depth + 1)}</div>
+            )}
           </div>
         )
       }
-
-      const active = node.path === activeFile
-      return (
-        <button
-          key={node.path}
-          type="button"
-          onClick={() => setSelectedFile(node.path)}
-          style={{ paddingLeft: `${depth * 12 + 26}px` }}
-          className={cn(
-            'flex w-full cursor-pointer items-center gap-2 rounded-[6px] py-1.5 pr-2 text-left text-[12.5px] transition-colors',
-            active
-              ? 'bg-white/[0.09] font-medium text-white'
-              : 'text-[#a8a8a3] hover:bg-white/[0.04] hover:text-[#e2e2e0]'
-          )}
-        >
-          <span className="truncate">{node.name}</span>
-        </button>
-      )
+      return <FileRow key={node.path} path={node.path} name={node.name} />
     })
+
+  const FileRow = ({ path, name, hint }: { path: string; name: string; hint?: string }): React.JSX.Element => {
+    const active = path === activeFile
+    const Icon = /\.(md|mdx|txt)$/i.test(name) ? FileText : FileCode2
+    return (
+      <button
+        type="button"
+        onClick={() => setSelectedFile(path)}
+        className={cn(
+          'relative flex h-[26px] w-full cursor-pointer items-center gap-2 rounded-[5px] pl-[22px] pr-1.5 text-left text-[12.5px] transition-colors',
+          active
+            ? 'bg-foreground/[0.08] text-foreground'
+            : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground'
+        )}
+      >
+        <Icon className={cn('h-3.5 w-3.5 shrink-0', active ? 'text-foreground' : 'text-faint-foreground')} />
+        <span className="truncate">{name}</span>
+        {hint && <span className="ml-auto truncate pl-2 text-[11px] text-faint-foreground">{hint}</span>}
+      </button>
+    )
+  }
+
+  const fileQuery = fileFilter.trim().toLowerCase()
+  const filteredPaths = fileQuery ? filePaths.filter((p) => p.toLowerCase().includes(fileQuery)) : []
+  const lineCount = rawContent ? rawContent.split(/\r?\n/).length : 0
+  const byteSize = new Blob([rawContent]).size
+  const sizeLabel = byteSize >= 1024 ? `${(byteSize / 1024).toFixed(1)} KB` : `${byteSize} B`
+  const fileName = activeFile.split('/').pop() ?? activeFile
+  const fileDir = activeFile.includes('/') ? activeFile.slice(0, activeFile.lastIndexOf('/')) : ''
+
+  const downloadFile = (): void => {
+    const url = URL.createObjectURL(new Blob([rawContent], { type: 'text/plain' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const menuItem =
+    'flex w-full cursor-pointer items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-left text-[12.5px] text-foreground transition-colors hover:bg-foreground/[0.07]'
 
   return (
     <div>
       <BackLink onBack={onBack} />
 
-      {/* Top Header matching Claude plugin detail */}
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Tile icon={skill.icon} size="lg" />
-          <div className="min-w-0">
-            <div className="truncate text-[15px] font-semibold text-white">{skill.name}</div>
-            <div className="mt-0.5 truncate text-[12px] text-[#8d8d8a]">
-              by {author} · {version} · {subSkills.length} {subSkills.length === 1 ? 'skill' : 'skills'} · updated {updatedAt}
-            </div>
+      {/* Header */}
+      <header className="mt-4 flex items-start gap-4">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[12px] border border-border bg-secondary text-foreground">
+          {React.createElement(skillIcon(skill.icon), { className: 'h-5 w-5' })}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h2 className="truncate text-[18px] font-semibold tracking-[-0.01em] text-foreground">{skill.name}</h2>
+            {custom && (
+              <span className="shrink-0 rounded-full border border-border px-1.5 text-[10.5px] font-medium leading-[16px] text-soft-foreground">
+                Yours
+              </span>
+            )}
+            {installed && (
+              <span
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1 text-[11px] font-medium',
+                  enabled ? 'text-success' : 'text-faint-foreground'
+                )}
+              >
+                <span className={cn('h-1.5 w-1.5 rounded-full', enabled ? 'bg-success' : 'bg-faint-foreground')} />
+                {enabled ? 'On' : 'Off'}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-muted-foreground">{skill.description}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-faint-foreground">
+            <code className="rounded-[5px] bg-foreground/[0.06] px-1.5 py-px font-mono text-[11px] text-soft-foreground">
+              /{skill.id}
+            </code>
+            <span>by {author}</span>
+            <span aria-hidden>·</span>
+            <span>v{version.replace(/^v/, '')}</span>
+            <span aria-hidden>·</span>
+            <span>Updated {updatedAt}</span>
           </div>
         </div>
+      </header>
 
-        <div className="flex shrink-0 items-center gap-2.5">
-          <div ref={menuRef} className="relative">
-            <button
-              type="button"
-              aria-label="More actions"
-              onClick={() => setMenuOpen((o) => !o)}
-              className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-[#9a9a95] transition-colors hover:bg-white/[0.07] hover:text-white"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full z-30 mt-1 w-[170px] rounded-[8px] border border-white/[0.1] bg-[#242423] p-1 shadow-xl">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    if (!installed) sk.install(id)
-                    prefill(`/${skill.id} ${skill.example}`.trim())
-                    onClose()
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-[5px] px-2.5 py-1.5 text-left text-[12px] text-[#ececea] hover:bg-white/[0.07]"
-                >
-                  <MessageSquare className="h-3.5 w-3.5 text-[#9a9a95]" />
-                  <span>Try in chat</span>
+      {/* Actions */}
+      <div className="mt-4 flex items-center gap-2">
+        {installed ? (
+          <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-[7px] border border-border px-2.5 text-[12.5px] text-foreground">
+            <Toggle label="Skill on or off" checked={enabled} onChange={(on) => sk.setEnabled(id, on)} />
+            {enabled ? 'Enabled' : 'Disabled'}
+          </label>
+        ) : (
+          <Btn
+            variant="primary"
+            onClick={() => {
+              sk.install(id)
+              toast.success(`${skill.name} added. Use it with /${id}`)
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" /> Add skill
+          </Btn>
+        )}
+        <Btn onClick={tryInChat}>
+          <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" /> Try in chat
+        </Btn>
+        <div ref={menuRef} className="relative ml-auto">
+          <button
+            type="button"
+            aria-label="More actions"
+            onClick={() => setMenuOpen((o) => !o)}
+            className="grid h-8 w-8 cursor-pointer place-items-center rounded-[7px] text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full z-30 mt-1 w-[180px] rounded-[9px] border border-border bg-card p-1 shadow-xl">
+              {custom && (
+                <button type="button" onClick={() => { setMenuOpen(false); setView({ name: 'edit', id }) }} className={menuItem}>
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> Edit skill
                 </button>
-                {custom && (
+              )}
+              <button type="button" onClick={() => { setMenuOpen(false); exportBundle() }} className={menuItem}>
+                <Download className="h-3.5 w-3.5 text-muted-foreground" /> Export bundle
+              </button>
+              {(custom || installed) && (
+                <>
+                  <div className="my-1 h-px bg-foreground/[0.07]" />
                   <button
                     type="button"
                     onClick={() => {
                       setMenuOpen(false)
-                      setView({ name: 'edit', id })
+                      if (custom) {
+                        sk.deleteSkill(id)
+                        toast.success('Skill deleted')
+                        onBack()
+                      } else {
+                        sk.uninstall(id)
+                        toast.success(`${skill.name} removed`)
+                      }
                     }}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-[5px] px-2.5 py-1.5 text-left text-[12px] text-[#ececea] hover:bg-white/[0.07]"
+                    className={cn(menuItem, 'text-destructive hover:bg-destructive/10')}
                   >
-                    <Pencil className="h-3.5 w-3.5 text-[#9a9a95]" />
-                    <span>Edit skill</span>
+                    <Trash2 className="h-3.5 w-3.5" /> {custom ? 'Delete skill' : 'Remove'}
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    exportBundle()
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-[5px] px-2.5 py-1.5 text-left text-[12px] text-[#ececea] hover:bg-white/[0.07]"
-                >
-                  <Download className="h-3.5 w-3.5 text-[#9a9a95]" />
-                  <span>Export bundle</span>
-                </button>
-                {(custom || installed) && (
-                  <>
-                    <div className="my-1 h-px bg-white/[0.07]" />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        if (custom) {
-                          sk.deleteSkill(id)
-                          toast.success('Skill deleted')
-                          onBack()
-                        } else {
-                          sk.uninstall(id)
-                          toast.success(`${skill.name} removed`)
-                        }
-                      }}
-                      className="flex w-full cursor-pointer items-center gap-2 rounded-[5px] px-2.5 py-1.5 text-left text-[12px] text-[#f4a39e] hover:bg-red-500/10"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>{custom ? 'Delete skill' : 'Remove'}</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {installed ? (
-            <Toggle
-              label="Skill on or off"
-              checked={sk.isEnabled(id)}
-              onChange={(on) => sk.setEnabled(id, on)}
-            />
-          ) : (
-            <Btn
-              variant="primary"
-              onClick={() => {
-                sk.install(id)
-                toast.success(`${skill.name} added. Use it with /${id}`)
-              }}
-            >
-              Add
-            </Btn>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Sub-navigation tabs: Overview | Contents · N | Skills · N */}
-      <div className="mt-5 flex items-center gap-6 border-b border-white/[0.08]">
+      {/* Tabs */}
+      <div role="tablist" className="mt-6 flex items-center gap-5 border-b border-border">
         {(
           [
-            { id: 'overview', label: 'Overview' },
-            { id: 'contents', label: `Contents · ${filePaths.length}` },
-            { id: 'skills', label: `Skills · ${subSkills.length}` }
+            { id: 'overview', label: 'Overview', count: null },
+            { id: 'contents', label: 'Files', count: filePaths.length },
+            { id: 'skills', label: 'Commands', count: subSkills.length }
           ] as const
         ).map((t) => (
           <button
             key={t.id}
+            role="tab"
             type="button"
+            aria-selected={subTab === t.id}
             onClick={() => setSubTab(t.id)}
             className={cn(
-              '-mb-px cursor-pointer border-b-2 pb-2.5 text-[12.5px] font-medium transition-colors',
+              '-mb-px flex cursor-pointer items-center gap-1.5 border-b-2 pb-2.5 text-[12.5px] font-medium transition-colors',
               subTab === t.id
-                ? 'border-white text-white'
-                : 'border-transparent text-[#8d8d8a] hover:text-[#d6d6d3]'
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-soft-foreground'
             )}
           >
             {t.label}
+            {t.count !== null && (
+              <span className="rounded-full bg-foreground/[0.07] px-1.5 text-[10.5px] leading-[16px] text-muted-foreground">
+                {t.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* CONTENTS TAB: Split File Tree + Markdown/Code Viewer */}
-      {subTab === 'contents' && (
-        <div className="mt-4">
-          <div className="mb-3 flex items-center justify-end">
-            <button
-              type="button"
-              title="Export skill bundle"
-              onClick={exportBundle}
-              className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-[#8d8d8a] transition-colors hover:bg-white/[0.06] hover:text-white"
-            >
-              <Download className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="flex h-[480px] overflow-hidden rounded-[10px] border border-white/[0.08]">
-            {/* Left File Tree */}
-            <div className="slim-scroll h-full w-[210px] shrink-0 overflow-y-auto border-r border-white/[0.07] p-2">
-              {renderTree(tree)}
-            </div>
-
-            {/* Right File Preview / Raw Source */}
-            <div className="flex h-full min-w-0 flex-1 flex-col">
-              <div className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-4 py-2">
-                <span className="truncate font-mono text-[12px] text-[#8f8f8a]">/{activeFile}</span>
-                {isMarkdown && (
-                  <SegmentedSwitch
-                    options={[
-                      { value: 'preview', icon: <Eye className="h-3.5 w-3.5" />, title: 'Rendered preview' },
-                      { value: 'code', icon: <Code2 className="h-3.5 w-3.5" />, title: 'Raw source' }
-                    ]}
-                    value={mode}
-                    onChange={setMode}
-                    itemWidth={32}
-                    height={26}
-                  />
-                )}
-              </div>
-
-              <div className="slim-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                {mode === 'preview' && isMarkdown ? (
-                  <div className="text-[13px] leading-6 text-[#d6d6d3]">
-                    {frontmatter && (
-                      <div className="mb-4 flex flex-wrap gap-2 rounded-[7px] bg-white/[0.04] px-3 py-2 text-[11.5px] text-[#9a9a95]">
-                        {Object.entries(frontmatter).map(([k, v]) => (
-                          <span key={k} className="mr-3">
-                            <span className="text-[#777772]">{k}:</span>{' '}
-                            <span className="font-mono text-[#d6d6d3]">{v}</span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <Markdown text={markdownBody} />
-                  </div>
-                ) : (
-                  <PierreFileView path={activeFile} code={rawContent} />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* OVERVIEW TAB */}
+      {/* OVERVIEW */}
       {subTab === 'overview' && (
-        <div className="mt-4 space-y-4">
-          <div className="rounded-[10px] border border-white/[0.08] p-5 text-[13px] leading-6 text-[#d6d6d3]">
-            <Markdown text={bundle['README.md'] ?? `# ${skill.name}\n\n${skill.description}\n\n${skill.instructions}`} />
+        <article className="mt-6 max-w-[640px] text-[13.5px] leading-[1.75] text-soft-foreground">
+          <Markdown text={stripYamlFrontmatter(overviewDoc).body} />
+        </article>
+      )}
+
+      {/* FILES */}
+      {subTab === 'contents' && (
+        <div className="mt-4 flex h-[600px]">
+          {/* tree */}
+          <div className="flex h-full w-[210px] shrink-0 flex-col pr-3">
+            <div className="mb-1 flex h-9 shrink-0 items-center gap-2 px-1.5">
+              <Search className="h-3.5 w-3.5 shrink-0 text-faint-foreground" />
+              <input
+                value={fileFilter}
+                onChange={(e) => setFileFilter(e.target.value)}
+                placeholder={`Filter ${filePaths.length} files`}
+                aria-label="Filter files"
+                className="min-w-0 flex-1 bg-transparent text-[12.5px] text-foreground outline-none placeholder:text-faint-foreground"
+              />
+              {fileFilter && (
+                <button
+                  type="button"
+                  aria-label="Clear filter"
+                  onClick={() => setFileFilter('')}
+                  className="grid h-5 w-5 cursor-pointer place-items-center rounded-[4px] text-faint-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            <div className="slim-scroll min-h-0 flex-1 overflow-y-auto">
+              {fileQuery ? (
+                filteredPaths.length ? (
+                  filteredPaths.map((p) => {
+                    const parts = p.split('/')
+                    return <FileRow key={p} path={p} name={parts[parts.length - 1]} hint={parts.slice(0, -1).join('/')} />
+                  })
+                ) : (
+                  <p className="px-2 py-6 text-center text-[12px] text-faint-foreground">No files match.</p>
+                )
+              ) : (
+                renderTree(tree)
+              )}
+            </div>
+            <div className="flex h-9 shrink-0 items-center justify-between px-1.5">
+              <span className="text-[11px] text-faint-foreground">{filePaths.length} files</span>
+              <button
+                type="button"
+                onClick={exportBundle}
+                className="inline-flex h-6 cursor-pointer items-center gap-1.5 rounded-[5px] px-1.5 text-[11.5px] text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+              >
+                <Download className="h-3 w-3" /> Export
+              </button>
+            </div>
           </div>
 
-          {skill.example && (
-            <div className="flex items-center justify-between gap-3 rounded-[9px] border border-white/[0.08] px-3.5 py-2.5">
-              <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-wider text-[#777772]">Try saying</div>
-                <div className="mt-0.5 truncate text-[12.5px] text-[#e2e2e0]">
-                  “/{skill.id} {skill.example}”
-                </div>
+          {/* viewer */}
+          <div className="flex h-full min-w-0 flex-1 flex-col border-l border-border/60 pl-5">
+            <div className="flex h-9 shrink-0 items-center gap-3">
+              <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                <span className="truncate text-[13px] font-medium text-foreground">{fileName}</span>
+                {fileDir && <span className="truncate font-mono text-[11px] text-faint-foreground">{fileDir}/</span>}
               </div>
-              <Btn
-                onClick={() => {
-                  if (!installed) sk.install(id)
-                  prefill(`/${skill.id} ${skill.example}`)
-                  onClose()
-                }}
-              >
-                Try in chat
-              </Btn>
+              <span className="hidden shrink-0 text-[11px] tabular-nums text-faint-foreground sm:inline">
+                {lineCount} lines · {sizeLabel}
+              </span>
+              <div className="flex shrink-0 items-center gap-0.5">
+                {isMarkdown && (
+                  <div className="mr-1">
+                    <SegmentedSwitch
+                      options={[
+                        { value: 'preview', icon: <Eye className="h-3.5 w-3.5" />, title: 'Preview' },
+                        { value: 'code', icon: <Code2 className="h-3.5 w-3.5" />, title: 'Source' }
+                      ]}
+                      value={mode}
+                      onChange={setMode}
+                      itemWidth={28}
+                      height={24}
+                    />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  aria-label="Copy file"
+                  title="Copy"
+                  onClick={copyFile}
+                  className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+                >
+                  {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  aria-label="Download file"
+                  title="Download"
+                  onClick={downloadFile}
+                  className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          )}
+
+            <div className="slim-scroll min-h-0 flex-1 overflow-auto">
+              {mode === 'preview' && isMarkdown ? (
+                <div className="max-w-[620px] py-4 pr-4 text-[13px] leading-6 text-soft-foreground">
+                  {frontmatter && (
+                    <dl className="mb-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border-b border-border pb-4 text-[11.5px]">
+                      {Object.entries(frontmatter).map(([k, v]) => (
+                        <React.Fragment key={k}>
+                          <dt className="text-faint-foreground">{k}</dt>
+                          <dd className="min-w-0 truncate font-mono text-soft-foreground">{v}</dd>
+                        </React.Fragment>
+                      ))}
+                    </dl>
+                  )}
+                  <Markdown text={markdownBody} />
+                </div>
+              ) : (
+                <div className="flex min-w-max py-3">
+                  <div
+                    aria-hidden
+                    className="sticky left-0 select-none bg-background pr-4 text-right font-mono text-[12px] leading-[20px] text-faint-foreground/70"
+                  >
+                    {Array.from({ length: lineCount || 1 }, (_, i) => (
+                      <div key={i}>{i + 1}</div>
+                    ))}
+                  </div>
+                  <div className="pr-6">
+                    <PierreFileView path={activeFile} code={rawContent} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* SKILLS TAB */}
+      {/* COMMANDS */}
       {subTab === 'skills' && (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-[12.5px]">
-            <thead>
-              <tr>
-                <th className="border-b border-white/[0.08] px-2 py-2 font-medium text-[#8d8d8a]">
-                  Command
-                </th>
-                <th className="border-b border-white/[0.08] px-2 py-2 font-medium text-[#8d8d8a]">
-                  Description
-                </th>
-                <th className="border-b border-white/[0.08] px-2 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {subSkills.map((sub) => (
-                <tr key={sub.id}>
-                  <td className="whitespace-nowrap border-b border-white/[0.06] px-2 py-2.5 align-middle">
-                    <code className="inline rounded-[5px] bg-[#1d4ed8]/20 px-1.5 py-[1.5px] font-mono text-[12px] text-[#a9c8ff]">
-                      /{sub.id}
-                    </code>
-                  </td>
-                  <td className="w-full max-w-0 truncate border-b border-white/[0.06] px-2 py-2.5 align-middle text-[#c9c9c4]">
-                    {sub.description}
-                  </td>
-                  <td className="whitespace-nowrap border-b border-white/[0.06] px-2 py-2.5 text-right align-middle">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedFile(sub.path)
-                        setSubTab('contents')
-                      }}
-                      className="cursor-pointer rounded-[6px] px-2 py-1 text-[11.5px] text-[#9a9a95] transition-colors hover:bg-white/[0.06] hover:text-white"
-                    >
-                      Inspect
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="mt-5 divide-y divide-border/60 overflow-hidden rounded-[10px] border border-border">
+          {subSkills.map((sub) => (
+            <li key={sub.id} className="flex items-center gap-3 px-3.5 py-3">
+              <code className="shrink-0 rounded-[5px] bg-foreground/[0.06] px-1.5 py-px font-mono text-[12px] text-link">
+                /{sub.id}
+              </code>
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-soft-foreground">{sub.description}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedFile(sub.path)
+                  setSubTab('contents')
+                }}
+                className="shrink-0 cursor-pointer rounded-[6px] px-2 py-1 text-[11.5px] text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+              >
+                View file
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
@@ -1062,7 +1087,7 @@ function BackLink({ onBack }: { onBack: () => void }): React.JSX.Element {
     <button
       type="button"
       onClick={onBack}
-      className="-ml-1 flex cursor-pointer items-center gap-1.5 rounded-[5px] px-1 py-0.5 text-[12.5px] text-[#9a9a95] transition-colors hover:text-[#ececea]"
+      className="-ml-1 flex cursor-pointer items-center gap-1.5 rounded-[5px] px-1 py-0.5 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground"
     >
       <ArrowLeft className="h-3.5 w-3.5" /> Skills
     </button>
@@ -1071,15 +1096,15 @@ function BackLink({ onBack }: { onBack: () => void }): React.JSX.Element {
 
 function FileChip({ name, onRemove }: { name: string; onRemove?: () => void }): React.JSX.Element {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] bg-[#44443f] py-0.5 pl-2 pr-1.5 text-[11.5px] text-white">
-      <FileText className="h-3 w-3 shrink-0 text-[#8d8d8a]" />
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] bg-border-strong py-0.5 pl-2 pr-1.5 text-[11.5px] text-foreground">
+      <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
       <span className="truncate">{name}</span>
       {onRemove && (
         <button
           type="button"
           aria-label={`Remove ${name}`}
           onClick={onRemove}
-          className="cursor-pointer text-[#8d8d8a] hover:text-[#ececea]"
+          className="cursor-pointer text-muted-foreground hover:text-foreground"
         >
           <X className="h-3 w-3" />
         </button>
@@ -1201,14 +1226,14 @@ function SkillEditor({
             onChange={(e) => setName(e.target.value)}
             placeholder="Release notes"
           />
-          <p className={cn('mt-1 text-[11.5px]', touched && problem ? 'text-[#e8b365]' : 'text-[#737370]')}>
+          <p className={cn('mt-1 text-[11.5px]', touched && problem ? 'text-warning' : 'text-faint-foreground')}>
             {touched && problem ? problem : slug ? `You will type /${slug}` : 'This becomes the / command.'}
           </p>
         </div>
 
         <div>
           <label htmlFor="sk-desc" className={label}>
-            What it is for <span className="text-[#737370]">(optional)</span>
+            What it is for <span className="text-faint-foreground">(optional)</span>
           </label>
           <TextInput
             id="sk-desc"
@@ -1232,14 +1257,14 @@ function SkillEditor({
             }
             className={area}
           />
-          <p className={cn('mt-1 text-[11.5px]', touched && missing ? 'text-[#e8b365]' : 'text-[#737370]')}>
+          <p className={cn('mt-1 text-[11.5px]', touched && missing ? 'text-warning' : 'text-faint-foreground')}>
             {touched && missing ? missing : 'Write it like you would explain the job to a new teammate.'}
           </p>
         </div>
 
         <div>
           <label htmlFor="sk-ex" className={label}>
-            Example message <span className="text-[#737370]">(optional)</span>
+            Example message <span className="text-faint-foreground">(optional)</span>
           </label>
           <TextInput
             id="sk-ex"
@@ -1251,7 +1276,7 @@ function SkillEditor({
 
         <div>
           <span className={label}>
-            Example files <span className="text-[#737370]">(optional)</span>
+            Example files <span className="text-faint-foreground">(optional)</span>
           </span>
           <div className="flex flex-wrap items-center gap-1.5">
             {files.map((f) => (
@@ -1272,14 +1297,14 @@ function SkillEditor({
               }}
             />
           </div>
-          <p className="mt-1 text-[11.5px] text-[#737370]">Show the AI what a good result looks like.</p>
+          <p className="mt-1 text-[11.5px] text-faint-foreground">Show the AI what a good result looks like.</p>
         </div>
 
-        <section className="rounded-[8px] border border-[#323230] bg-[#272726] p-3">
+        <section className="rounded-[8px] border border-border bg-background p-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-[12.5px] text-[#ececea]">Test it</div>
-              <div className="text-[11.5px] text-[#8d8d8a]">See how the AI will read your instructions.</div>
+              <div className="text-[12.5px] text-foreground">Test it</div>
+              <div className="text-[11.5px] text-muted-foreground">See how the AI will read your instructions.</div>
             </div>
             <Btn onClick={runTest} busy={test?.running}>
               {test ? 'Run again' : 'Run test'}
@@ -1289,19 +1314,19 @@ function SkillEditor({
             <>
               <ul className="mt-3 space-y-1.5" aria-live="polite">
                 {test.steps.slice(0, test.shown).map((s, i) => (
-                  <li key={i} className="flex items-start gap-2 text-[12px] leading-[18px] text-[#c9c9c6]">
-                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#5fd17a]" />
+                  <li key={i} className="flex items-start gap-2 text-[12px] leading-[18px] text-soft-foreground">
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
                     {s}
                   </li>
                 ))}
                 {test.running && (
-                  <li className="flex items-center gap-2 text-[12px] text-[#8d8d8a]">
+                  <li className="flex items-center gap-2 text-[12px] text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" /> Working…
                   </li>
                 )}
               </ul>
               {!test.running && (
-                <p className="mt-2.5 text-[11.5px] text-[#8d8d8a]">
+                <p className="mt-2.5 text-[11.5px] text-muted-foreground">
                   This is a preview. Use “Save and try in chat” for a real run.
                 </p>
               )}
@@ -1310,7 +1335,7 @@ function SkillEditor({
         </section>
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t border-[#323230] pt-3">
+      <div className="mt-5 flex items-center justify-between border-t border-border pt-3">
         <Btn onClick={useInChat}>Save and try in chat</Btn>
         <span className="flex gap-2">
           <Btn onClick={onBack}>Cancel</Btn>
@@ -1364,13 +1389,13 @@ function CommandEditor({ id, onBack }: { id: string | null; onBack: () => void }
             onChange={(e) => setName(e.target.value)}
             placeholder="standup"
           />
-          <p className={cn('mt-1 text-[11.5px]', touched && problem ? 'text-[#e8b365]' : 'text-[#737370]')}>
+          <p className={cn('mt-1 text-[11.5px]', touched && problem ? 'text-warning' : 'text-faint-foreground')}>
             {touched && problem ? problem : slug ? `You will type /${slug}` : 'Letters, numbers and dashes.'}
           </p>
         </div>
         <div>
           <label htmlFor="cm-desc" className={label}>
-            Short description <span className="text-[#737370]">(optional)</span>
+            Short description <span className="text-faint-foreground">(optional)</span>
           </label>
           <TextInput
             id="cm-desc"
@@ -1391,15 +1416,15 @@ function CommandEditor({ id, onBack }: { id: string | null; onBack: () => void }
             placeholder="Summarise what changed today in three bullet points for my team standup."
             className={area}
           />
-          <p className={cn('mt-1 text-[11.5px]', touched && missing ? 'text-[#e8b365]' : 'text-[#737370]')}>
+          <p className={cn('mt-1 text-[11.5px]', touched && missing ? 'text-warning' : 'text-faint-foreground')}>
             {touched && missing ? missing : 'Type $ARGUMENTS where text typed after the command should go.'}
           </p>
         </div>
       </div>
-      <div className="mt-5 flex items-center justify-between border-t border-[#323230] pt-3">
+      <div className="mt-5 flex items-center justify-between border-t border-border pt-3">
         {existing ? (
           confirm ? (
-            <span className="flex items-center gap-2 text-[12px] text-[#a8a8a6]">
+            <span className="flex items-center gap-2 text-[12px] text-muted-foreground">
               Delete?
               <Btn
                 variant="danger"

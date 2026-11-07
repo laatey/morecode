@@ -8,9 +8,9 @@ import { EMPTY_BILLING, type Invoice } from '@/features/auth/auth-service'
 import { toCard, validateCard } from '@/features/billing/card'
 import { getPlan } from '@/features/billing/plans'
 import { money, priceOf, useBillingConfig } from '@/features/billing/prices'
+import { LIMIT_LABEL, resetsIn, windowOf } from '@/features/billing/limits'
 import { getUsageHistory } from '@/features/billing/usage'
 import { Btn, DangerRow, Group, Page, Row, TextInput } from '../kit'
-import { FeatureBanner } from '@/components/feature-banner'
 import { useSettings } from '../settings-store'
 
 const date = (t: number): string => new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
@@ -89,9 +89,9 @@ function CardForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => vo
           onChange={(e) => setCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
         />
       </div>
-      {error && <p className="text-[12.5px] text-[#f4a39e]">{error}</p>}
+      {error && <p className="text-[12.5px] text-destructive">{error}</p>}
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[12px] text-[#77776f]">Demo only. Just the brand and last four digits are kept.</p>
+        <p className="text-[12px] text-faint-foreground">Demo only. Just the brand and last four digits are kept.</p>
         <div className="flex gap-2">
           <Btn onClick={onCancel}>Cancel</Btn>
           <Btn variant="primary" type="submit" busy={busy}>
@@ -104,7 +104,7 @@ function CardForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => vo
 }
 
 export function BillingPage(): React.JSX.Element {
-  const { account, service, update, openPlanDialog, cancelPlan, messagesLeft } = useAuth()
+  const { account, service, update, openPlanDialog, cancelPlan } = useAuth()
   const { closeSettings } = useSettings()
   const { cfg } = useBillingConfig()
   const [editingCard, setEditingCard] = useState(false)
@@ -115,10 +115,11 @@ export function BillingPage(): React.JSX.Element {
   const real = cfg.billing === 'paystack' // real payments: the card is handled by Paystack, never typed here
   const currency = billing.currency ?? cfg.currency
   const history = getUsageHistory(account)
-  const peak = Math.max(1, ...history.map((d) => d.count), plan.dailyMessages > 100 ? 0 : plan.dailyMessages)
+  const peak = Math.max(1, ...history.map((d) => d.count))
   const hasHistory = history.some((d) => d.count > 0)
-  const used = account.sentToday
-  const pct = account.apiKey ? 0 : Math.min(100, (used / plan.dailyMessages) * 100)
+  const off = cfg.billing === 'off' // no payments, or no AI behind them: nothing can be bought
+  const session = windowOf(account, 'session')
+  const week = windowOf(account, 'week')
   const price = priceOf(cfg, account.plan, billing.yearly)
 
   const changeCard = (): void => {
@@ -132,42 +133,31 @@ export function BillingPage(): React.JSX.Element {
   }
   return (
     <Page title="Usage and billing">
-      {plan.id === 'free' && (
-        <FeatureBanner
-          tone="violet"
-          art="pro"
-          eyebrow="MoreCode Pro"
-          tag="5× Allowance"
-          title="Built for daily shipping"
-          description="Unlock 5× more daily messages, every flagship Claude model, and priority routing across all your projects."
-          actionLabel="Compare plans"
-          onAction={() => {
-            closeSettings()
-            setTimeout(() => openPlanDialog('upgrade'), 120)
-          }}
-        />
-      )}
       <Group title="Plan">
         <Row
           title={`${plan.name}${account.apiKey ? ' with your own API key' : ''}`}
           description={
             plan.id === 'free'
-              ? 'Free forever. Upgrade for more messages and every model.'
+              ? off
+              ? 'Free forever. Paid plans are not available yet.'
+              : 'Free forever. Upgrade for higher limits and every model.'
               : billing.cancelling && billing.renews
                 ? `Cancelled. You keep ${plan.name} until ${date(billing.renews)}, then you are on Free.`
                 : `${money(price, currency)} a month${billing.yearly ? ', billed yearly' : ''}${billing.renews ? `. Renews ${date(billing.renews)}.` : '.'}`
           }
         >
-          <Btn
-            variant="primary"
-            onClick={() => {
-              // the plan picker is its own window, so settings steps aside first
-              closeSettings()
-              setTimeout(() => openPlanDialog('upgrade'), 120)
-            }}
-          >
-            {plan.id === 'free' ? 'Upgrade' : 'Change plan'}
-          </Btn>
+          {!off && (
+            <Btn
+              variant="primary"
+              onClick={() => {
+                // the plan picker is its own window, so settings steps aside first
+                closeSettings()
+                setTimeout(() => openPlanDialog('upgrade'), 120)
+              }}
+            >
+              {plan.id === 'free' ? 'Upgrade' : 'Change plan'}
+            </Btn>
+          )}
         </Row>
         {billing.pastDue && !billing.cancelling && plan.id !== 'free' && (
           <Row title="Your last payment did not go through" description="Your plan keeps working for a few days. Update your card so it can renew.">
@@ -182,7 +172,7 @@ export function BillingPage(): React.JSX.Element {
             description={
               real && billing.renews
                 ? `It stops renewing. You keep ${plan.name} until ${date(billing.renews)}, then go back to Free.`
-                : 'You go back to Free right away, with 25 messages a day.'
+                : 'You go back to Free right away, with its smaller limits.'
             }
             button="Cancel plan"
             confirmLabel="Yes, cancel"
@@ -198,20 +188,36 @@ export function BillingPage(): React.JSX.Element {
         )}
       </Group>
 
-      <Group title="Messages">
-        <div className="space-y-3 py-4">
-          <div className="flex items-baseline justify-between text-[13px]">
-            <span className="font-medium text-[#ececea]">Today</span>
-            <span className="text-[#9b9b97]">
-              {account.apiKey ? `${used} sent, no limit` : `${used} of ${plan.dailyMessages} used, ${messagesLeft} left`}
-            </span>
+      <Group title="Usage limits">
+        {account.apiKey ? (
+          <Row title="Your own API key" description="There is no limit here. Your provider bills you directly." />
+        ) : session && week ? (
+          <div className="space-y-4 py-4">
+            {(['session', 'week'] as const).map((kind) => {
+              const w = kind === 'session' ? session : week
+              return (
+                <div key={kind} className="space-y-1.5">
+                  <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                    <span className="font-medium text-foreground">{LIMIT_LABEL[kind]}</span>
+                    <span className="text-right text-muted-foreground">
+                      {w.percent}% used · {resetsIn(w.resetsAt)}
+                    </span>
+                  </div>
+                  <Bar percent={w.percent} tone={limitTone(w.percent)} label={`${LIMIT_LABEL[kind]} used`} />
+                </div>
+              )
+            })}
+            <p className="text-[11.5px] leading-5 text-faint-foreground">
+              A limit starts with your first message and resets when its time is up. Longer tasks and bigger models use it up faster.
+            </p>
           </div>
-          {!account.apiKey && <Bar percent={pct} tone={limitTone(pct)} label="Messages used today" />}
-        </div>
+        ) : (
+          <Row title="No limits to show" description="Your usage limits appear here once you are signed in to a MoreCode server." />
+        )}
         <div className="py-4">
           <div className="mb-3 flex items-center justify-between text-[12px]">
-            <span className="font-medium text-[#d7d7d3]">Usage history</span>
-            <span className="text-[#777773]">Last 14 days</span>
+            <span className="font-medium text-soft-foreground">Usage history</span>
+            <span className="text-faint-foreground">Last 14 days</span>
           </div>
           {hasHistory ? (
             <>
@@ -219,29 +225,30 @@ export function BillingPage(): React.JSX.Element {
                 {history.map((d) => (
                   <div key={d.key} className="group flex h-full flex-1 items-end" title={`${d.label}: ${d.count} messages`}>
                     <div
-                      className={d.today ? 'w-full rounded-t-[4px] bg-[#8b9dff]' : 'w-full rounded-t-[4px] bg-[#5f6685] transition-colors group-hover:bg-[#7985ba]'}
+                      className={d.today ? 'w-full rounded-t-[4px] bg-primary' : 'w-full rounded-t-[4px] bg-primary transition-colors group-hover:bg-primary/90'}
                       style={{ height: `${Math.max(4, (d.count / peak) * 100)}%` }}
                     />
                   </div>
                 ))}
               </div>
-              <div className="mt-2 flex justify-between text-[11px] text-[#777773]">
+              <div className="mt-2 flex justify-between text-[11px] text-faint-foreground">
                 <span>{history[0].label}</span>
                 <span>Today</span>
               </div>
             </>
           ) : (
-            <div className="rounded-lg border border-dashed border-white/[0.1] px-4 py-5 text-center text-[12px] text-[#858581]">
+            <div className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-[12px] text-muted-foreground">
               Your actual message history will appear here after you start a chat.
             </div>
           )}
         </div>
       </Group>
 
+      {!off && (
       <Group title="Payment method">
         {real ? (
           billing.card ? (
-            <Row icon={<CreditCard className="h-4 w-4 text-[#a8a8a6]" />} title={`${billing.card.brand} ending ${billing.card.last4}`} description={`Expires ${billing.card.exp}`}>
+            <Row icon={<CreditCard className="h-4 w-4 text-muted-foreground" />} title={`${billing.card.brand} ending ${billing.card.last4}`} description={`Expires ${billing.card.exp}`}>
               <Btn busy={cardBusy} onClick={changeCard}>
                 Update card
               </Btn>
@@ -253,7 +260,7 @@ export function BillingPage(): React.JSX.Element {
           <CardForm onDone={() => setEditingCard(false)} onCancel={() => setEditingCard(false)} />
         ) : billing.card ? (
           <Row
-            icon={<CreditCard className="h-4 w-4 text-[#a8a8a6]" />}
+            icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
             title={`${billing.card.brand} ending ${billing.card.last4}`}
             description={`Expires ${billing.card.exp}`}
           >
@@ -273,14 +280,15 @@ export function BillingPage(): React.JSX.Element {
           </Row>
         )}
       </Group>
+      )}
 
       <Group title="Invoices">
         {billing.invoices.length === 0 ? (
-          <p className="py-3 text-[12.5px] text-[#8d8d8a]">No invoices yet. They appear here after your first payment.</p>
+          <p className="py-3 text-[12.5px] text-muted-foreground">No invoices yet. They appear here after your first payment.</p>
         ) : (
           billing.invoices.map((inv) => (
             <Row key={inv.id} title={inv.description} description={`${date(inv.date)} · ${inv.id}`}>
-              <span className="text-[13px] tabular-nums text-[#c9c9c6]">{money(inv.amount, inv.currency ?? 'USD')}</span>
+              <span className="text-[13px] tabular-nums text-soft-foreground">{money(inv.amount, inv.currency ?? 'USD')}</span>
               <Btn aria-label={`Download receipt ${inv.id}`} onClick={() => downloadReceipt(inv, account.email)}>
                 <Download className="h-3.5 w-3.5" /> Receipt
               </Btn>

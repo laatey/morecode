@@ -49,6 +49,13 @@ CREATE TABLE IF NOT EXISTS usage (
   count INTEGER NOT NULL,
   PRIMARY KEY (user_id, day)
 );
+CREATE TABLE IF NOT EXISTS limits (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  session_start INTEGER NOT NULL,
+  session_tokens INTEGER NOT NULL,
+  week_start INTEGER NOT NULL,
+  week_tokens INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS runs (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   run_id TEXT NOT NULL,
@@ -168,6 +175,8 @@ export function openRepo(file) {
     usageDays: q('SELECT day, count FROM usage WHERE user_id = ? ORDER BY day DESC LIMIT 30'),
     usageDay: q('SELECT count FROM usage WHERE user_id = ? AND day = ?'),
     bumpUsage: q('INSERT INTO usage (user_id, day, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1'),
+    limitsGet: q('SELECT * FROM limits WHERE user_id = ?'),
+    limitsPut: q('INSERT INTO limits (user_id, session_start, session_tokens, week_start, week_tokens) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET session_start = excluded.session_start, session_tokens = excluded.session_tokens, week_start = excluded.week_start, week_tokens = excluded.week_tokens'),
     runSeen: q('SELECT 1 FROM runs WHERE user_id = ? AND run_id = ?'),
     runAdd: q('INSERT OR IGNORE INTO runs (user_id, run_id, ts) VALUES (?, ?, ?)'),
     runsPrune: q('DELETE FROM runs WHERE ts < ?'),
@@ -246,6 +255,23 @@ export function openRepo(file) {
 
     usageMap: (userId) => Object.fromEntries(st.usageDays.all(userId).map((r) => [r.day, r.count])),
     usageToday: (userId, day) => st.usageDay.get(userId, day)?.count ?? 0,
+
+    /** Has this run already been let in? (A run is allowed to finish even when a limit is reached part-way.) */
+    runSeen: (userId, runId) => Boolean(runId && st.runSeen.get(userId, runId)),
+
+    limitsGet(userId) {
+      const r = st.limitsGet.get(userId)
+      return r ? { sessionStart: r.session_start, sessionTokens: r.session_tokens, weekStart: r.week_start, weekTokens: r.week_tokens } : null
+    },
+    /** Reads the person's windows, lets `fn(row)` return `{ next, out }`, saves `next` if given, and returns `out` - all in one step. */
+    limitsUpdate(userId, fn) {
+      return tx(() => {
+        const r = st.limitsGet.get(userId)
+        const { next, out } = fn(r ? { sessionStart: r.session_start, sessionTokens: r.session_tokens, weekStart: r.week_start, weekTokens: r.week_tokens } : null)
+        if (next) st.limitsPut.run(userId, next.sessionStart, next.sessionTokens, next.weekStart, next.weekTokens)
+        return out
+      })
+    },
 
     /**
      * Counts one message unless today's limit is already reached (decided and written together, so
