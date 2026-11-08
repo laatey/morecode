@@ -21,6 +21,7 @@ import { ContextRing } from './context-ring'
 import { setMemoryOff } from '@/lib/chat-memory'
 import { useChatContext } from './chat-context'
 import { UsageHint } from './usage-hint'
+import { FileCards } from './file-cards'
 import { BackgroundTasksBar, type HelperTask } from './background-tasks-bar'
 import { ChangesBar } from './changes-bar'
 import { fileIconHtml } from '@/components/file-icon'
@@ -52,7 +53,7 @@ import { ToolRow } from './tool-rows'
 import { UserMessage } from './user-message'
 import { useDictation } from './use-dictation'
 import { matchFiles, useWorkspaceFiles } from './workspace-files'
-import type { Attachment, Msg, Part, ToolBlock } from './types'
+import type { Attachment, Msg, Part, ResultFile, ToolBlock } from './types'
 
 const took = (ms?: number): string | null => {
   if (!ms) return null
@@ -233,7 +234,7 @@ function useElapsed(since: number | undefined, active: boolean): number {
   return since ? Math.max(0, Math.floor((now - since) / 1000)) : 0
 }
 
-type Group = { tools: Part[] } | { text: string } | { error: Extract<Part, { type: 'error' }> }
+type Group = { tools: Part[] } | { text: string } | { error: Extract<Part, { type: 'error' }> } | { files: ResultFile[] }
 
 /** Consecutive tool calls become one tight group; text parts stay separate. */
 function groupParts(parts: Part[]): Group[] {
@@ -241,6 +242,7 @@ function groupParts(parts: Part[]): Group[] {
   for (const p of parts) {
     if (p.type === 'text') groups.push({ text: p.text })
     else if (p.type === 'error') groups.push({ error: p })
+    else if (p.type === 'files') groups.push({ files: p.files })
     else {
       const last = groups[groups.length - 1]
       if (last && 'tools' in last) last.tools.push(p)
@@ -268,7 +270,7 @@ function foldRun(msg: AgentMsg): { folded: Part[]; kept: Part[]; summary: Part[]
   while (tail > 0 && parts[tail - 1].type === 'text') tail--
   if (tail === 0 || tail === parts.length) return null // no tool calls, or it did not end on a reply
   const head = parts.slice(0, tail)
-  const stays = (p: Part): boolean => p.type === 'tool' && STAYS_VISIBLE.has(p.tool.kind)
+  const stays = (p: Part): boolean => p.type === 'files' || (p.type === 'tool' && STAYS_VISIBLE.has(p.tool.kind))
   const folded = head.filter((p) => !stays(p))
   const steps = folded.filter((p) => p.type === 'tool' && p.tool.kind !== 'thinking' && p.tool.kind !== 'todos').length
   if (steps < MIN_FOLD_STEPS) return null
@@ -285,6 +287,8 @@ function Groups({ groups, agentId }: { groups: Group[]; agentId: string }): Reac
           </div>
         ) : 'error' in g ? (
           <ErrorCard key={i} part={g.error} agentId={agentId} />
+        ) : 'files' in g ? (
+          <FileCards key={i} files={g.files} />
         ) : (
           <div key={i} className="my-1 space-y-px">
             {g.tools.map((p) => p.type === 'tool' && <ToolRow key={p.tool.id} tool={p.tool} />)}

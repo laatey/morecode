@@ -69,6 +69,7 @@ export interface AgentStart {
   attachments: { kind: 'file' | 'folder'; name: string; path?: string }[]
   history: { role: 'user' | 'assistant'; text: string }[]
   style: 'new' | 'some' | 'pro'
+  noThinking?: boolean
   /** What already happened in this chat, so "continue" picks up where things stopped. */
   progress?: string
   noTools?: boolean
@@ -168,6 +169,7 @@ export type AgentMessage = { runId: string } & (
         | { type: 'project'; name: string; path: string }
         | { type: 'usage'; tokens: number; detail: AgentUsage }
         | { type: 'live'; tokens: number }
+        | { type: 'files'; files: { path: string; name: string; size: number }[] }
     }
   | {
       kind: 'ask'
@@ -212,6 +214,10 @@ function listen<T>(channel: string, cb: (payload: T) => void): () => void {
 
 const api = {
   platform: process.platform,
+  files: {
+    reveal: (path: string): Promise<boolean> => ipcRenderer.invoke('files:reveal', path),
+    saveAs: (path: string): Promise<boolean> => ipcRenderer.invoke('files:save-as', path)
+  },
   power: {
     set: (prefs: { keepAwake: boolean; onBattery: boolean }): void => ipcRenderer.send('power:set', prefs)
   },

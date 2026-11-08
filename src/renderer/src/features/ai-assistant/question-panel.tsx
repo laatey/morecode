@@ -9,6 +9,13 @@ interface Draft {
   other: string
 }
 
+/** The AI marks the option it suggests by ending its label with "(Recommended)". */
+const RECOMMENDED = /\s*\(recommended\)\s*$/i
+const isRecommended = (label: string): boolean => RECOMMENDED.test(label)
+const plain = (label: string): string => label.replace(RECOMMENDED, '').trim()
+/** What goes back to the AI when the person leaves the choice to it. */
+const YOU_DECIDE = 'You decide: use your best judgement'
+
 /**
  * The AI's questions, attached to the top of the message box like the other bars. One question at a
  * time. Choosing an option only selects it: Next moves on, and the last question says Submit, so a
@@ -25,7 +32,13 @@ export function QuestionPanel({
   const total = request.items.length
   const [at, setAt] = useState(0)
   // what has been picked or typed for each question, kept so Back shows it again
-  const [drafts, setDrafts] = useState<Draft[]>(() => request.items.map(() => ({ picked: [], other: '' })))
+  // the suggested option starts selected, so accepting the suggestion is just Next
+  const [drafts, setDrafts] = useState<Draft[]>(() =>
+    request.items.map((q) => {
+      const suggested = q.options.filter((o) => isRecommended(o.label)).map((o) => plain(o.label))
+      return { picked: q.multi ? suggested : suggested.slice(0, 1), other: '' }
+    })
+  )
   const [cursor, setCursor] = useState(0)
   const box = useRef<HTMLDivElement>(null)
   const otherInput = useRef<HTMLInputElement>(null)
@@ -62,6 +75,16 @@ export function QuestionPanel({
     }
   }
 
+  const decide = (): void => {
+    const next = drafts.map((d, i) => (i === at ? { picked: [YOU_DECIDE], other: '' } : d))
+    setDrafts(next)
+    if (last) submitAll(next)
+    else {
+      setAt(at + 1)
+      setCursor(0)
+    }
+  }
+
   const back = (): void => {
     if (at === 0) return
     setAt(at - 1)
@@ -69,7 +92,7 @@ export function QuestionPanel({
   }
 
   const choose = (i: number): void => {
-    const label = item.options[i]?.label
+    const label = item.options[i] ? plain(item.options[i].label) : ''
     if (!label) return
     if (item.multi) patch({ picked: picked.includes(label) ? picked.filter((x) => x !== label) : [...picked, label] })
     else patch({ picked: [label], other: '' }) // one answer: choosing clears what was typed
@@ -102,7 +125,7 @@ export function QuestionPanel({
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (cursor === otherRow) otherInput.current?.focus()
-      else if (canGo && (!item.multi ? picked.includes(item.options[cursor]?.label) : true)) go()
+      else if (canGo && (!item.multi ? picked.includes(plain(item.options[cursor]?.label ?? '')) : true)) go()
       else choose(cursor)
     } else if (e.key === ' ' && cursor < otherRow) {
       e.preventDefault()
@@ -151,7 +174,7 @@ export function QuestionPanel({
 
       <ul className="mt-1.5">
         {item.options.map((o, i) => {
-          const on = picked.includes(o.label)
+          const on = picked.includes(plain(o.label))
           return (
             <li key={o.label}>
               <button
@@ -178,7 +201,10 @@ export function QuestionPanel({
                 </span>
                 {/* the description sits beside the label when there is room and drops under it when there is not */}
                 <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0">
-                  <span className="text-[12.5px] leading-[18px] text-foreground">{o.label}</span>
+                  <span className="text-[12.5px] leading-[18px] text-foreground">
+                    {plain(o.label)}
+                    {isRecommended(o.label) && <span className="ml-1.5 rounded-[4px] bg-foreground/[0.08] px-1 py-px align-[1px] text-[10px] leading-[14px] text-muted-foreground">Recommended</span>}
+                  </span>
                   {o.description && (
                     <span className="min-w-0 flex-1 basis-40 text-[12px] leading-[18px] text-muted-foreground/80">{o.description}</span>
                   )}
@@ -213,6 +239,9 @@ export function QuestionPanel({
       </ul>
 
       <div className="mt-1.5 flex items-center justify-end gap-1.5 px-1">
+        <Button size="xs" variant="ghost" onClick={decide} title="Leave this one to the AI" className="mr-auto h-6 px-2 text-[11.5px] text-muted-foreground">
+          You decide
+        </Button>
         {at > 0 && (
           <Button size="xs" variant="ghost" onClick={back} className="h-6 px-2 text-[11.5px] text-muted-foreground">
             Back

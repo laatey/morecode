@@ -8,7 +8,7 @@ import { fromGroqId, fromModelScopeId, GROQ_BASE_URL, modelScopeBase, sourceOf }
  *
  * Two kinds of people use the app and they must not be mixed up:
  *  - On the MoreCode subscription: the MoreCode server makes the request, under their plan. Messages are counted
- *    against the plan's daily limit and only the models the plan includes can be used.
+ *    against the plan's usage limits and only the models the plan includes can be used.
  *  - Using their own provider (an Anthropic key, OpenRouter, ModelScope, their own gateway): the request goes straight to that
  *    provider with their key. MoreCode neither counts these messages nor limits them.
  */
@@ -19,7 +19,7 @@ export interface AiRoute {
   /** Null when this route needs a key or sign-in that is not there yet. */
   apiKey: string | null
   baseUrl?: string
-  /** Counted against the plan's daily messages. Only the subscription is. */
+  /** Counted against the plan's 5-hour and weekly limits. Only the subscription is. */
   metered: boolean
   /** The model the request really uses. */
   model: string

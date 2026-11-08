@@ -5,6 +5,7 @@ import { buildAppMenu, registerMenuIpc } from './menu'
 import { registerGitIpc } from './git'
 import { registerAgentIpc, stopAllAgents } from './agent/ipc'
 import { registerPowerIpc } from './power'
+import { registerDeliverablesIpc } from './deliverables-ipc'
 import { actionFromArgv, deliverAction, registerOpenWithIpc, setupJumpList } from './open-with'
 import { registerMemoryIpc } from './memory-ipc'
 import { enableBrowserDebugging, registerBrowserIpc } from './agent/browser'
@@ -144,6 +145,7 @@ app.whenReady().then(() => {
   registerAgentIpc()
   registerPowerIpc()
   registerOpenWithIpc()
+  registerDeliverablesIpc()
   setupJumpList()
   const firstAction = actionFromArgv(process.argv)
   if (firstAction) deliverAction(firstAction)

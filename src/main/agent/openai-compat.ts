@@ -18,6 +18,8 @@ const ALTERNATE_IDS: Record<string, string[]> = {
 const CAPS = [32768, 16384, 8192]
 /** The size each model last accepted, so the next request does not go down the list again. */
 const accepted = new Map<string, number>()
+/** Services that did not accept being told not to think: it is not sent to them again. */
+const thinkingParamRefused = new Set<string>()
 const CAP_REFUSED = /max_tokens|max_completion_tokens|maximum|too large|exceed|out of range|less than or equal|at most/i
 
 export async function streamOpenAI(
@@ -37,6 +39,7 @@ export async function streamOpenAI(
         model,
         max_tokens: cap,
         stream: true,
+        ...(req.noThinking && !thinkingParamRefused.has(`${base}|${model}`) ? { enable_thinking: false } : {}),
         ...(withUsage ? { stream_options: { include_usage: true } } : {}),
         messages: toOpenAIMessages(req.system, req.messages),
         ...(req.tools.length ? { tools: toOpenAITools(req.tools) } : {})
@@ -56,6 +59,12 @@ export async function streamOpenAI(
         if (res.status === 400) {
           const said400 = await res.clone().text().catch(() => '')
           // a reply size the service refuses: try the next smaller one
+          // not told to skip thinking: this service does not know that setting, so ask again without it
+          if (req.noThinking && /enable_thinking|thinking/i.test(said400) && !thinkingParamRefused.has(`${base}|${model}`)) {
+            thinkingParamRefused.add(`${base}|${model}`)
+            i--
+            continue
+          }
           if (CAP_REFUSED.test(said400) && !/invalid model id/i.test(said400) && i < caps.length - 1) continue
           res = await send(false, model, caps[i])
         }

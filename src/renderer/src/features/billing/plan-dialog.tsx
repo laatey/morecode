@@ -77,7 +77,7 @@ function PlanDialogBody({ reason }: { reason: Reason }): React.JSX.Element | nul
           }}
           onKey={(key) => {
             void update({ apiKey: key })
-            toast.success('API key saved. No daily limit now.')
+            toast.success('API key saved. No usage limit now.')
             closePlanDialog()
           }}
         />

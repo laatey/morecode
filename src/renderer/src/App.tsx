@@ -7,6 +7,7 @@ import { ActionMenu } from './components/action-menu'
 import { IconButton } from './components/layout/icon-button'
 import { SidebarLeftIcon, SidebarRightIcon } from './components/layout/icons'
 import { ShareSheet } from './features/workspace/share-sheet'
+import { useStartupChecks } from './features/updates/use-startup-checks'
 import { LayoutSwitcher } from './components/layout/layout-switcher'
 import type { LayoutId, LayoutState } from '@/lib/sidebar-layout'
 import {
@@ -168,6 +169,7 @@ function RightControls({
 }
 
 function AppShell(): React.JSX.Element {
+  useStartupChecks()
   const {
     leftRef,
     rightRef,

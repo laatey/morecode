@@ -219,7 +219,7 @@ function ApiKeyBox({ onSaved }: { onSaved: (key: string) => void }): React.JSX.E
         <div className="min-w-0 flex-1">
           <div className="text-[13px] text-foreground">Use your own API key</div>
           <div className="text-[12px] leading-5 text-muted-foreground">
-            Pay your provider directly and skip the daily message limit.
+            Pay your provider directly and skip your plan’s usage limits.
           </div>
         </div>
         {!open && (

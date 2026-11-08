@@ -22,9 +22,11 @@ const upstream = createServer((req, res) => {
   let data = ''
   req.on('data', (c) => (data += c))
   req.on('end', () => {
-    upstreamSeen.push({ headers: req.headers, body: JSON.parse(data) })
+    const seen = JSON.parse(data)
+    upstreamSeen.push({ headers: req.headers, body: seen })
     res.writeHead(200, { 'content-type': 'text/event-stream' })
-    res.end('event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":4000}}}\n\nevent: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":1000}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n')
+    // a request that says "slow" takes a moment, so several can be in flight together
+    setTimeout(() => res.end('event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":4000}}}\n\nevent: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":1000}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n'), JSON.stringify(seen.messages).includes('"slow"') ? 500 : 0)
   })
 })
 const upstreamUrl = await listen(upstream)
@@ -65,7 +67,7 @@ const dir = mkdtempSync(join(tmpdir(), 'mcs-'))
 const dataFile = join(dir, 'd.db')
 const releases = join(dir, 'releases.json')
 writeFileSync(releases, JSON.stringify({ latest: '1.2.0', notes: ['Faster'], url: 'https://morecode.test/dl' }))
-const config = loadConfig({ SIGNUPS_PER_HOUR: '200', DATABASE_FILE: dataFile, RELEASES_FILE: releases, GOOGLE_CLIENT_ID: 'gid', GOOGLE_CLIENT_SECRET: 'gsec', GOOGLE_AUTH_URL: 'https://accounts.example/auth', GOOGLE_TOKEN_URL: providerUrl + '/token', GOOGLE_USERINFO_URL: providerUrl + '/google/userinfo', GITHUB_CLIENT_ID: 'hid', GITHUB_CLIENT_SECRET: 'hsec', GITHUB_AUTH_URL: 'https://gh.example/auth', GITHUB_TOKEN_URL: providerUrl + '/token', GITHUB_API_URL: providerUrl + '/gh', ANTHROPIC_API_KEY: 'sk-server-secret-key', ANTHROPIC_BASE_URL: upstreamUrl, APP_URL: 'https://morecode.test', BILLING_MODE: 'demo', LIMIT_FREE_SESSION: '3000', LIMIT_PRO_WEEK: '9000' })
+const config = loadConfig({ SIGNUPS_PER_HOUR: '200', DATABASE_FILE: dataFile, RELEASES_FILE: releases, GOOGLE_CLIENT_ID: 'gid', GOOGLE_CLIENT_SECRET: 'gsec', GOOGLE_AUTH_URL: 'https://accounts.example/auth', GOOGLE_TOKEN_URL: providerUrl + '/token', GOOGLE_USERINFO_URL: providerUrl + '/google/userinfo', GITHUB_CLIENT_ID: 'hid', GITHUB_CLIENT_SECRET: 'hsec', GITHUB_AUTH_URL: 'https://gh.example/auth', GITHUB_TOKEN_URL: providerUrl + '/token', GITHUB_API_URL: providerUrl + '/gh', ANTHROPIC_API_KEY: 'sk-server-secret-key', ANTHROPIC_BASE_URL: upstreamUrl, APP_URL: 'https://morecode.test', BILLING_MODE: 'demo', LIMIT_FREE_SESSION: '3000', LIMIT_PRO_WEEK: '9000', MAX_CONCURRENT_AI: '3' })
 const repo = openRepo(dataFile)
 const mails = []
 const app = createApp({ config, repo, mail: { send: async (to, subject, text) => mails.push({ to, subject, text }) } })
@@ -229,6 +231,35 @@ try {
   const preDump = dump()
   ok('no plain passwords or codes in the database', !preDump.includes('longenough1') && !preDump.includes('brandnewpass1'))
   ok('passwords are scrypt hashes', /"pass_hash":"[0-9a-f]{32}:[0-9a-f]{128}"/.test(preDump))
+
+  /* ---- the server forwards only what the app really sends ---- */
+  const sneaky = await makeUser('sneaky@x.com', 'Sneaky')
+  const sn = await fetch(base + '/v1/ai/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': sneaky.token, 'x-morecode-run': 'sneak-1' },
+    body: JSON.stringify({
+      model: 'claude-haiku-5-5', max_tokens: 99999, stream: true, messages: [{ role: 'user', content: 'hi' }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }, { name: 'read_file', description: 'Read', input_schema: { type: 'object' }, secret: 'x' }],
+      mcp_servers: [{ type: 'url', url: 'https://evil.test', name: 'x' }], metadata: { user_id: 'someone' }, thinking: { type: 'enabled', budget_tokens: 900000 }, container: 'abc'
+    })
+  })
+  await sn.text()
+  const fwd = upstreamSeen[upstreamSeen.length - 1].body
+  ok('paid server tools and outside connections are dropped', !('mcp_servers' in fwd) && !('metadata' in fwd) && !('container' in fwd) && fwd.tools.length === 1 && fwd.tools[0].name === 'read_file' && !('secret' in fwd.tools[0]), fwd)
+  ok('thinking is capped', fwd.thinking.budget_tokens === 16000 && fwd.max_tokens <= 16000, fwd.thinking)
+  const junk = await fetch(base + '/v1/ai/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': sneaky.token }, body: JSON.stringify({ model: 'claude-haiku-5-5', messages: [] }) })
+  ok('a request with no messages is refused', junk.status === 400)
+
+  /* ---- only a few answers at once per person ---- */
+  const crowd = await makeUser('crowd@x.com', 'Crowd')
+  const slowBody = JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 100, stream: true, messages: [{ role: 'user', content: 'slow' }] })
+  const slowCall = (i) => fetch(base + '/v1/ai/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': crowd.token, 'x-morecode-run': `slow-${i}` }, body: slowBody }).then(async (r) => (await r.text(), r.status))
+  const statuses = await Promise.all([0, 1, 2, 3, 4].map(slowCall))
+  ok('beyond 3 at once are told to wait', statuses.filter((s) => s === 200).length === 3 && statuses.filter((s) => s === 429).length === 2, statuses)
+  // the three answers used up this free plan's session, so what refuses the next is the limit, no longer the crowd
+  const later = await fetch(base + '/v1/ai/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': crowd.token, 'x-morecode-run': 'slow-9' }, body: slowBody })
+  const laterJson = await later.json()
+  ok('and the room frees up afterwards', !String(laterJson?.error?.message).includes('several answers'), laterJson)
 
   /* ---- concurrency: many messages at once from one person ---- */
   const racer = await makeUser('race@x.com', 'Race')

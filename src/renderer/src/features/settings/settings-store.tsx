@@ -42,6 +42,10 @@ export interface Settings extends ThemePrefs {
   reduceMotion: boolean
   /** Stop the computer sleeping while the AI works. */
   keepAwake: boolean
+  /** Send a report when the app crashes (the error and where it happened, never messages or code). */
+  shareCrashes: boolean
+  /** Ask models that reason before they act not to. Faster, usually a little less thorough. */
+  reasoningOff: boolean
   /** Also do it when running on battery power. */
   keepAwakeOnBattery: boolean
   /** What the AI does with each kind of action. Editing files follows `autoAccept`. */
@@ -69,6 +73,8 @@ export const DEFAULT_SETTINGS: Settings = {
   contentWidth: 'default',
   reduceMotion: false,
   keepAwake: true,
+  shareCrashes: false,
+  reasoningOff: false,
   keepAwakeOnBattery: false,
   rules: { commands: 'ask', install: 'ask', remove: 'ask', network: 'ask', browse: 'ask', web: 'allow', git: 'ask', memory: 'ask' },
   allowedCommands: [],

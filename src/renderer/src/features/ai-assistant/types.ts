@@ -157,8 +157,17 @@ export type ToolBlock =
       state: 'draft' | 'approved'
     }
 
+/** A file the AI made that is worth opening or keeping. */
+export interface ResultFile {
+  /** Relative to the chat's folder. */
+  path: string
+  name: string
+  size: number
+}
+
 export type Part =
   | { type: 'text'; text: string }
+  | { type: 'files'; files: ResultFile[] }
   | { type: 'tool'; tool: ToolBlock }
   | { type: 'error'; kind: ErrorKind; message: string; retryAfter?: number; at: number }
 
@@ -194,6 +203,7 @@ export type AgentEvent =
   | { type: 'tool'; tool: ToolBlock } // upsert by tool.id
   | { type: 'text'; delta: string }
   | { type: 'live'; tokens: number } // running estimate for the reply being written
+  | { type: 'files'; files: ResultFile[] } // files a command made, to offer in the chat
   | { type: 'usage'; tokens: number; detail?: { input: number; output: number; cacheRead: number; cacheWrite: number } }
 
 export interface AgentRequest {

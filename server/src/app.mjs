@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { PLANS } from './config.mjs'
+import { cleanRequest } from './ai-request.mjs'
 import { addTokens, blocked, costOf, start, usageReader, view } from './limits.mjs'
 import { createBilling } from './billing.mjs'
 import { HttpError } from './http-error.mjs'
@@ -37,6 +38,8 @@ export function createApp({ config, repo, mail, fetchImpl = fetch }) {
 
   /* ---------- shape sent to the app ---------- */
 
+  /** How many AI answers each person has being written right now. */
+  const inFlight = new Map()
   const planOf = (u) => config.plans[u.plan] ?? config.plans.free
   /** Plans can only be bought when the AI they pay for is actually switched on and payments are set up. */
   const canBuy = () => config.billing !== 'off' && Boolean(config.anthropicKey)
@@ -328,9 +331,27 @@ export function createApp({ config, repo, mail, fetchImpl = fetch }) {
     } catch {
       return send(res, aiError(400, 'invalid_request_error', 'The request was not valid JSON.'))
     }
+    // only what the app really sends is forwarded: the server pays for this request
+    const cleaned = cleanRequest(body)
+    if (cleaned.error) return send(res, aiError(400, 'invalid_request_error', cleaned.error))
+    body = cleaned.body
+    // a person can have only a few answers being written at once; the rest wait their turn
+    const running = inFlight.get(user.id) ?? 0
+    if (running >= config.maxConcurrentAi) {
+      return send(res, aiError(429, 'rate_limit_error', 'You already have several answers being written. Wait for one to finish, then try again.', { 'retry-after': '5' }))
+    }
     const refused = await admit(user, req, String(body.model || ''), tzOf(req))
     if (refused) return send(res, refused)
-    body.max_tokens = Math.min(Number(body.max_tokens) || 4096, 16_000)
+    inFlight.set(user.id, running + 1)
+    let released = false
+    const release = () => {
+      if (released) return
+      released = true
+      const left = (inFlight.get(user.id) ?? 1) - 1
+      if (left > 0) inFlight.set(user.id, left)
+      else inFlight.delete(user.id)
+    }
+    res.on('close', release)
 
     const ac = new AbortController()
     res.on('close', () => !res.writableEnded && ac.abort()) // the app stopped waiting: stop paying

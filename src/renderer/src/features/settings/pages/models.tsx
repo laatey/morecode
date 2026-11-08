@@ -6,7 +6,7 @@ import { errorText } from '@/features/auth/ui'
 import { MODELS, sourceOf } from '@/features/ai-assistant/models'
 import { resetsIn } from '@/features/billing/limits'
 import { getPlan } from '@/features/billing/plans'
-import { Btn, Group, Page, Pick, Row, TextInput } from '../kit'
+import { Btn, Group, Page, Pick, Row, TextInput, Toggle } from '../kit'
 import { useSettings } from '../settings-store'
 
 const mask = (key: string): string => `${key.slice(0, 3)}…${key.slice(-4)}`
@@ -187,11 +187,20 @@ export function ModelsPage(): React.JSX.Element {
         title="Your MoreCode plan"
         note={
           source === 'claude'
-            ? 'Claude models run through your plan, with a daily message limit.'
-            : 'This model does not use your plan, so it has no daily limit.'
+            ? 'Claude models run through your plan, with a 5-hour and a weekly limit.'
+            : 'This model does not use your plan, so your plan limits do not apply.'
         }
       >
         <PlanRow />
+      </Group>
+
+      <Group title="Thinking">
+        <Row
+          title="Let the AI think before it acts"
+          description="Some models reason silently before every step, which can add seconds to each one. Turn this off for faster replies on simple tasks. It only works with models and services that allow it, and answers may be a little less thorough."
+        >
+          <Toggle label="Let the AI think before it acts" checked={!settings.reasoningOff} onChange={(v) => set({ reasoningOff: !v })} />
+        </Row>
       </Group>
 
       <Group

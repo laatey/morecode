@@ -84,6 +84,8 @@ interface WorkspaceApi {
   deleteAllChats: () => void
   /** Messages for a chat, as last saved. Read once when a chat opens. */
   getMessages: (id: string) => Msg[]
+  /** Bring chats and projects back from a file made by "Download my data". Anything already here is left as it is. */
+  restore: (data: unknown) => { chats: number; projects: number }
   /** Called by the chat as it streams. Kept out of React state so typing stays smooth. */
   saveMessages: (id: string, messages: Msg[]) => void
   /** Plain text of every message, for search. */
@@ -226,6 +228,28 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
         return add.length ? [...prev, ...add] : prev
       })
       persist()
+    },
+    [persist]
+  )
+  const restore = useCallback(
+    (data: unknown): { chats: number; projects: number } => {
+      const d = (data && typeof data === 'object' ? data : {}) as { projects?: unknown; chats?: unknown }
+      const haveChats = new Set(latest.current.chats.map((c) => c.id))
+      const haveGroups = new Set(latest.current.groups.map((g) => g.id))
+      const text = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '')
+      const groupsIn = (Array.isArray(d.projects) ? d.projects : []).flatMap((x: Record<string, unknown>) =>
+        x && typeof x.id === 'string' && !haveGroups.has(x.id) && text(x.name, 80) ? [{ id: x.id, name: text(x.name, 80), folder: typeof x.folder === 'string' ? x.folder : undefined } as ProjectGroup] : []
+      )
+      const chatsIn = (Array.isArray(d.chats) ? d.chats : []).flatMap((x: Record<string, unknown>) =>
+        x && typeof x.id === 'string' && !haveChats.has(x.id) && Array.isArray(x.messages)
+          ? [{ chat: { id: x.id, title: text(x.title, 120) || NEW_CHAT_TITLE, projectId: typeof x.projectId === 'string' ? x.projectId : null, pinned: x.pinned === true, archived: x.archived === true, updatedAt: typeof x.updatedAt === 'number' ? x.updatedAt : now() } as Chat, messages: x.messages as Msg[] }]
+          : []
+      )
+      for (const c of chatsIn) messages.current[c.chat.id] = settle(c.messages)
+      if (groupsIn.length) setGroups((l) => [...l, ...groupsIn])
+      if (chatsIn.length) setChats((l) => [...l, ...chatsIn.map((c) => c.chat)])
+      persist()
+      return { chats: chatsIn.length, projects: groupsIn.length }
     },
     [persist]
   )
@@ -526,6 +550,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       groups,
       activeId: active.id,
       active,
+      restore,
       renamingId,
       searchOpen,
       canBack: trail.at > 0,
@@ -553,7 +578,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       saveMessages,
       textOf
     }),
-    [
+    [restore, 
       dialog,
       chats,
       groups,

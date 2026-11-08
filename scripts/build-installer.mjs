@@ -4,7 +4,7 @@
 //   3. Inno Setup compiles installer.iss -> dist/MoreCode-Setup-<version>.exe
 //   4. removes intermediate build output so dist/ holds only the setup file
 // Flags: --skip-build (reuse out/), --repack (force re-run of electron-builder)
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { existsSync, readFileSync, rmSync, statSync, readdirSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,6 +28,28 @@ function findISCC() {
     if (out) return out.split(/\r?\n/)[0]
   } catch {}
   return null
+}
+
+// Optional code signing, so Windows does not warn "unknown publisher". Set SIGN_CERT_FILE (a .pfx file) and
+// SIGN_CERT_PASSWORD to turn it on; SIGNTOOL_PATH and SIGN_TIMESTAMP_URL are optional. Without them the build is unsigned.
+const certFile = process.env.SIGN_CERT_FILE
+function findSigntool() {
+  if (process.env.SIGNTOOL_PATH && existsSync(process.env.SIGNTOOL_PATH)) return process.env.SIGNTOOL_PATH
+  try {
+    const out = execSync('where signtool.exe', { stdio: 'pipe' }).toString().trim()
+    if (out) return out.split(/\r?\n/)[0]
+  } catch {}
+  return null
+}
+const signtool = certFile ? findSigntool() : null
+if (certFile && !signtool) {
+  console.error('ERROR: SIGN_CERT_FILE is set but signtool.exe was not found. Install the Windows SDK or set SIGNTOOL_PATH.')
+  process.exit(1)
+}
+function sign(file) {
+  if (!signtool) return
+  console.log(`Signing ${file}...`)
+  execFileSync(signtool, ['sign', '/f', certFile, ...(process.env.SIGN_CERT_PASSWORD ? ['/p', process.env.SIGN_CERT_PASSWORD] : []), '/fd', 'sha256', '/tr', process.env.SIGN_TIMESTAMP_URL || 'http://timestamp.digicert.com', '/td', 'sha256', file], { stdio: 'inherit' })
 }
 
 console.log(`=== MoreCode Installer Builder (v${version}) ===\n`)
@@ -55,6 +77,7 @@ if (!skipBuild || process.argv.includes('--repack') || !existsSync(unpacked)) {
   console.log('[1/3] Reusing existing dist/win-unpacked.')
 }
 
+sign(join(unpacked, 'morecode.exe'))
 console.log('[2/3] Compiling installer with Inno Setup...')
 run(`"${iscc}" /DMyAppVersion=${version} "${join(root, 'installer.iss')}"`)
 
@@ -68,6 +91,8 @@ for (const entry of readdirSync(dist)) {
 
 const out = join(dist, `MoreCode-Setup-${version}.exe`)
 if (existsSync(out)) {
+  sign(out)
+  if (!signtool) console.log('Note: this installer is not signed, so Windows may warn about an unknown publisher. See SIGN_CERT_FILE in scripts/build-installer.mjs.')
   const mb = (statSync(out).size / 1024 / 1024).toFixed(2)
   console.log(`\nSUCCESS: ${out} (${mb} MB)\n`)
 } else {

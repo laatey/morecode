@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import { ApiFailure, streamMessage, type ApiMessage, type ContentBlock } from './anthropic'
+import { changedDeliverables, snapshotDeliverables, type FileInfo } from './deliverables'
 import { slimBrowserResults, dropCutOffCalls, cutOffInfo, cutOffNudgeFor, pushUser, saveUnfinished, takeUnfinished, resumeWith, CUT_OFF_NOTICE, STEPS_NOTICE } from './history'
 import { usesOpenAIFormat } from './openai-format'
 import { streamOpenAI } from './openai-compat'
@@ -35,6 +36,8 @@ export type OutEvent =
   | { type: 'usage'; tokens: number; detail: UsageDetail }
   /** Running estimate of the tokens the AI has produced so far in the reply being written. */
   | { type: 'live'; tokens: number }
+  /** Files (a PDF, a spreadsheet...) that a command just made, so the chat can offer them. */
+  | { type: 'files'; files: FileInfo[] }
 
 export interface RunInput {
   apiKey: string
@@ -50,6 +53,8 @@ export interface RunInput {
   attachments: { kind: 'file' | 'folder'; name: string; path?: string }[]
   history: { role: 'user' | 'assistant'; text: string }[]
   style: Style
+  /** Ask the model not to reason before it acts (where the service supports turning that off). */
+  noThinking?: boolean
   /** What already happened in this chat (edits, commands, task list), written by the app. */
   progress?: string
   /** No tools: the model can only answer in text. */
@@ -406,6 +411,7 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
         messages: slimBrowserResults(messages),
         tools,
         maxTokens: REPLY_TOKENS,
+        noThinking: input.noThinking,
         signal: io.signal,
         headers: input.headers,
         fetchImpl: io.fetchImpl
@@ -448,7 +454,13 @@ export async function runAgent(input: RunInput, io: RunIo): Promise<void> {
     for (const block of content) {
       if (block.type !== 'tool_use') continue
       if (io.signal.aborted) return
+      // a command can make a file no tool reports (a PDF from a script): look at the folder before and after
+      const before = block.name === 'run_command' ? snapshotDeliverables(input.cwd) : null
       const r = await executeTool(block.name, block.id, block.input, ctx)
+      if (before) {
+        const made = changedDeliverables(input.cwd, before, snapshotDeliverables(input.cwd))
+        if (made.length) io.emit({ type: 'files', files: made })
+      }
       const content = r.images?.length
         ? [{ type: 'text' as const, text: r.content }, ...r.images.map((im) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: im.media_type, data: im.data } }))]
         : r.content

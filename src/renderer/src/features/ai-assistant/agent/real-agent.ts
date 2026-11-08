@@ -10,6 +10,8 @@ export interface RealConfig {
   /** Null when no key has been added yet. */
   apiKey: string | null
   style: 'new' | 'some' | 'pro'
+  /** Ask the model to skip its reasoning step where it can. */
+  noThinking?: boolean
   /** Set when the AI is reached through the MoreCode server instead of directly. */
   baseUrl?: string
   hosted?: boolean
@@ -94,6 +96,7 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         progress: req.progress,
         noTools: req.noTools,
         style: cfg.style,
+        noThinking: cfg.noThinking,
         connectors: cfg.connectors?.(),
         skills: cfg.skills?.(),
         routines: cfg.routines?.(),
@@ -114,6 +117,7 @@ export function makeRealRunner(getConfig: () => RealConfig): AgentRunner {
         if (e.type === 'tool') yield { type: 'tool', tool: e.tool as unknown as ToolBlock }
         else if (e.type === 'text') yield { type: 'text', delta: e.delta }
         else if (e.type === 'live') yield { type: 'live', tokens: e.tokens }
+        else if (e.type === 'files') yield { type: 'files', files: e.files }
         else if (e.type === 'project') {
           window.dispatchEvent(
             new CustomEvent('workspace:project-created', { detail: { name: e.name, path: e.path } })

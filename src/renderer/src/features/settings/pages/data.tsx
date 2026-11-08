@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/auth-store'
 import { useWorkspace } from '@/features/workspace/workspace-store'
@@ -9,7 +9,19 @@ export function DataPage(): React.JSX.Element {
   const { account, update, deleteAccount } = useAuth()
   const ws = useWorkspace()
   const { settings, set, reset, closeSettings } = useSettings()
+  const fileInput = useRef<HTMLInputElement>(null)
   if (!account) return <></>
+
+  const restoreData = async (file: File | undefined): Promise<void> => {
+    if (!file) return
+    try {
+      if (file.size > 100_000_000) throw new Error('too big')
+      const done = ws.restore(JSON.parse(await file.text()))
+      toast.success(done.chats || done.projects ? `Restored ${done.chats} chat${done.chats === 1 ? '' : 's'} and ${done.projects} project${done.projects === 1 ? '' : 's'}` : 'Nothing new to restore: everything in that file is already here')
+    } catch {
+      toast.error('That file could not be read. Use a file made by “Download my data”.')
+    }
+  }
 
   const exportData = (): void => {
     const data = {
@@ -31,6 +43,13 @@ export function DataPage(): React.JSX.Element {
       <Group title="Your data">
         <Row title="Download my data" description="A file with your account details, projects and every chat.">
           <Btn onClick={exportData}>Download</Btn>
+        </Row>
+        <Row title="Restore from a download" description="Bring back chats and projects from a file you downloaded before, for example on a new computer. Nothing already here is changed.">
+          <input ref={fileInput} type="file" accept="application/json,.json" className="hidden" onChange={(e) => { void restoreData(e.target.files?.[0]); e.target.value = '' }} />
+          <Btn onClick={() => fileInput.current?.click()}>Choose file</Btn>
+        </Row>
+        <Row title="Send crash reports" description="If MoreCode crashes, send the error and where it happened so it can be fixed. Never your messages, code or file contents. Off by default.">
+          <Toggle label="Send crash reports" checked={settings.shareCrashes} onChange={(v) => set({ shareCrashes: v })} />
         </Row>
         <Row title="Share anonymous usage" description="Counts of which features are used. Never your code or messages.">
           <Toggle label="Share anonymous usage" checked={settings.shareUsage} onChange={(v) => set({ shareUsage: v })} />

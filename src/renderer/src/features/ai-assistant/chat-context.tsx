@@ -128,6 +128,7 @@ export function ChatProvider({
       projectPath,
       chatId: active.id,
       style: account?.profile?.experience ?? 'some',
+      noThinking: settings.reasoningOff,
       connectors: connectorsForRun,
       skills: skillsForRun,
       routines: routinesForRun,

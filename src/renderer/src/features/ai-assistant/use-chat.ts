@@ -118,6 +118,15 @@ function applyEvent(
     return { ...msg, parts }
   }
   if (e.type === 'live') return { ...msg, liveTokens: e.tokens }
+  if (e.type === 'files') {
+    // one card group per message; a file made again is updated rather than listed twice
+    const at = parts.findIndex((p) => p.type === 'files')
+    const known = at >= 0 && parts[at].type === 'files' ? (parts[at] as Extract<Part, { type: 'files' }>).files : []
+    const merged = [...known.filter((f) => !e.files.some((n) => n.path === f.path)), ...e.files]
+    if (at >= 0) parts[at] = { type: 'files', files: merged }
+    else parts.push({ type: 'files', files: merged })
+    return { ...msg, parts }
+  }
   const d = e.detail
   return {
     ...msg,

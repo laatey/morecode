@@ -72,7 +72,7 @@ export interface Account {
   plan: PlanId
   /** Own API key, if the person chose to bring one. */
   apiKey: string | null
-  /** Messages sent today on this plan, for the daily limit demo. */
+  /** Messages sent today, for the usage history chart. */
   sentToday: number
   /** How full the 5-hour and weekly usage windows are. Sent by the server; there is nothing to show without one. */
   limits?: { session: LimitWindow; week: LimitWindow }

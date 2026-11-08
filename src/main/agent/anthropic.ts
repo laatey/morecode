@@ -53,6 +53,7 @@ export interface StreamRequest {
   messages: ApiMessage[]
   tools: ToolDef[]
   maxTokens?: number
+  noThinking?: boolean
   signal?: AbortSignal
   headers?: Record<string, string>
   fetchImpl?: typeof fetch

@@ -82,6 +82,8 @@ export function loadConfig(env = process.env) {
     /** A JSON file {latest, notes[], url} describing the newest app release. */
     releasesFile: env.RELEASES_FILE || '',
     billing,
+    /** How many AI answers one person may have being written at once. */
+    maxConcurrentAi: Math.max(1, Math.floor(Number(env.MAX_CONCURRENT_AI) || 6)),
     /** Plan limits in tokens (a 5-hour session and a week), each adjustable: LIMIT_PRO_SESSION, LIMIT_PRO_WEEK, and so on. */
     plans: Object.fromEntries(
       Object.entries(PLANS).map(([id, p]) => {
