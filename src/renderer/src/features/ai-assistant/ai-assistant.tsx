@@ -278,6 +278,38 @@ function foldRun(msg: AgentMsg): { folded: Part[]; kept: Part[]; summary: Part[]
 function Groups({ groups, agentId }: { groups: Group[]; agentId: string }): React.JSX.Element {
   return (
     <>
+      {groups.map((g, i) =>
+        'text' in g ? (
+          <div key={i} className="my-1.5">
+            <Markdown text={g.text} />
+          </div>
+        ) : 'error' in g ? (
+          <ErrorCard key={i} part={g.error} agentId={agentId} />
+        ) : (
+          <div key={i} className="my-1 space-y-px">
+            {g.tools.map((p) => p.type === 'tool' && <ToolRow key={p.tool.id} tool={p.tool} />)}
+          </div>
+        )
+      )}
+    </>
+  )
+}
+
+function AgentMessage({ msg, isLast }: { msg: AgentMsg; isLast: boolean }): React.JSX.Element {
+  const { rate, retry, running } = useChatContext()
+  const fold = foldRun(msg)
+  const [open, setOpen] = useState(false)
+  const elapsed = useElapsed(msg.startedAt, Boolean(msg.running))
+  const meta = [took(msg.durationMs), tokensLabel(msg.tokens), msg.stopped ? 'Stopped' : null]
+    .filter(Boolean)
+    .join(' · ')
+  const replyText = msg.parts
+    .map((p) => (p.type === 'text' ? p.text : ''))
+    .filter(Boolean)
+    .join('\n\n')
+
+  return (
+    <div className="min-w-0 text-[13px] leading-6 [overflow-wrap:anywhere]">
       {fold ? (
         <>
           <button

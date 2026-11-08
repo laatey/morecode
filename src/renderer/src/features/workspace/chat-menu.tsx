@@ -50,43 +50,73 @@ const sharedMap = (): Record<string, string> => {
     return {}
   }
 }
-const setShared = (id: string, token: string | null): void => {
+const SHARE_URLS = 'morecode:share-urls:v1'
+const urlMap = (): Record<string, string> => {
+  try {
+    return JSON.parse(localStorage.getItem(SHARE_URLS) || '{}') as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+const setShared = (id: string, token: string | null, url?: string): void => {
   const map = sharedMap()
-  if (token) map[id] = token
-  else delete map[id]
+  const urls = urlMap()
+  if (token) {
+    map[id] = token
+    if (url) urls[id] = url
+  } else {
+    delete map[id]
+    delete urls[id]
+  }
   try {
     localStorage.setItem(SHARES, JSON.stringify(map))
+    localStorage.setItem(SHARE_URLS, JSON.stringify(urls))
   } catch {
     // the link still works; we just will not remember it is shared
   }
+}
+
+/** The link this chat is already shared at, if any (remembered on this computer). */
+export function sharedLink(chatId: string): { token: string; url: string } | null {
+  const token = sharedMap()[chatId]
+  const url = urlMap()[chatId]
+  return token && url ? { token, url } : null
 }
 
 /**
  * Public read-only link for a chat, hosted on the MoreCode server. Sharing again refreshes the page
  * with the latest messages and keeps the same link.
  */
-export function useShareChat(): { share: (chat: Chat) => void; unshare: (chat: Chat) => void } {
+export function useShareChat(): {
+  create: (chat: Chat, access: 'view' | 'comment') => Promise<{ token: string; url: string }>
+  share: (chat: Chat) => void
+  unshare: (chat: Chat) => Promise<void>
+} {
   const ws = useWorkspace()
+  const create = (chat: Chat, access: 'view' | 'comment'): Promise<{ token: string; url: string }> => {
+    const history = toHistory(ws.getMessages(chat.id))
+    if (!history.length) return Promise.reject(new Error('There is nothing in this chat to share yet.'))
+    return hostedRequest<{ token: string; url: string }>('POST', '/v1/shares', { chatId: chat.id, title: chat.title, access, messages: history }).then((r) => {
+      setShared(chat.id, r.token, r.url)
+      return r
+    })
+  }
   return {
+    create,
     share: (chat) => {
-      const history = toHistory(ws.getMessages(chat.id))
-      if (!history.length) return void toast.error('There is nothing in this chat to share yet.')
-      hostedRequest<{ token: string; url: string }>('POST', '/v1/shares', { chatId: chat.id, title: chat.title, access: 'view', messages: history })
-        .then((r) => {
-          setShared(chat.id, r.token)
-          return navigator.clipboard.writeText(r.url).then(() => toast.success('Share link copied', { description: 'Anyone with the link can read this chat.' }))
-        })
+      create(chat, 'view')
+        .then((r) => navigator.clipboard.writeText(r.url).then(() => toast.success('Share link copied', { description: 'Anyone with the link can read this chat.' })))
         .catch((e: Error) => toast.error(e.message || 'Could not create the link.'))
     },
     unshare: (chat) => {
       const token = sharedMap()[chat.id]
-      if (!token) return
-      hostedRequest('DELETE', `/v1/shares/${token}`)
+      if (!token) return Promise.resolve()
+      return hostedRequest('DELETE', `/v1/shares/${token}`)
         .then(() => {
           setShared(chat.id, null)
           toast.success('This chat is no longer shared')
         })
-        .catch(() => toast.error('Could not stop sharing. Try again.'))
+        .catch(() => void toast.error('Could not stop sharing. Try again.'))
     }
   }
 }
@@ -139,7 +169,7 @@ export function useChatMenu(): (chat: Chat) => ActionMenuItem[] {
             onClick: () => share(chat)
           },
           ...(sharedMap()[chat.id]
-            ? [{ id: 'unshare', label: 'Stop sharing', icon: <Link2Off className={ICON} />, onClick: () => unshare(chat) }]
+            ? [{ id: 'unshare', label: 'Stop sharing', icon: <Link2Off className={ICON} />, onClick: () => void unshare(chat) }]
             : [])
         ]
       : []),

@@ -5,7 +5,8 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './componen
 import { SegmentedSwitch, SegmentedSwitchOption } from './components/segmented-switch'
 import { ActionMenu } from './components/action-menu'
 import { IconButton } from './components/layout/icon-button'
-import { ShareIcon, SidebarLeftIcon, SidebarRightIcon } from './components/layout/icons'
+import { SidebarLeftIcon, SidebarRightIcon } from './components/layout/icons'
+import { ShareSheet } from './features/workspace/share-sheet'
 import { LayoutSwitcher } from './components/layout/layout-switcher'
 import type { LayoutId, LayoutState } from '@/lib/sidebar-layout'
 import {
@@ -33,7 +34,7 @@ import { Tour } from './features/tour/tour'
 import { ChatProvider } from './features/ai-assistant/chat-context'
 import { WorkspaceProvider, useWorkspace } from './features/workspace/workspace-store'
 import { InlineRename, WorkspaceDialogs } from './features/workspace/dialogs'
-import { useChatMenu, useCopyChat } from './features/workspace/chat-menu'
+import { useChatMenu } from './features/workspace/chat-menu'
 import { CustomizePage } from './features/customize/customize-page'
 import { ConnectorsProvider } from './features/connectors/connectors-store'
 import { SkillsProvider } from './features/skills/skills-store'
@@ -139,15 +140,13 @@ function RightControls({
   children,
   docClass,
   docActive,
-  onDocument,
-  onShare
+  onDocument
 }: {
   children?: React.ReactNode
   docClass?: string
   /** Docs tab is open: show the button in its blue "on" state. */
   docActive?: boolean
   onDocument: () => void
-  onShare: () => void
 }): React.JSX.Element {
   return (
     <div className="flex items-center gap-1 shrink-0">
@@ -162,9 +161,7 @@ function RightControls({
       >
         <FileText className="w-[17px] h-[17px] stroke-[1.7]" />
       </IconButton>
-      <IconButton title="Copy chat as Markdown" onClick={onShare}>
-        <ShareIcon />
-      </IconButton>
+      <ShareSheet />
       {children}
     </div>
   )
@@ -263,7 +260,6 @@ function AppShell(): React.JSX.Element {
   const { account, openProject } = useAuth()
   const ws = useWorkspace()
   const chatMenu = useChatMenu()
-  const copyChat = useCopyChat()
   const { active } = ws
   const title = showSettings ? 'Settings' : showRoutines ? 'Routines' : showCustomize ? 'Customize' : active.title
   // A loose chat deliberately has no project context. Never fall back to the last folder opened.
@@ -455,7 +451,6 @@ function AppShell(): React.JSX.Element {
     onBack: () => goHistory(backIndex),
     onForward: () => goHistory(forwardIndex)
   }
-  const share = (): void => copyChat(active)
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground select-none">
@@ -636,7 +631,6 @@ function AppShell(): React.JSX.Element {
 
             {rightCollapsed && (
               <RightControls
-                onShare={share}
                 docClass="@max-[520px]:hidden"
                 docActive={docsOpen}
                 onDocument={openDocs}
@@ -679,7 +673,7 @@ function AppShell(): React.JSX.Element {
             className="app-drag h-[38px] w-full flex items-center justify-end px-2 shrink-0 overflow-hidden"
             style={{ paddingRight: WINDOW_CONTROLS_RIGHT_PX || undefined }}
           >
-            <RightControls docActive={docsOpen} onDocument={openDocs} onShare={share}>
+            <RightControls docActive={docsOpen} onDocument={openDocs}>
               <IconButton title="Collapse secondary sidebar" onClick={toggleRight}>
                 <SidebarRightIcon />
               </IconButton>
@@ -725,7 +719,7 @@ function AppShell(): React.JSX.Element {
                 className="app-drag h-[38px] w-full flex items-center justify-end px-2 shrink-0 overflow-hidden"
                 style={{ paddingRight: WINDOW_CONTROLS_RIGHT_PX || undefined }}
               >
-                <RightControls docActive={docsOpen} onDocument={openDocs} onShare={share}>
+                <RightControls docActive={docsOpen} onDocument={openDocs}>
                   <IconButton title="Close secondary sidebar" onClick={closeOverlay}>
                     <SidebarRightIcon />
                   </IconButton>

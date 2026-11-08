@@ -6,7 +6,6 @@ import { errorText } from '@/features/auth/ui'
 import { MODELS, sourceOf } from '@/features/ai-assistant/models'
 import { resetsIn } from '@/features/billing/limits'
 import { getPlan } from '@/features/billing/plans'
-import { resetsIn } from '@/features/billing/limits'
 import { Btn, Group, Page, Pick, Row, TextInput } from '../kit'
 import { useSettings } from '../settings-store'
 

@@ -94,14 +94,14 @@ const Ctx = createContext<WorkspaceApi | null>(null)
 const uid = (): string => crypto.randomUUID().slice(0, 8)
 const now = (): number => Date.now()
 
-function emptyWorkspace(): Saved {
-  const t = now()
+/** Nothing is saved until the first message is sent: a new chat is only a draft until then. */
+function emptyWorkspace(groups: ProjectGroup[] = []): Saved {
   const id = uid()
-  const chat: Chat = { id, title: NEW_CHAT_TITLE, projectId: null, pinned: false, archived: false, updatedAt: t }
-  return { chats: [chat], groups: [], activeId: id, messages: { [id]: [] } }
+  return { chats: [], groups, activeId: id, messages: {} }
 }
 
 const keyFor = workspaceKey
+const FALLBACK_CHAT: Chat = { id: 'draft', title: NEW_CHAT_TITLE, projectId: null, pinned: false, archived: false, updatedAt: 0 }
 
 function load(accountId: string): Saved {
   try {
@@ -121,7 +121,17 @@ function load(accountId: string): Saved {
   } catch {
     /* fall through to an empty workspace */
   }
-  return emptyWorkspace()
+  return emptyWorkspace(savedGroups(accountId))
+}
+
+/** Projects outlive their chats: a workspace with no chats left still keeps them. */
+function savedGroups(accountId: string): ProjectGroup[] {
+  try {
+    const g = (JSON.parse(localStorage.getItem(keyFor(accountId)) || '{}') as Partial<Saved>).groups
+    return Array.isArray(g) ? g : []
+  } catch {
+    return []
+  }
 }
 
 /** A message list that was saved mid-run must not come back looking busy. */
@@ -132,13 +142,17 @@ const textOfMsg = (m: Msg): string =>
   m.role === 'agent' ? m.parts.map((p) => (p.type === 'text' ? p.text : '')).join(' ') : m.text
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const { account } = useAuth()
+  const { account, update } = useAuth()
   const accountId = account?.id ?? 'guest'
   const [initial] = useState<Saved>(() => load(accountId))
 
   const [chats, setChats] = useState<Chat[]>(initial.chats)
   const [groups, setGroups] = useState<ProjectGroup[]>(initial.groups)
   const [activeId, setActiveId] = useState(initial.activeId)
+  // a chat that has been opened but not written in yet: it is not in the list and is not saved until the first message
+  const [draft, setDraft] = useState<{ id: string; projectId: string | null } | null>(() =>
+    initial.chats.some((c) => c.id === initial.activeId) ? null : { id: initial.activeId, projectId: null }
+  )
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [dialog, setDialog] = useState<WorkspaceDialog>(null)
@@ -150,9 +164,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   // messages live in a ref: they change on every streamed token
   const messages = useRef<Record<string, Msg[]>>(initial.messages)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const latest = useRef({ chats, groups, activeId })
+  const latest = useRef({ chats, groups, activeId, draft })
   useEffect(() => {
-    latest.current = { chats, groups, activeId }
+    latest.current = { chats, groups, activeId, draft }
   })
 
   const persist = useCallback(() => {
@@ -172,10 +186,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
 
   // The folder chosen during onboarding is a real project, but chats always begin loose.
   // A person chooses when a chat belongs to a project by creating it there or moving it there.
+  // It is added once. Without that, removing the project from the sidebar added it straight back.
   const projectPath = account?.project?.path
+  const seeded = useRef<Set<string>>(new Set())
   useEffect(() => {
     const project = account?.project
-    if (!project || groups.some((group) => group.folder === project.path)) return
+    if (!project || seeded.current.has(project.path)) return
+    seeded.current.add(project.path)
+    if (groups.some((group) => group.folder === project.path)) return
     const id = uid()
     setGroups((current) => [...current, { id, name: project.name, folder: project.path }])
   }, [account?.project, groups, projectPath])
@@ -219,7 +237,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     apply: applyRemote
   })
 
-  const active = chats.find((c) => c.id === activeId) ?? chats[0]
+  const draftChat = useMemo<Chat | null>(
+    () => (draft ? { id: draft.id, title: NEW_CHAT_TITLE, projectId: draft.projectId, pinned: false, archived: false, updatedAt: 0 } : null),
+    [draft]
+  )
+  const active = chats.find((c) => c.id === activeId) ?? (draftChat && draftChat.id === activeId ? draftChat : (chats[0] ?? draftChat ?? FALLBACK_CHAT))
+  // the workspace always has a chat on screen: with none in the list, the open one is a draft
+  useEffect(() => {
+    if (!chats.some((c) => c.id === activeId) && !draft) setDraft({ id: activeId, projectId: null })
+  }, [chats, activeId, draft])
 
   // Every chat lives in exactly one environment, and the app's file access follows it:
   //   chat in a project  -> that project's folder
@@ -292,12 +318,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
         go(empty.id, true)
         return empty.id
       }
-      const id = uid()
+      // a draft: it only becomes a real chat (and shows in the sidebar) when the first message is sent
+      const id = latest.current.draft?.id ?? uid()
       messages.current[id] = []
-      setChats((l) => [
-        { id, title: NEW_CHAT_TITLE, projectId, pinned: false, archived: false, updatedAt: now() },
-        ...l
-      ])
+      setDraft({ id, projectId })
       go(id, true)
       return id
     },
@@ -402,6 +426,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   const removeGroup = useCallback((id: string) => {
     const g = latest.current.groups.find((x) => x.id === id)
     const affected = latest.current.chats.filter((c) => c.projectId === id).map((c) => c.id)
+    // the project chosen at sign-up is remembered on the account too: forget it there, or it comes back next launch
+    const remembered = g?.folder && account?.project?.path === g.folder ? account.project : null
+    if (remembered) void update({ project: null })
     setGroups((l) => l.filter((x) => x.id !== id))
     setChats((l) => l.map((c) => (c.projectId === id ? { ...c, projectId: null } : c)))
     toast.success(`Project “${g?.name ?? ''}” removed`, {
@@ -410,18 +437,31 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
         label: 'Undo',
         onClick: () => {
           if (g) setGroups((l) => [...l, g])
+          if (remembered) void update({ project: remembered })
           setChats((l) => l.map((c) => (affected.includes(c.id) ? { ...c, projectId: id } : c)))
         }
       }
     })
-  }, [])
+  }, [account, update])
 
   const getMessages = useCallback((id: string) => settle(messages.current[id] ?? []), [])
 
   const saveMessages = useCallback(
     (id: string, list: Msg[]) => {
       const c = latest.current.chats.find((x) => x.id === id)
-      if (!c) return // deleted: do not bring its messages back
+      if (!c) {
+        // the first message of a draft: now it becomes a real chat
+        const d = latest.current.draft
+        const first = list.find((m) => m.role === 'user')
+        if (d && d.id === id && first && first.role === 'user') {
+          messages.current[id] = list
+          const title = first.text.replace(/\s+/g, ' ').trim().slice(0, 48) || NEW_CHAT_TITLE
+          setChats((l) => [{ id, title, projectId: d.projectId, pinned: false, archived: false, updatedAt: now() }, ...l])
+          setDraft(null)
+          persist()
+        }
+        return // otherwise deleted: do not bring its messages back
+      }
       const before = messages.current[id]?.length ?? 0
       messages.current[id] = list
       const firstUser = list.find((m) => m.role === 'user')
@@ -464,8 +504,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     const id = uid()
     // a routine's chat belongs to the routine, so it stays
     const kept = latest.current.chats.filter((c) => c.routineId)
-    messages.current = Object.fromEntries([[id, [] as Msg[]], ...kept.map((c) => [c.id, messages.current[c.id] ?? []] as [string, Msg[]])])
-    setChats([{ id, title: NEW_CHAT_TITLE, projectId: null, pinned: false, archived: false, updatedAt: now() }, ...kept])
+    messages.current = Object.fromEntries(kept.map((c) => [c.id, messages.current[c.id] ?? []] as [string, Msg[]]))
+    messages.current[id] = []
+    setChats(kept)
+    setDraft({ id, projectId: null })
     setActiveId(id)
     setRenamingId(null)
     setTrail({ ids: [id], at: 0 })
